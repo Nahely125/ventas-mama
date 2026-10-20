@@ -2,6 +2,7 @@
 # Variables de entorno y credenciales
 .env
 .env.*
+!.env.example
 
 # Dependencias de Node.js
 node_modules/
@@ -12,3 +13,10 @@ Thumbs.db
 
 # Archivos de registro
 npm-debug.log*
+
+# Imágenes privadas (QR de pago)
+public/imagenes/
+
+# Respaldos de la base de datos
+*.dump
+*.backup

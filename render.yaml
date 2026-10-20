@@ -1,0 +1,21 @@
+# Configuración para desplegar en Render (https://render.com) como "Blueprint".
+# La base de datos está en Neon; su URL se pega a mano en DATABASE_URL.
+services:
+  - type: web
+    name: ventas-mama
+    runtime: node
+    plan: free
+    region: oregon
+    branch: develop
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/sesion
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "24"
+      - key: DATABASE_URL
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
