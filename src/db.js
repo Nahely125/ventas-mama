@@ -21,4 +21,11 @@ const pool = process.env.DATABASE_URL
         password: process.env.DB_PASSWORD
     });
 
+// Si la base de datos cierra una conexión inactiva (por ejemplo, Neon se suspende
+// tras unos minutos sin uso), solo se registra el aviso: la siguiente consulta abre
+// una conexión nueva. Sin esto, el error tumbaría todo el servidor.
+pool.on("error", (error) => {
+    console.error("Conexión con la base de datos cerrada:", error.message);
+});
+
 module.exports = pool;

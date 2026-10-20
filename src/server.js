@@ -26,6 +26,18 @@ if (enProduccion) {
 
 app.use(express.json());
 
+// Revisión de estado para el hosting: responde 200 si el servidor y la base de datos funcionan.
+// Va antes de las sesiones para no crear ni leer sesiones en cada revisión.
+app.get("/api/salud", async (req, res) => {
+    try {
+        await pool.query("SELECT 1");
+        res.json({ estado: "ok" });
+    } catch (error) {
+        console.error("Revisión de estado fallida:", error.message);
+        res.status(503).json({ estado: "sin base de datos" });
+    }
+});
+
 // Las sesiones se guardan en PostgreSQL (tabla "session") para que no se
 // pierdan cuando el servidor se reinicia.
 app.use(session({
