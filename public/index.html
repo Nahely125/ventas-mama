@@ -1,0 +1,268 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ventas Mamá</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    
+    <header>
+        <h1>Ventas Mamá</h1>
+        <p>Control de ventas e inventario</p>
+
+        <div class="sesion-usuario">
+            <span id="nombre-usuario">Cargando usuario...</span>
+            <button type="button" id="btn-cerrar-sesion">
+                Cerrar sesión
+            </button>
+        </div>
+    </header>
+
+    <main>
+        <nav class="navegacion-vistas" aria-label="Secciones principales">
+            <button
+                type="button"
+                class="boton-vista activo"
+                id="vista-inventario"
+                aria-pressed="true"
+            >
+                📦 Inventario
+            </button>
+
+            <button
+                type="button"
+                class="boton-vista"
+                id="vista-ventas"
+                aria-pressed="false"
+            >
+                🛒 Ventas
+            </button>
+        </nav>
+
+        <section class="bienvenida">
+            <h2>Panel de control</h2>
+            <p>Administra tus productos y controla tu inventario desde aquí.</p>
+        </section>
+
+        <section class="resumen">
+            <article class="tarjeta-resumen" id="tarjeta-valor-inventario">
+                <h3>Total de productos</h3>
+                <p id="total-productos">0</p>
+            </article>
+
+            <article class="tarjeta-resumen">
+                <h3>Unidades disponibles</h3>
+                <p id="unidades-totales">0</p>
+            </article>
+
+            <article class="tarjeta-resumen">
+                <h3>Valor del inventario</h3>
+                <p id="valor-inventario">S/ 0.00</p>
+            </article>
+
+            <article class="tarjeta-resumen">
+                <h3>Productos con stock bajo</h3>
+                <p id="productos-stock-bajo">0</p>
+            </article>
+            
+            <article class="tarjeta-resumen" id="tarjeta-ganancia-total" hidden>
+                <h3>Ganancia total</h3>
+                <p id="ganancia-total">S/ 0.00</p>
+            </article>
+
+        </section>
+
+        <div id="contenido-inventario" class="contenido-vista">
+            <section class="alertas">
+                <h2>Alertas de inventario</h2>
+                <div id="lista-alertas">
+                    <p>Consultando productos con stock bajo...</p>
+                </div>
+            </section>
+
+            <section class="inventario">
+                <h2>Inventario de productos</h2>
+                <p>Aquí aparecerán los productos registrados en tu base de datos.</p>
+
+                <div class="buscador">
+                    <label for="buscar-producto">Buscar producto</label>
+                    <input
+                        type="search"
+                        id="buscar-producto"
+                        placeholder="Escribe el nombre del producto..."
+                    >
+                </div>
+            </section>
+
+            <section class="formulario-producto" id="seccion-formulario-producto">
+                
+            <form id="form-producto">
+                <label for="nombre">Nombre del producto</label>
+                <input
+                    type="text"
+                    id="nombre"
+                    name="nombre"
+                    placeholder="Ej. Cinta navideña"
+                    maxlength="150"
+                    required
+                >
+
+                <label for="precio">Precio de venta por unidad (S/)</label>
+                <input
+                    type="number"
+                    id="precio"
+                    name="precio"
+                    min="0"
+                    step="0.01"
+                    placeholder="3.00"
+                    required
+                >
+
+                <div id="campo-precio-minimo">
+                    <label for="precioMinimo">Precio mínimo por unidad (S/)</label>
+                    <input
+                        type="number"
+                        id="precioMinimo"
+                        name="precioMinimo"
+                        min="0"
+                        step="0.01"
+                        placeholder="2.50"
+                        required
+                    >
+                </div>
+
+                <label for="precioCompra">Costo de compra (S/)</label>
+                <input
+                    type="number"
+                    id="precioCompra"
+                    name="precioCompra"
+                    min="0"
+                    step="0.01"
+                    placeholder="48.00"
+                    required
+                >
+
+                <label for="unidadesPorCaja">Unidades por caja</label>
+                <input
+                    type="number"
+                    id="unidadesPorCaja"
+                    name="unidadesPorCaja"
+                    min="1"
+                    step="1"
+                    value="1"
+                    required
+                >
+
+                <p id="costo-unitario-calculado">
+                    Costo por unidad: S/ 48.00
+                </p>
+
+                <label for="stock">Stock inicial (unidades)</label>
+                <input
+                    type="number"
+                    id="stock"
+                    name="stock"
+                    min="0"
+                    step="1"
+                    placeholder="24"
+                    required
+                >
+
+                <button type="submit">Registrar producto</button>
+                <p id="mensaje-formulario" role="status" aria-live="polite"></p>
+            </form>
+            </section>
+        </div>
+
+        <div id="contenido-ventas" class="contenido-vista">
+            <section class="formulario-venta">
+                <h2>Registrar una venta</h2>
+
+                <form id="form-venta">
+                    <label for="producto-venta">Producto</label>
+                    <select id="producto-venta" name="productoId" required>
+                        <option value="">Selecciona un producto</option>
+                    </select>
+
+                    <label for="cantidad-venta">Cantidad vendida</label>
+                    <input
+                        type="number"
+                        id="cantidad-venta"
+                        name="cantidad"
+                        min="1"
+                        step="1"
+                        placeholder="Ej. 2"
+                        required
+                    >
+                    
+<div id="resumen-venta" class="resumen-venta">
+    <h3>Resumen de la venta</h3>
+
+    <p>Precio unitario:
+        <strong id="precio-unitario-venta">S/ 0.00</strong>
+    </p>
+
+    <p>Stock disponible:
+        <strong id="stock-disponible-venta">0 unidades</strong>
+    </p>
+
+    <p>Cantidad:
+        <strong id="cantidad-resumen-venta">0 unidades</strong>
+    </p>
+
+    <div class="total-venta">
+        <span>Total a cobrar</span>
+        <strong id="total-venta">S/ 0.00</strong>
+    </div>
+</div>
+
+                    <button type="submit">Registrar venta</button>
+
+                    <p id="mensaje-venta" role="status" aria-live="polite"></p>
+                </form>
+            </section>
+
+            
+<section class="historial-ventas">
+    <h2>Historial de ventas</h2>
+
+    <div class="tabla-contenedor">
+        
+<table class="tabla-ventas">
+    <thead>
+        <tr>
+            <th>Fecha</th>
+            <th>Producto</th>
+            <th>Vendedor</th>
+            <th>Cantidad</th>
+            <th>Precio unitario</th>
+            <th>Total</th>
+            <th class="columna-jefe" hidden>Costo por unidad</th>
+            <th class="columna-jefe" hidden>Ganancia</th>
+        </tr>
+    </thead>
+
+    <tbody id="lista-ventas">
+        <tr>
+            <td colspan="6">Cargando historial de ventas...</td>
+        </tr>
+    </tbody>
+</table>
+
+    </div>
+
+    <p id="mensaje-historial" role="status" aria-live="polite"></p>
+</section>
+
+        </div>
+    </main>
+
+    <script src="app.js"></script>
+</body>
+</html>
