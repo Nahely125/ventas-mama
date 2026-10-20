@@ -28,13 +28,23 @@ app.use(express.json());
 
 // Revisión de estado para el hosting: responde 200 si el servidor y la base de datos funcionan.
 // Va antes de las sesiones para no crear ni leer sesiones en cada revisión.
+// Si la base tarda más de 5 s, responde 503 en lugar de dejar esperando al hosting.
 app.get("/api/salud", async (req, res) => {
+    let temporizador;
+
     try {
-        await pool.query("SELECT 1");
+        await Promise.race([
+            pool.query("SELECT 1"),
+            new Promise((_, rechazar) => {
+                temporizador = setTimeout(() => rechazar(new Error("la base de datos no respondió en 5 s")), 5000);
+            })
+        ]);
         res.json({ estado: "ok" });
     } catch (error) {
         console.error("Revisión de estado fallida:", error.message);
         res.status(503).json({ estado: "sin base de datos" });
+    } finally {
+        clearTimeout(temporizador);
     }
 });
 
@@ -195,8 +205,12 @@ app.get("/", (req, res) => {
 });
 
 // Iniciar servidor (primero se actualiza la estructura de la base de datos).
+const inicio = Date.now();
+console.log("Conectando con la base de datos y revisando su estructura...");
+
 ejecutarMigraciones()
     .then(() => {
+        console.log(`Base de datos lista en ${Date.now() - inicio} ms.`);
         app.listen(PORT, "0.0.0.0", () => {
             console.log(`Servidor iniciado en http://localhost:${PORT}`);
         });
