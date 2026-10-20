@@ -9,7 +9,7 @@ services:
     branch: develop
     buildCommand: npm ci && npm run build
     startCommand: npm start
-    healthCheckPath: /api/sesion
+    healthCheckPath:
     envVars:
       - key: NODE_ENV
         value: production
