@@ -3,6 +3,7 @@ import { moneda, pedir } from "../api.js";
 import { METODOS_PAGO } from "../venta.js";
 import BuscadorProducto from "./BuscadorProducto.jsx";
 import Comprobante from "./Comprobante.jsx";
+import DatosPago from "./DatosPago.jsx";
 
 function precioDeLista(producto, modalidad) {
     if (!producto) return "";
@@ -19,7 +20,6 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
     const [mensaje, setMensaje] = useState(null);
     const [enviando, setEnviando] = useState(false);
     const [comprobante, setComprobante] = useState(null);
-    const [qrDisponible, setQrDisponible] = useState(true);
 
     // Usar siempre los datos más recientes del producto (por ejemplo, el stock).
     const productoActual = producto
@@ -241,30 +241,7 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                             ))}
                         </div>
 
-                        {metodoPago === "yape" && (
-                            <div className="contenedor-qr-yape">
-                                <h3>💜 Paga con Yape</h3>
-                                {qrDisponible ? (
-                                    <>
-                                        <p>Escanea este código QR con tu aplicación Yape.</p>
-                                        <img
-                                            src="/imagenes/qr-yape.png"
-                                            alt="Código QR de Yape para realizar el pago"
-                                            className="imagen-qr-yape"
-                                            onError={() => setQrDisponible(false)}
-                                        />
-                                    </>
-                                ) : (
-                                    <p>El código QR no está disponible. Pide al cliente que yapee al número del negocio.</p>
-                                )}
-                                <p className="texto-qr-yape">
-                                    Importe a pagar: <strong>{moneda(total)}</strong>
-                                </p>
-                                <p className="ayuda-comprobante">
-                                    Verifica el importe antes de confirmar el pago.
-                                </p>
-                            </div>
-                        )}
+                        <DatosPago metodoPago={metodoPago} total={total} />
                     </div>
 
                     <div className="resumen-venta">

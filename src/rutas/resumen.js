@@ -34,16 +34,22 @@ router.get("/", requiereSesion, async (req, res) => {
 
             Object.assign(resumen, datos.rows[0]);
 
-            const gananciaNeta = Number(resumen.gananciaTotal) - Number(resumen.gastosTotales);
-            const inversion = Number(resumen.inversionTotal);
+            const gananciaVentas = Number(resumen.gananciaTotal);
+            const gastos = Number(resumen.gastosTotales);
+            const inversiones = Number(resumen.inversionTotal);
 
-            resumen.gananciaNeta = gananciaNeta.toFixed(2);
+            resumen.gananciaNeta = (gananciaVentas - gastos).toFixed(2);
 
-            // La inversión se recupera con la ganancia neta acumulada.
-            resumen.inversionRecuperada = Math.min(Math.max(gananciaNeta, 0), inversion).toFixed(2);
-            resumen.faltaRecuperar = Math.max(inversion - gananciaNeta, 0).toFixed(2);
-            resumen.porcentajeRecuperado = inversion > 0
-                ? Math.min(Math.max(gananciaNeta / inversion, 0) * 100, 100).toFixed(1)
+            // Los gastos también cuentan como inversión: todo lo que salió del bolsillo
+            // (inversiones + gastos) se recupera con la ganancia de las ventas.
+            const totalInvertido = inversiones + gastos;
+
+            resumen.inversionesRegistradas = inversiones.toFixed(2);
+            resumen.inversionTotal = totalInvertido.toFixed(2);
+            resumen.inversionRecuperada = Math.min(Math.max(gananciaVentas, 0), totalInvertido).toFixed(2);
+            resumen.faltaRecuperar = Math.max(totalInvertido - gananciaVentas, 0).toFixed(2);
+            resumen.porcentajeRecuperado = totalInvertido > 0
+                ? Math.min(Math.max(gananciaVentas / totalInvertido, 0) * 100, 100).toFixed(1)
                 : "0.0";
         }
 

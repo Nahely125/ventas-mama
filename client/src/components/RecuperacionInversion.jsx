@@ -1,18 +1,20 @@
 import { moneda } from "../api.js";
 
-// Muestra cuánto se ha recuperado de la inversión con la ganancia neta.
+/* Muestra cuánto se ha recuperado de lo invertido.
+   Total invertido = inversiones registradas + gastos.
+   Se recupera con la ganancia de las ventas. */
 export default function RecuperacionInversion({ resumen, onRegistrar }) {
     if (!resumen) {
         return null;
     }
 
-    const inversion = Number(resumen.inversionTotal ?? 0);
+    const total = Number(resumen.inversionTotal ?? 0);
 
-    if (inversion === 0) {
+    if (total === 0) {
         return (
             <section className="tarjeta recuperacion recuperacion-vacia">
                 <h2>Recuperación de la inversión</h2>
-                <p>Todavía no registraste tu inversión. Anótala para saber cuánto te falta recuperar.</p>
+                <p>Todavía no registraste inversiones ni gastos. Anótalos para saber cuánto te falta recuperar.</p>
                 {onRegistrar && (
                     <button type="button" className="boton-principal boton-pequeno" onClick={onRegistrar}>
                         Registrar inversión
@@ -25,7 +27,7 @@ export default function RecuperacionInversion({ resumen, onRegistrar }) {
     const porcentaje = Number(resumen.porcentajeRecuperado);
     const falta = Number(resumen.faltaRecuperar);
     const recuperada = falta === 0;
-    const excedente = Number(resumen.gananciaNeta) - inversion;
+    const excedente = Number(resumen.gananciaTotal) - total;
 
     return (
         <section className={`tarjeta recuperacion ${recuperada ? "recuperacion-completa" : ""}`}>
@@ -47,8 +49,8 @@ export default function RecuperacionInversion({ resumen, onRegistrar }) {
 
             <div className="recuperacion-datos">
                 <div>
-                    <span>Inversión total</span>
-                    <strong>{moneda(inversion)}</strong>
+                    <span>Total invertido</span>
+                    <strong>{moneda(total)}</strong>
                 </div>
                 <div>
                     <span>Recuperado</span>
@@ -60,10 +62,15 @@ export default function RecuperacionInversion({ resumen, onRegistrar }) {
                 </div>
             </div>
 
+            <p className="recuperacion-desglose">
+                Total invertido = inversiones <strong>{moneda(resumen.inversionesRegistradas)}</strong>
+                {" + "}gastos <strong>{moneda(resumen.gastosTotales)}</strong>
+            </p>
+
             <p className="ayuda-campo">
                 {recuperada
-                    ? "🎉 ¡Ya recuperaste toda tu inversión! Todo lo que ganes ahora es ganancia."
-                    : "Se recupera con la ganancia neta: ganancia de las ventas menos los gastos."}
+                    ? "🎉 ¡Ya recuperaste todo lo invertido! Todo lo que ganes ahora es ganancia."
+                    : "Se recupera con la ganancia de las ventas (precio de venta menos costo)."}
             </p>
         </section>
     );

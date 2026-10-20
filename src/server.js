@@ -163,9 +163,16 @@ app.use("/api/inversiones", require("./rutas/inversiones"));
 
 const carpetaFrontend = path.join(__dirname, "..", "client", "dist");
 
-app.get("/imagenes/qr-yape.png", requiereSesion, (req, res) => {
+// Códigos QR de pago (solo con sesión iniciada).
+const IMAGENES_PERMITIDAS = ["qr-yape.png", "qr-plin.png"];
+
+app.get("/imagenes/:archivo", requiereSesion, (req, res) => {
+    if (!IMAGENES_PERMITIDAS.includes(req.params.archivo)) {
+        return res.status(404).end();
+    }
+
     res.sendFile(
-        path.join(__dirname, "..", "public", "imagenes", "qr-yape.png")
+        path.join(__dirname, "..", "public", "imagenes", req.params.archivo)
     );
 });
 

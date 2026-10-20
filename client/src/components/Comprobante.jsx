@@ -1,17 +1,23 @@
 import { useEffect, useRef, useState } from "react";
-import { moneda } from "../api.js";
-import {
-    describirCantidad,
-    formatearFecha,
-    nombreMetodoPago,
-    normalizarWhatsapp,
-    numeroComprobante,
-    precioCobrado,
-    textoComprobante
-} from "../venta.js";
+import { generarImagenComprobante } from "../imagenComprobante.js";
+import { normalizarWhatsapp, numeroComprobante, textoComprobante } from "../venta.js";
+
+function descargar(archivo) {
+    const url = URL.createObjectURL(archivo);
+    const enlace = document.createElement("a");
+    enlace.href = url;
+    enlace.download = archivo.name;
+    document.body.append(enlace);
+    enlace.click();
+    enlace.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 
 export default function Comprobante({ venta, onCerrar }) {
     const dialogo = useRef(null);
+    const [archivo, setArchivo] = useState(null);
+    const [vistaPrevia, setVistaPrevia] = useState("");
+    const [errorImagen, setErrorImagen] = useState(false);
     const [telefono, setTelefono] = useState("");
     const [aviso, setAviso] = useState(null);
 
@@ -19,9 +25,77 @@ export default function Comprobante({ venta, onCerrar }) {
         dialogo.current?.showModal();
     }, []);
 
-    function enviarWhatsapp(evento) {
-        evento.preventDefault();
+    // La imagen se prepara al abrir, para poder compartirla en cuanto se toque el botón.
+    useEffect(() => {
+        let cancelado = false;
+        let url = "";
 
+        generarImagenComprobante(venta)
+            .then((imagen) => {
+                if (cancelado) return;
+                url = URL.createObjectURL(imagen);
+                setArchivo(imagen);
+                setVistaPrevia(url);
+            })
+            .catch((error) => {
+                console.error(error);
+                if (!cancelado) setErrorImagen(true);
+            });
+
+        return () => {
+            cancelado = true;
+            if (url) URL.revokeObjectURL(url);
+        };
+    }, [venta]);
+
+    const puedeCompartirArchivos = Boolean(
+        archivo && navigator.canShare && navigator.canShare({ files: [archivo] })
+    );
+
+    async function enviarImagen() {
+        setAviso(null);
+
+        if (!archivo) return;
+
+        // Celulares: abre el menú "Compartir" con la imagen; ahí se elige WhatsApp y el contacto.
+        if (puedeCompartirArchivos) {
+            try {
+                await navigator.share({
+                    files: [archivo],
+                    title: `Comprobante N° ${numeroComprobante(venta)}`
+                });
+            } catch (error) {
+                if (error.name !== "AbortError") {
+                    setAviso({ tipo: "error", texto: "No se pudo compartir la imagen. Prueba con «Descargar imagen»." });
+                }
+            }
+            return;
+        }
+
+        // Computadoras: se descarga la imagen y se abre el chat para adjuntarla.
+        const numero = normalizarWhatsapp(telefono);
+
+        if (!numero) {
+            setAviso({
+                tipo: "error",
+                texto: "Escribe el número de WhatsApp del cliente para abrir su chat."
+            });
+            return;
+        }
+
+        descargar(archivo);
+        window.open(
+            `https://wa.me/${numero}?text=${encodeURIComponent(`Hola, te envío tu comprobante de compra N° ${numeroComprobante(venta)} de Ventas Mamá.`)}`,
+            "_blank",
+            "noopener"
+        );
+        setAviso({
+            tipo: "exito",
+            texto: "La imagen se descargó. Adjúntala en el chat de WhatsApp que se abrió (clip 📎 → Fotos)."
+        });
+    }
+
+    function enviarTexto() {
         const numero = normalizarWhatsapp(telefono);
 
         if (!numero) {
@@ -33,20 +107,21 @@ export default function Comprobante({ venta, onCerrar }) {
         }
 
         setAviso(null);
-        const enlace = `https://wa.me/${numero}?text=${encodeURIComponent(textoComprobante(venta))}`;
-        window.open(enlace, "_blank", "noopener");
+        window.open(
+            `https://wa.me/${numero}?text=${encodeURIComponent(textoComprobante(venta))}`,
+            "_blank",
+            "noopener"
+        );
     }
 
-    async function copiar() {
+    async function copiarTexto() {
         try {
             await navigator.clipboard.writeText(textoComprobante(venta));
-            setAviso({ tipo: "exito", texto: "Comprobante copiado. Ya puedes pegarlo en cualquier chat." });
+            setAviso({ tipo: "exito", texto: "Comprobante copiado como texto." });
         } catch {
             setAviso({ tipo: "error", texto: "No se pudo copiar el comprobante." });
         }
     }
-
-    const porDocena = venta.modalidad === "docena";
 
     return (
         <dialog
@@ -64,72 +139,76 @@ export default function Comprobante({ venta, onCerrar }) {
                     </button>
                 </div>
 
-                <article className="ticket">
-                    <header className="ticket-encabezado">
-                        <strong>Ventas Mamá</strong>
-                        <span>N° {numeroComprobante(venta)}</span>
-                    </header>
+                <div className="vista-previa-comprobante">
+                    {vistaPrevia ? (
+                        <img src={vistaPrevia} alt={`Comprobante de venta N° ${numeroComprobante(venta)}`} />
+                    ) : errorImagen ? (
+                        <p className="mensaje mensaje-error">No se pudo crear la imagen. Puedes enviarlo como texto.</p>
+                    ) : (
+                        <p className="cargando-imagen">
+                            <span className="spinner" aria-hidden="true"></span> Preparando imagen...
+                        </p>
+                    )}
+                </div>
 
-                    <dl className="ticket-datos">
-                        <div><dt>Fecha</dt><dd>{formatearFecha(venta.fecha)}</dd></div>
-                        <div><dt>Atendido por</dt><dd>{venta.vendedor}</dd></div>
-                    </dl>
-
-                    <div className="ticket-producto">
-                        <strong>{venta.producto}</strong>
-                        {venta.codigo && <span>Código: {venta.codigo}</span>}
-                    </div>
-
-                    <dl className="ticket-datos">
-                        <div><dt>Cantidad</dt><dd>{describirCantidad(venta)}</dd></div>
-                        <div>
-                            <dt>Precio por {porDocena ? "docena" : "unidad"}</dt>
-                            <dd>{moneda(precioCobrado(venta))}</dd>
+                <div className="formulario envio-whatsapp">
+                    {!puedeCompartirArchivos && (
+                        <div className="campo">
+                            <label htmlFor="telefono-whatsapp">WhatsApp del cliente</label>
+                            <input
+                                type="tel"
+                                id="telefono-whatsapp"
+                                inputMode="tel"
+                                autoComplete="tel"
+                                placeholder="Ej. 987 654 321"
+                                value={telefono}
+                                onChange={(e) => setTelefono(e.target.value)}
+                            />
                         </div>
-                        <div><dt>Método de pago</dt><dd>{nombreMetodoPago(venta.metodoPago)}</dd></div>
-                    </dl>
+                    )}
 
-                    <div className="ticket-total">
-                        <span>Total</span>
-                        <strong>{moneda(venta.total)}</strong>
-                    </div>
+                    <button
+                        type="button"
+                        className="boton-whatsapp boton-whatsapp-grande"
+                        onClick={enviarImagen}
+                        disabled={!archivo}
+                    >
+                        📷 Enviar imagen por WhatsApp
+                    </button>
 
-                    <p className="ticket-gracias">¡Gracias por su compra!</p>
-                </article>
-
-                <form className="formulario envio-whatsapp" onSubmit={enviarWhatsapp}>
-                    <label htmlFor="telefono-whatsapp">Enviar por WhatsApp</label>
-                    <div className="fila-whatsapp">
-                        <input
-                            type="tel"
-                            id="telefono-whatsapp"
-                            inputMode="tel"
-                            autoComplete="tel"
-                            placeholder="Ej. 987 654 321"
-                            value={telefono}
-                            onChange={(e) => setTelefono(e.target.value)}
-                        />
-                        <button type="submit" className="boton-whatsapp">
-                            Enviar
-                        </button>
-                    </div>
                     <span className="ayuda-campo">
-                        Se abrirá WhatsApp con el comprobante listo para enviar.
+                        {puedeCompartirArchivos
+                            ? "Se abrirá el menú Compartir: elige WhatsApp y luego el contacto del cliente."
+                            : "Se descargará la imagen y se abrirá el chat del cliente para que la adjuntes."}
                     </span>
 
                     {aviso && (
                         <p className={`mensaje mensaje-${aviso.tipo}`} role="status">{aviso.texto}</p>
                     )}
 
-                    <div className="modal-acciones">
-                        <button type="button" className="boton-secundario" onClick={copiar}>
-                            Copiar texto
+                    <div className="acciones-comprobante">
+                        <button
+                            type="button"
+                            className="boton-secundario boton-pequeno"
+                            onClick={() => archivo && descargar(archivo)}
+                            disabled={!archivo}
+                        >
+                            ⬇️ Descargar imagen
                         </button>
-                        <button type="button" className="boton-principal" onClick={onCerrar}>
-                            Listo
+                        {!puedeCompartirArchivos && (
+                            <button type="button" className="boton-secundario boton-pequeno" onClick={enviarTexto}>
+                                💬 Enviar como texto
+                            </button>
+                        )}
+                        <button type="button" className="boton-secundario boton-pequeno" onClick={copiarTexto}>
+                            📋 Copiar texto
                         </button>
                     </div>
-                </form>
+
+                    <button type="button" className="boton-principal" onClick={onCerrar}>
+                        Listo
+                    </button>
+                </div>
             </div>
         </dialog>
     );

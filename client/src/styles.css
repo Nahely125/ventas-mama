@@ -1445,106 +1445,6 @@ input[aria-invalid="true"] {
    COMPROBANTE
 ======================================== */
 
-.ticket {
-    margin: 4px 0 18px;
-    padding: 18px;
-    background:
-        radial-gradient(circle at 0 0, transparent 0) top / 100% 100%,
-        #ffffff;
-    border: 1px dashed var(--morado-300);
-    border-radius: 14px;
-    font-size: 0.9rem;
-}
-
-.ticket-encabezado {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 10px;
-    padding-bottom: 10px;
-    margin-bottom: 10px;
-    border-bottom: 1px dashed var(--morado-200);
-}
-
-.ticket-encabezado strong {
-    font-family: 'Playfair Display', serif;
-    color: var(--morado-700);
-    font-size: 1.2rem;
-}
-
-.ticket-encabezado span {
-    color: var(--texto-suave);
-    font-family: ui-monospace, Consolas, monospace;
-}
-
-.ticket-datos {
-    display: grid;
-    gap: 4px;
-}
-
-.ticket-datos div {
-    display: flex;
-    justify-content: space-between;
-    gap: 12px;
-}
-
-.ticket-datos dt {
-    color: var(--texto-suave);
-}
-
-.ticket-datos dd {
-    font-weight: 600;
-    text-align: right;
-}
-
-.ticket-producto {
-    display: flex;
-    flex-direction: column;
-    margin: 12px 0;
-    padding: 10px 12px;
-    background: var(--morado-50);
-    border-radius: 10px;
-}
-
-.ticket-producto strong {
-    color: var(--morado-900);
-}
-
-.ticket-producto span {
-    color: var(--texto-suave);
-    font-size: 0.8rem;
-}
-
-.ticket-total {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-top: 12px;
-    padding-top: 12px;
-    border-top: 1px dashed var(--morado-200);
-    color: var(--morado-700);
-    font-weight: 600;
-}
-
-.ticket-total strong {
-    font-size: 1.5rem;
-}
-
-.ticket-gracias {
-    margin-top: 10px;
-    text-align: center;
-    font-size: 0.85rem;
-}
-
-.fila-whatsapp {
-    display: flex;
-    gap: 8px;
-}
-
-.fila-whatsapp input {
-    flex: 1;
-}
-
 .boton-whatsapp {
     flex-shrink: 0;
     min-height: 46px;
@@ -1563,6 +1463,113 @@ input[aria-invalid="true"] {
 
 .boton-whatsapp:active {
     transform: scale(0.97);
+}
+
+
+.vista-previa-comprobante {
+    display: flex;
+    justify-content: center;
+    margin: 4px 0 16px;
+}
+
+.vista-previa-comprobante img {
+    width: 100%;
+    max-width: 360px;
+    border-radius: 16px;
+    box-shadow: 0 8px 24px rgba(76, 29, 149, 0.15);
+}
+
+.cargando-imagen {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 40px 0;
+    color: var(--morado-700);
+    font-weight: 600;
+}
+
+.boton-whatsapp-grande {
+    width: 100%;
+    min-height: 50px;
+    font-size: 1rem;
+}
+
+.boton-whatsapp:disabled {
+    opacity: 0.6;
+}
+
+.acciones-comprobante {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.acciones-comprobante button {
+    flex: 1 1 140px;
+}
+
+/* Datos de pago: QR y transferencia */
+.imagen-qr-yape {
+    image-rendering: pixelated;
+}
+
+.cuenta-bancaria {
+    display: grid;
+    gap: 10px;
+    margin: 12px 0;
+    text-align: left;
+}
+
+.cuenta-bancaria > div {
+    display: grid;
+    gap: 4px;
+    padding: 10px 12px;
+    background: var(--morado-50);
+    border: 1px solid var(--morado-200);
+    border-radius: 12px;
+}
+
+.cuenta-bancaria dt {
+    color: var(--texto-suave);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.cuenta-bancaria dd {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    font-weight: 700;
+    color: var(--texto);
+}
+
+.cuenta-banco dd {
+    color: #002a8d;
+}
+
+.numero-cuenta {
+    font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+    font-size: 1rem;
+    letter-spacing: 0.04em;
+    overflow-wrap: anywhere;
+}
+
+.boton-copiar {
+    flex-shrink: 0;
+    min-height: 34px;
+    padding: 6px 12px;
+    border: 1px solid var(--morado-300);
+    border-radius: 8px;
+    background: #ffffff;
+    color: var(--morado-700);
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+
+.boton-copiar:hover {
+    background: var(--morado-100);
 }
 
 /* ========================================
@@ -2194,6 +2201,14 @@ body.sin-desplazamiento {
 
 .monto-inversion {
     color: var(--morado-700);
+}
+
+.recuperacion-desglose {
+    font-size: 0.85rem;
+}
+
+.recuperacion-desglose strong {
+    color: var(--texto);
 }
 
 @media (max-width: 420px) {
