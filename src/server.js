@@ -197,7 +197,7 @@ app.get("/", (req, res) => {
 // Iniciar servidor (primero se actualiza la estructura de la base de datos).
 ejecutarMigraciones()
     .then(() => {
-        app.listen(PORT, () => {
+        app.listen(PORT, "0.0.0.0", () => {
             console.log(`Servidor iniciado en http://localhost:${PORT}`);
         });
     })
