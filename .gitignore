@@ -14,8 +14,6 @@ Thumbs.db
 # Archivos de registro
 npm-debug.log*
 
-# Imágenes privadas (QR de pago)
-public/imagenes/
 
 # Respaldos de la base de datos
 *.dump

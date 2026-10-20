@@ -84,11 +84,7 @@ Al arrancar, el servidor actualiza la estructura de la base de datos en Neon (co
 
 ## Código QR de Yape
 
-El repositorio de GitHub es **público**, así que el archivo `public/imagenes/qr-yape.png` **no se sube** (está en `.gitignore`). En la versión de internet, al elegir Yape la app muestra un aviso en lugar del QR. Opciones:
-
-1. Hacer el repositorio **privado** (GitHub → Settings → Danger Zone → *Change visibility*) y luego subir el QR.
-2. Subir el QR de todos modos, sabiendo que cualquiera podrá verlo en GitHub.
-3. Agregar a la app una opción para que el jefe **suba el QR desde la propia app**. Se guardaría en la base de datos.
+El QR está en `public/imagenes/qr-yape.png` y se publica junto con la app. Para cambiarlo, reemplaza ese archivo (con el mismo nombre) y haz `git push`.
 
 ## Problemas comunes
 
