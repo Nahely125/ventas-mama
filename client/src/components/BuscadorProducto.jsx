@@ -25,7 +25,14 @@ function buscar(productos, texto) {
         .slice(0, MAXIMO_RESULTADOS);
 }
 
-export default function BuscadorProducto({ productos, seleccionado, onSeleccionar, permitirAgotados = false }) {
+export default function BuscadorProducto({
+    productos,
+    seleccionado,
+    onSeleccionar,
+    permitirAgotados = false,
+    id = "buscar-producto-venta",
+    textoVacio = "No hay productos con ese código o nombre."
+}) {
     const [texto, setTexto] = useState("");
     const [abierto, setAbierto] = useState(false);
     const [activo, setActivo] = useState(0);
@@ -100,10 +107,10 @@ export default function BuscadorProducto({ productos, seleccionado, onSelecciona
             <div className="campo-con-boton">
             <input
                 type="search"
-                id="buscar-producto-venta"
+                id={id}
                 role="combobox"
                 aria-expanded={abierto}
-                aria-controls="resultados-producto"
+                aria-controls={`${id}-resultados`}
                 aria-autocomplete="list"
                 placeholder={productos === null ? "Cargando productos..." : "Escribe el código o el nombre..."}
                 autoComplete="off"
@@ -133,9 +140,9 @@ export default function BuscadorProducto({ productos, seleccionado, onSelecciona
             )}
 
             {abierto && (
-                <ul className="resultados-producto" id="resultados-producto" role="listbox">
+                <ul className="resultados-producto" id={`${id}-resultados`} role="listbox">
                     {resultados.length === 0 ? (
-                        <li className="sin-resultados">No hay productos con ese código o nombre.</li>
+                        <li className="sin-resultados">{textoVacio}</li>
                     ) : (
                         resultados.map((producto, indice) => (
                             <li

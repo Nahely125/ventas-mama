@@ -997,6 +997,33 @@ select {
     font-size: 0.85rem;
 }
 
+.grupo-campos.agregar-obsequio {
+    background: #fdf2f8;
+    border-color: #fbcfe8;
+}
+
+.grupo-campos.agregar-obsequio legend {
+    color: #9d174d;
+}
+
+.fila-obsequio {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    align-items: end;
+}
+
+@media (min-width: 640px) {
+    .fila-obsequio {
+        grid-template-columns: 160px minmax(0, 1fr);
+    }
+}
+
+.boton-agregar.boton-agregar-obsequio {
+    border-color: #f9a8d4;
+    color: #9d174d;
+}
+
 .etiqueta-obsequio {
     margin-left: 6px;
     background: #fce7f3;

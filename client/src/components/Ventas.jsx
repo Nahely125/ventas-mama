@@ -111,6 +111,11 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
     const [precio, setPrecio] = useState("");
     const [errorItem, setErrorItem] = useState("");
 
+    // Obsequio: casillero aparte, solo con productos de menos de S/ 5.
+    const [regalo, setRegalo] = useState(null);
+    const [cantidadRegalo, setCantidadRegalo] = useState("1");
+    const [errorRegalo, setErrorRegalo] = useState("");
+
     // Carrito y cobro
     const [carrito, setCarrito] = useState([]);
     const [metodoPago, setMetodoPago] = useState("efectivo");
@@ -135,9 +140,9 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
 
     const porUnidades = unidadesDe(modalidad);
     const esDePaquete = esPaquete(modalidad);
-    const esObsequio = modalidad === "obsequio";
-    // El empleado solo puede regalar productos de menos de S/ 5; el jefe, cualquiera.
-    const puedeObsequiar = (p) => Boolean(p && (esJefe || p.obsequiable));
+    // Productos que se pueden regalar (menos de S/ 5 por unidad).
+    const productosObsequio = productos === null ? null : (productos ?? []).filter((p) => p.obsequiable);
+    const regaloActual = regalo ? buscarActual(regalo.id) ?? regalo : null;
     const cantidadNumero = Number(cantidad);
     const cantidadValida = Number.isInteger(cantidadNumero) && cantidadNumero > 0 ? cantidadNumero : 0;
     const precioNumero = Number(precio);
@@ -146,13 +151,13 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
     const minimoPaquete = productoActual ? minimoDe(productoActual, modalidad) : null;
     const minimo = minimoPaquete === null ? null : minimoPaquete / porUnidades;
     // Precio del paquete: precio por unidad × unidades (al precio de lista, exactamente el registrado).
-    const precioDelPaquete = !productoActual || esObsequio
+    const precioDelPaquete = !productoActual
         ? 0
         : precio === lista
             ? precioPaquete(productoActual, modalidad)
             : Number((precioValido * porUnidades).toFixed(2));
     // El precio mínimo solo limita a los empleados; el jefe vende al precio que quiera.
-    const bajoMinimo = !esJefe && !esObsequio && minimoPaquete !== null && precioValido > 0
+    const bajoMinimo = !esJefe && minimoPaquete !== null && precioValido > 0
         && centimos(precioDelPaquete) < centimos(minimoPaquete);
 
     // Unidades ya puestas en el carrito por producto (para avisar del stock).
@@ -172,10 +177,8 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
     const itemsBajoMinimo = esJefe ? [] : carrito.filter(estaBajoMinimo);
 
     function seleccionarProducto(nuevo) {
-        const nuevaModalidad = modalidad === "obsequio" && !puedeObsequiar(nuevo) ? "unidad" : modalidad;
         setProducto(nuevo);
-        setModalidad(nuevaModalidad);
-        setPrecio(precioDeLista(nuevo, nuevaModalidad));
+        setPrecio(precioDeLista(nuevo, modalidad));
         setCantidad("1");
         setErrorItem("");
     }
@@ -191,7 +194,7 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
             return;
         }
 
-        if (cantidadValida === 0 || (!esObsequio && precioValido === 0)) {
+        if (cantidadValida === 0 || precioValido === 0) {
             setErrorItem("Ingresa una cantidad y un precio válidos.");
             return;
         }
@@ -219,6 +222,36 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
         setCantidad("1");
         setPrecio("");
         setErrorItem("");
+        setMensaje(null);
+    }
+
+    function agregarRegalo() {
+        const cantidadNum = Number(cantidadRegalo);
+
+        if (!regaloActual) {
+            setErrorRegalo("Elige el producto que vas a regalar.");
+            return;
+        }
+
+        if (!Number.isInteger(cantidadNum) || cantidadNum <= 0) {
+            setErrorRegalo("Ingresa una cantidad válida.");
+            return;
+        }
+
+        const disponibles = regaloActual.stock - unidadesEnCarrito(regaloActual.id);
+
+        if (cantidadNum > disponibles) {
+            setErrorRegalo(`Stock insuficiente. Quedan ${Math.max(disponibles, 0)} unidades disponibles.`);
+            return;
+        }
+
+        setCarrito((anterior) => [
+            ...anterior,
+            { clave: siguienteClave++, producto: regaloActual, modalidad: "obsequio", cantidad: cantidadNum, precio: 0 }
+        ]);
+        setRegalo(null);
+        setCantidadRegalo("1");
+        setErrorRegalo("");
         setMensaje(null);
     }
 
@@ -407,9 +440,8 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                                         {[
                                             { valor: "unidad", texto: "Unidad" },
                                             { valor: "media", texto: "Media docena (6 u.)" },
-                                            { valor: "docena", texto: "Docena (12 u.)" },
-                                            puedeObsequiar(productoActual) && { valor: "obsequio", texto: "🎁 Obsequio" }
-                                        ].filter(Boolean).map((opcion) => (
+                                            { valor: "docena", texto: "Docena (12 u.)" }
+                                        ].map((opcion) => (
                                             <button
                                                 key={opcion.valor}
                                                 type="button"
@@ -443,69 +475,100 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                                         )}
                                     </div>
 
-                                    {esObsequio ? (
-                                        <div className="campo aviso-obsequio">
-                                            <span className="etiqueta-campo">Precio</span>
-                                            <p>
-                                                {esJefe ? (
-                                                    <>🎁 <strong>Gratis.</strong> Se descuenta del stock y su costo cuenta como gasto en la ganancia.</>
-                                                ) : (
-                                                    <>🎁 <strong>Gratis.</strong> Este producto se puede regalar: el obsequio debe valer menos de <strong>S/ 5</strong>.</>
-                                                )}
-                                            </p>
-                                        </div>
-                                    ) : (
-                                        <div className="campo">
-                                            <label htmlFor="precio-venta">
-                                                {esDePaquete ? `Precio por unidad en la ${nombreModalidad(modalidad)}` : "Precio por unidad"} (S/)
-                                            </label>
-                                            <input
-                                                type="number"
-                                                id="precio-venta"
-                                                min="0.01"
-                                                step="0.01"
-                                                inputMode="decimal"
-                                                value={precio}
-                                                onChange={(e) => setPrecio(e.target.value)}
-                                                aria-invalid={bajoMinimo}
-                                            />
-                                            <span className={`ayuda-campo ${bajoMinimo ? "texto-aviso" : ""}`}>
-                                                Lista: {moneda(lista)}
-                                                {precio !== lista && (
-                                                    <>
-                                                        {" "}
-                                                        <button type="button" className="boton-enlace" onClick={() => setPrecio(lista)}>
-                                                            Restaurar
-                                                        </button>
-                                                    </>
-                                                )}
-                                                {!esJefe && (
-                                                    <>{" "}· Mínimo: <strong>{moneda(minimo)}</strong>{esDePaquete && " c/u"}</>
-                                                )}
-                                                {esDePaquete && precioValido > 0 && (
-                                                    <>
-                                                        <br />
-                                                        La {nombreModalidad(modalidad)} sale a <strong>{moneda(precioDelPaquete)}</strong>{" "}
-                                                        ({moneda(precioValido)} × {porUnidades})
-                                                        {!esJefe && <> · mínimo {moneda(minimoPaquete)}</>}
-                                                    </>
-                                                )}
-                                                {bajoMinimo && (
-                                                    <><br />🔒 Bajo el mínimo: necesitará la contraseña del jefe.</>
-                                                )}
-                                            </span>
-                                        </div>
-                                    )}
+                                    <div className="campo">
+                                        <label htmlFor="precio-venta">
+                                            {esDePaquete ? `Precio por unidad en la ${nombreModalidad(modalidad)}` : "Precio por unidad"} (S/)
+                                        </label>
+                                        <input
+                                            type="number"
+                                            id="precio-venta"
+                                            min="0.01"
+                                            step="0.01"
+                                            inputMode="decimal"
+                                            value={precio}
+                                            onChange={(e) => setPrecio(e.target.value)}
+                                            aria-invalid={bajoMinimo}
+                                        />
+                                        <span className={`ayuda-campo ${bajoMinimo ? "texto-aviso" : ""}`}>
+                                            Lista: {moneda(lista)}
+                                            {precio !== lista && (
+                                                <>
+                                                    {" "}
+                                                    <button type="button" className="boton-enlace" onClick={() => setPrecio(lista)}>
+                                                        Restaurar
+                                                    </button>
+                                                </>
+                                            )}
+                                            {!esJefe && (
+                                                <>{" "}· Mínimo: <strong>{moneda(minimo)}</strong>{esDePaquete && " c/u"}</>
+                                            )}
+                                            {esDePaquete && precioValido > 0 && (
+                                                <>
+                                                    <br />
+                                                    La {nombreModalidad(modalidad)} sale a <strong>{moneda(precioDelPaquete)}</strong>{" "}
+                                                    ({moneda(precioValido)} × {porUnidades})
+                                                    {!esJefe && <> · mínimo {moneda(minimoPaquete)}</>}
+                                                </>
+                                            )}
+                                            {bajoMinimo && (
+                                                <><br />🔒 Bajo el mínimo: necesitará la contraseña del jefe.</>
+                                            )}
+                                        </span>
+                                    </div>
                                 </div>
 
                                 <button type="button" className="boton-agregar" onClick={agregar}>
                                     ＋ Agregar a la venta
-                                    {cantidadValida > 0 && (esObsequio ? <> · Gratis</> : precioValido > 0 && <> · {moneda(precioDelPaquete * cantidadValida)}</>)}
+                                    {cantidadValida > 0 && precioValido > 0 && <> · {moneda(precioDelPaquete * cantidadValida)}</>}
                                 </button>
                             </>
                         )}
 
                         {errorItem && <p className="mensaje mensaje-error" role="alert">{errorItem}</p>}
+                    </fieldset>
+
+                    <fieldset className="grupo-campos agregar-obsequio">
+                        <legend>🎁 Obsequio (opcional)</legend>
+                        <p className="ayuda-campo">
+                            Solo aparecen los productos de menos de <strong>S/ 5</strong>. Va gratis en la boleta y se descuenta del stock.
+                        </p>
+
+                        <div className="campo">
+                            <label htmlFor="buscar-obsequio">Producto para regalar</label>
+                            <BuscadorProducto
+                                id="buscar-obsequio"
+                                productos={productosObsequio}
+                                seleccionado={regaloActual}
+                                onSeleccionar={(nuevo) => {
+                                    setRegalo(nuevo);
+                                    setCantidadRegalo("1");
+                                    setErrorRegalo("");
+                                }}
+                                textoVacio="No hay productos de menos de S/ 5 con ese código o nombre."
+                            />
+                        </div>
+
+                        {regaloActual && (
+                            <div className="fila-obsequio">
+                                <div className="campo">
+                                    <label htmlFor="cantidad-obsequio">Cantidad (unidades)</label>
+                                    <input
+                                        type="number"
+                                        id="cantidad-obsequio"
+                                        min="1"
+                                        step="1"
+                                        inputMode="numeric"
+                                        value={cantidadRegalo}
+                                        onChange={(e) => setCantidadRegalo(e.target.value)}
+                                    />
+                                </div>
+                                <button type="button" className="boton-agregar boton-agregar-obsequio" onClick={agregarRegalo}>
+                                    🎁 Agregar obsequio · Gratis
+                                </button>
+                            </div>
+                        )}
+
+                        {errorRegalo && <p className="mensaje mensaje-error" role="alert">{errorRegalo}</p>}
                     </fieldset>
 
                     <div className="resumen-venta carrito">
