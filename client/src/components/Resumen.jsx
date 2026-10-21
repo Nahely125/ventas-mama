@@ -6,7 +6,8 @@ export default function Resumen({ resumen, esJefe }) {
         { titulo: "Unidades disponibles", icono: "📦", valor: resumen?.unidadesTotales },
         esJefe && { titulo: "Valor del inventario", icono: "💰", valor: resumen?.valorInventario, formato: "moneda" },
         { titulo: "Productos con stock bajo", icono: "⚠️", valor: resumen?.productosStockBajo },
-        esJefe && { titulo: "Ganancia por ventas", icono: "📈", valor: resumen?.gananciaTotal, formato: "moneda" },
+        esJefe && { titulo: "Ganancia por ventas", icono: "📈", valor: resumen?.gananciaVentasNuevas, formato: "moneda" },
+        esJefe && { titulo: "Ganancia inventario 2025", icono: "📦", valor: resumen?.ganancia2025, formato: "moneda" },
         esJefe && { titulo: "Gastos", icono: "💸", valor: resumen?.gastosTotales, formato: "moneda" },
         esJefe && {
             titulo: "Ganancia neta",

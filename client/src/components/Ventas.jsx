@@ -4,6 +4,7 @@ import { METODOS_PAGO } from "../venta.js";
 import BuscadorProducto from "./BuscadorProducto.jsx";
 import Comprobante from "./Comprobante.jsx";
 import DatosPago from "./DatosPago.jsx";
+import DictadoVenta from "./DictadoVenta.jsx";
 
 function precioDeLista(producto, modalidad) {
     if (!producto) return "";
@@ -12,7 +13,7 @@ function precioDeLista(producto, modalidad) {
 }
 
 function minimoDe(producto, modalidad) {
-    return Number(producto.precioMinimo) * (modalidad === "docena" ? 12 : 1);
+    return Number(modalidad === "docena" ? producto.precioMinimoDocena : producto.precioMinimo);
 }
 
 function centimos(valor) {
@@ -100,6 +101,7 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
     const [enviando, setEnviando] = useState(false);
     const [autorizacion, setAutorizacion] = useState(null); // { error }
     const [comprobante, setComprobante] = useState(null);
+    const [dictando, setDictando] = useState(false);
 
     const buscarActual = (id) => (productos ?? []).find((p) => p.id === id);
 
@@ -175,6 +177,41 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
         setMensaje(null);
     }
 
+    // Agrega al carrito lo dictado por voz, al precio de lista y revisando el stock.
+    function agregarDictados(lineas) {
+        const nuevos = [];
+        const avisos = [];
+        const usadas = new Map();
+
+        for (const linea of lineas) {
+            const actual = buscarActual(linea.producto.id) ?? linea.producto;
+            const unidades = linea.cantidad * (linea.modalidad === "docena" ? 12 : 1);
+            const yaUsadas = unidadesEnCarrito(actual.id) + (usadas.get(actual.id) ?? 0);
+
+            if (unidades > actual.stock - yaUsadas) {
+                avisos.push(`${actual.nombre} (quedan ${Math.max(actual.stock - yaUsadas, 0)} u.)`);
+                continue;
+            }
+
+            usadas.set(actual.id, (usadas.get(actual.id) ?? 0) + unidades);
+            nuevos.push({
+                clave: siguienteClave++,
+                producto: actual,
+                modalidad: linea.modalidad,
+                cantidad: linea.cantidad,
+                precio: Number(Number(precioDeLista(actual, linea.modalidad)).toFixed(2))
+            });
+        }
+
+        setCarrito((anterior) => [...anterior, ...nuevos]);
+        setDictando(false);
+        setMensaje(
+            avisos.length
+                ? { tipo: "error", texto: `Se agregaron ${nuevos.length}. Sin stock suficiente: ${avisos.join(", ")}.` }
+                : { tipo: "info", texto: `🎤 Se agregaron ${nuevos.length} ${nuevos.length === 1 ? "producto" : "productos"} a la venta.` }
+        );
+    }
+
     function quitar(clave) {
         setCarrito((anterior) => anterior.filter((item) => item.clave !== clave));
     }
@@ -247,6 +284,10 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                 <form onSubmit={cobrar} className="formulario">
                     <fieldset className="grupo-campos agregar-producto">
                         <legend>Agregar producto</legend>
+
+                        <button type="button" className="boton-dictar" onClick={() => setDictando(true)}>
+                            🎤 Dictar productos por voz
+                        </button>
 
                         <div className="campo">
                             <label htmlFor="buscar-producto-venta">Producto (código o nombre)</label>
@@ -433,6 +474,14 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                     )}
                 </form>
             </section>
+
+            {dictando && (
+                <DictadoVenta
+                    productos={productos}
+                    onAgregar={agregarDictados}
+                    onCerrar={() => setDictando(false)}
+                />
+            )}
 
             {autorizacion && (
                 <ModalAutorizacion

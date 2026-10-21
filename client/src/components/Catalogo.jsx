@@ -41,7 +41,7 @@ function TarjetaProductoCatalogo({ producto, onAbrir }) {
                     <span className="cat-producto-precio">
                         {moneda(producto.precioMinimo)} <small>c/u</small>
                     </span>
-                    <span className="cat-producto-docena">Docena {moneda(producto.precioDocena)}</span>
+                    <span className="cat-producto-docena">Docena {moneda(producto.precioMinimoDocena)}</span>
                 </span>
             </button>
         </li>
@@ -437,7 +437,7 @@ function DetalleProducto({ producto, onCerrar }) {
                         </div>
                         <div>
                             <dt>Por docena</dt>
-                            <dd>{moneda(producto.precioDocena)}</dd>
+                            <dd>{moneda(producto.precioMinimoDocena)}</dd>
                         </div>
                     </dl>
                     <p className={producto.disponible ? "cat-disponible" : "cat-no-disponible"}>

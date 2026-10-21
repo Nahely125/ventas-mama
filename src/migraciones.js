@@ -96,6 +96,17 @@ const MIGRACIONES = `
     ALTER TABLE productos
         ADD COLUMN IF NOT EXISTS categoria_id INTEGER REFERENCES categorias(id) ON DELETE SET NULL;
 
+    -- Precio mínimo por docena propio (antes se usaba precio mínimo × 12).
+    ALTER TABLE productos ADD COLUMN IF NOT EXISTS precio_minimo_docena NUMERIC(10, 2);
+    UPDATE productos SET precio_minimo_docena = precio_minimo * 12 WHERE precio_minimo_docena IS NULL;
+    ALTER TABLE productos ALTER COLUMN precio_minimo_docena SET NOT NULL;
+
+    -- Mercadería del año pasado (2025): unidades del stock que ya se pagaron.
+    -- Al vender se descuentan primero; todo lo que se cobra por ellas es ganancia neta
+    -- y no se usa para recuperar la inversión de este año.
+    ALTER TABLE productos ADD COLUMN IF NOT EXISTS stock_2025 INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE ventas ADD COLUMN IF NOT EXISTS unidades_2025 INTEGER NOT NULL DEFAULT 0;
+
     -- Registro de los cambios de datos que solo deben hacerse una vez.
     CREATE TABLE IF NOT EXISTS migraciones_unicas (
         nombre VARCHAR(100) PRIMARY KEY,

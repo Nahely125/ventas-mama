@@ -70,8 +70,18 @@ export default function RecuperacionInversion({ resumen, onRegistrar }) {
             <p className="ayuda-campo">
                 {recuperada
                     ? "🎉 ¡Ya recuperaste todo lo invertido! Todo lo que ganes ahora es ganancia."
-                    : "Se recupera con la ganancia de las ventas (precio de venta menos costo)."}
+                    : "Se recupera con la ganancia de las ventas de este año (precio de venta menos costo)."}
             </p>
+
+            {Number(resumen.ganancia2025) > 0 || Number(resumen.unidades2025) > 0 ? (
+                <p className="nota-inventario-2025">
+                    📦 <strong>Inventario 2025</strong> (aparte): ganancia {moneda(resumen.ganancia2025)}
+                    {Number(resumen.unidades2025) > 0 && (
+                        <> · quedan {resumen.unidades2025} u. por vender (aprox. {moneda(resumen.valorInventario2025)})</>
+                    )}
+                    . Suma a la ganancia neta, pero no a la recuperación de la inversión.
+                </p>
+            ) : null}
         </section>
     );
 }

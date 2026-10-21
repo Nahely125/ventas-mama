@@ -14,6 +14,8 @@ export default function Gastos({ onCambio, onError }) {
     const [categorias, setCategorias] = useState([]);
     const [errorLista, setErrorLista] = useState("");
     const [valores, setValores] = useState(VALORES_INICIALES);
+    const [modo, setModo] = useState("hoy");
+    const [dia, setDia] = useState(hoy());
     const [mes, setMes] = useState(hoy().slice(0, 7));
     const [mensaje, setMensaje] = useState(null);
     const [enviando, setEnviando] = useState(false);
@@ -68,7 +70,9 @@ export default function Gastos({ onCambio, onError }) {
             });
 
             setMensaje({ tipo: "exito", texto: "¡Gasto registrado correctamente!" });
-            setMes(valores.fecha.slice(0, 7));
+            // Mostrar el día del gasto recién registrado.
+            setDia(valores.fecha);
+            setModo(valores.fecha === hoy() ? "hoy" : "dia");
             setValores({ ...VALORES_INICIALES, fecha: valores.fecha });
             await Promise.all([cargarGastos(), onCambio()]);
         } catch (error) {
@@ -93,8 +97,28 @@ export default function Gastos({ onCambio, onError }) {
 
     const meses = mesesDisponibles((gastos ?? []).map((g) => g.fecha));
 
-    const filtrados = (gastos ?? []).filter((gasto) => mes === "todos" || gasto.fecha.startsWith(mes));
+    const filtrados = (gastos ?? []).filter((gasto) => {
+        if (modo === "hoy") return gasto.fecha === hoy();
+        if (modo === "dia") return gasto.fecha === dia;
+        if (modo === "mes") return gasto.fecha.startsWith(mes);
+        return true;
+    });
     const totalPeriodo = filtrados.reduce((suma, gasto) => suma + Number(gasto.monto), 0);
+
+    // Gastos agrupados por día (del más reciente al más antiguo), con su total.
+    const porDia = Object.entries(
+        filtrados.reduce((acumulado, gasto) => {
+            (acumulado[gasto.fecha] ??= []).push(gasto);
+            return acumulado;
+        }, {})
+    ).sort((a, b) => b[0].localeCompare(a[0]));
+
+    const periodo = {
+        hoy: `Hoy, ${formatearDia(hoy())}`,
+        dia: dia ? formatearDia(dia) : "Elige un día",
+        mes: nombreMes(mes),
+        todo: "Todos los gastos"
+    }[modo];
 
     const porCategoria = Object.entries(
         filtrados.reduce((acumulado, gasto) => {
@@ -183,18 +207,56 @@ export default function Gastos({ onCambio, onError }) {
             </section>
 
             <section className="tarjeta lista-gastos-seccion">
-                <div className="encabezado-seccion">
-                    <h2>Mis gastos</h2>
+                <h2>Mis gastos</h2>
 
-                    <div className="campo filtro-mes">
-                        <label htmlFor="filtro-mes">Periodo</label>
-                        <select id="filtro-mes" value={mes} onChange={(e) => setMes(e.target.value)}>
-                            {meses.map((clave) => (
-                                <option key={clave} value={clave}>{nombreMes(clave)}</option>
-                            ))}
-                            <option value="todos">Todos los gastos</option>
-                        </select>
+                <div className="filtros-gastos">
+                    <div className="selector-modalidad selector-filtro" role="radiogroup" aria-label="Ver gastos de">
+                        {[
+                            { valor: "hoy", texto: "Hoy" },
+                            { valor: "dia", texto: "Por día" },
+                            { valor: "mes", texto: "Por mes" },
+                            { valor: "todo", texto: "Todo" }
+                        ].map((opcion) => (
+                            <button
+                                key={opcion.valor}
+                                type="button"
+                                role="radio"
+                                aria-checked={modo === opcion.valor}
+                                className={modo === opcion.valor ? "activo" : ""}
+                                onClick={() => setModo(opcion.valor)}
+                            >
+                                {opcion.texto}
+                            </button>
+                        ))}
                     </div>
+
+                    {modo === "dia" && (
+                        <div className="campo">
+                            <label htmlFor="filtro-dia-gastos">Día</label>
+                            <input
+                                type="date"
+                                id="filtro-dia-gastos"
+                                max={hoy()}
+                                value={dia}
+                                onChange={(e) => setDia(e.target.value)}
+                            />
+                        </div>
+                    )}
+
+                    {modo === "mes" && (
+                        <div className="campo">
+                            <label htmlFor="filtro-mes">Mes</label>
+                            <select id="filtro-mes" value={mes} onChange={(e) => setMes(e.target.value)}>
+                                {meses.map((clave) => (
+                                    <option key={clave} value={clave}>{nombreMes(clave)}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+
+                    <p className="periodo-actual">
+                        <span aria-hidden="true">📅</span> {periodo}
+                    </p>
                 </div>
 
                 {errorLista ? (
@@ -227,29 +289,36 @@ export default function Gastos({ onCambio, onError }) {
                         {filtrados.length === 0 ? (
                             <p>No hay gastos registrados en este periodo.</p>
                         ) : (
-                            <ul className="lista-gastos">
-                                {filtrados.map((gasto) => (
-                                    <li className="gasto" key={gasto.id}>
-                                        <div className="gasto-datos">
-                                            <strong>{gasto.descripcion}</strong>
-                                            <span>
-                                                <span className="etiqueta etiqueta-trabajador">{gasto.categoria}</span>{" "}
-                                                {formatearDia(gasto.fecha)}
-                                            </span>
-                                        </div>
-                                        <strong className="gasto-monto">{moneda(gasto.monto)}</strong>
-                                        <button
-                                            type="button"
-                                            className="boton-icono"
-                                            onClick={() => eliminar(gasto)}
-                                            aria-label={`Eliminar gasto ${gasto.descripcion}`}
-                                            title="Eliminar"
-                                        >
-                                            🗑️
-                                        </button>
-                                    </li>
-                                ))}
-                            </ul>
+                            porDia.map(([fecha, delDia]) => (
+                                <section className="gastos-del-dia" key={fecha}>
+                                    <h3 className="titulo-dia">
+                                        <span>{fecha === hoy() ? `Hoy · ${formatearDia(fecha)}` : formatearDia(fecha)}</span>
+                                        <strong>{moneda(delDia.reduce((suma, g) => suma + Number(g.monto), 0))}</strong>
+                                    </h3>
+                                    <ul className="lista-gastos">
+                                        {delDia.map((gasto) => (
+                                            <li className="gasto" key={gasto.id}>
+                                                <div className="gasto-datos">
+                                                    <strong>{gasto.descripcion}</strong>
+                                                    <span>
+                                                        <span className="etiqueta etiqueta-trabajador">{gasto.categoria}</span>
+                                                    </span>
+                                                </div>
+                                                <strong className="gasto-monto">{moneda(gasto.monto)}</strong>
+                                                <button
+                                                    type="button"
+                                                    className="boton-icono"
+                                                    onClick={() => eliminar(gasto)}
+                                                    aria-label={`Eliminar gasto ${gasto.descripcion}`}
+                                                    title="Eliminar"
+                                                >
+                                                    🗑️
+                                                </button>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </section>
+                            ))
                         )}
                     </>
                 )}

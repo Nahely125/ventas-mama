@@ -1777,6 +1777,352 @@ input[aria-invalid="true"] {
 }
 
 /* ========================================
+   GANANCIA AL REGISTRAR UN PRODUCTO
+======================================== */
+
+.resumen-ganancia {
+    display: grid;
+    gap: 8px;
+    padding: 14px;
+    background: #ecfdf5;
+    border: 1px solid #a7f3d0;
+    border-radius: 12px;
+}
+
+.resumen-ganancia h4 {
+    color: #047857;
+    font-size: 0.9rem;
+}
+
+.resumen-ganancia dl {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.resumen-ganancia dl div {
+    display: flex;
+    flex-direction: column;
+    padding: 8px 10px;
+    background: #ffffff;
+    border-radius: 10px;
+}
+
+.resumen-ganancia dt {
+    color: var(--texto-suave);
+    font-size: 0.72rem;
+}
+
+.resumen-ganancia dd {
+    color: #047857;
+    font-size: 1.05rem;
+    font-weight: 700;
+}
+
+.resumen-ganancia dd small {
+    color: var(--texto-suave);
+    font-size: 0.72rem;
+    font-weight: 500;
+}
+
+.resumen-ganancia .perdida dd {
+    color: var(--rojo);
+}
+
+.ganancia-total-stock {
+    font-size: 0.85rem;
+}
+
+.ganancia-total-stock strong {
+    color: #047857;
+}
+
+.dato-2025 dt,
+.dato-2025 dd {
+    color: #b45309 !important;
+}
+
+.nota-inventario-2025 {
+    padding: 10px 12px;
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    border-radius: 10px;
+    font-size: 0.85rem;
+}
+
+/* ========================================
+   GANANCIA NETA POR DÍA
+======================================== */
+
+.ganancia-diaria {
+    display: grid;
+    gap: 14px;
+}
+
+.ganancia-hoy {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 14px 16px;
+    background: linear-gradient(135deg, var(--morado-500), var(--morado-700));
+    border-radius: 14px;
+    color: #ffffff;
+}
+
+.ganancia-hoy.negativa {
+    background: linear-gradient(135deg, #f43f5e, #be123c);
+}
+
+.ganancia-hoy span {
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.ganancia-hoy strong {
+    font-size: 1.8rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.ganancia-hoy small {
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.tabla-dias {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+.tabla-dias thead {
+    background: var(--morado-500);
+    color: #ffffff;
+}
+
+.tabla-dias th,
+.tabla-dias td {
+    padding: 10px;
+    text-align: right;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.tabla-dias th:first-child,
+.tabla-dias td:first-child {
+    text-align: left;
+}
+
+.tabla-dias tbody tr:nth-child(even) {
+    background: #fcfaff;
+}
+
+.tabla-dias tbody tr.dia-hoy {
+    background: var(--morado-100);
+    font-weight: 600;
+}
+
+.tabla-dias tfoot td {
+    border-top: 2px solid var(--morado-200);
+    font-weight: 700;
+}
+
+.celda-gasto {
+    color: #9f1239;
+}
+
+.celda-neta {
+    color: #047857;
+    font-weight: 700;
+}
+
+.celda-neta.negativa {
+    color: var(--rojo);
+}
+
+.nota-2025 {
+    display: block;
+    color: #b45309;
+    font-size: 0.7rem;
+}
+
+/* En celular, cada día se ve como una tarjeta. */
+@media (max-width: 767px) {
+    .tabla-dias thead {
+        display: none;
+    }
+
+    .tabla-dias,
+    .tabla-dias tbody,
+    .tabla-dias tfoot {
+        display: grid;
+        gap: 8px;
+    }
+
+    .tabla-dias tr {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 4px 12px;
+        padding: 12px;
+        background: var(--morado-50) !important;
+        border: 1px solid var(--morado-200);
+        border-radius: 12px;
+    }
+
+    .tabla-dias tr.dia-hoy {
+        border-color: var(--morado-500);
+    }
+
+    .tabla-dias td {
+        display: flex;
+        flex-direction: column;
+        padding: 0;
+        text-align: left;
+    }
+
+    .tabla-dias td:empty {
+        display: none;
+    }
+
+    .tabla-dias td[data-etiqueta]::before {
+        content: attr(data-etiqueta);
+        color: var(--texto-suave);
+        font-size: 0.68rem;
+        font-weight: 500;
+        text-transform: uppercase;
+    }
+
+    .tabla-dias td.celda-dia {
+        grid-column: 1 / -1;
+        color: var(--morado-900);
+        font-weight: 700;
+        font-size: 0.95rem;
+    }
+
+    .tabla-dias td.celda-dia::before {
+        display: none;
+    }
+
+    .tabla-dias tfoot td {
+        border: none;
+    }
+}
+
+/* ========================================
+   GASTOS POR DÍA
+======================================== */
+
+.filtros-gastos {
+    display: grid;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.gastos-del-dia + .gastos-del-dia {
+    margin-top: 16px;
+}
+
+.titulo-dia {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--morado-150);
+    color: var(--morado-900);
+    font-size: 0.9rem;
+}
+
+.titulo-dia strong {
+    color: #9f1239;
+}
+
+/* ========================================
+   DICTADO POR VOZ
+======================================== */
+
+.boton-dictar {
+    width: 100%;
+    min-height: 46px;
+    border: 1px solid var(--morado-300);
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--morado-50), var(--morado-150));
+    color: var(--morado-900);
+    font-weight: 700;
+}
+
+.boton-microfono {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    min-height: 56px;
+    border: none;
+    border-radius: 999px;
+    background: linear-gradient(135deg, var(--morado-500), var(--morado-700));
+    color: #ffffff;
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+.boton-microfono.escuchando {
+    background: linear-gradient(135deg, #f43f5e, #be123c);
+}
+
+.boton-microfono.escuchando .icono-microfono {
+    animation: latido 1s ease-in-out infinite;
+}
+
+@keyframes latido {
+    50% { transform: scale(1.25); }
+}
+
+textarea {
+    width: 100%;
+    padding: 11px 14px;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    background: #f8fafc;
+    font: inherit;
+    font-size: 16px;
+    resize: vertical;
+}
+
+.lineas-dictado {
+    list-style: none;
+    display: grid;
+    gap: 8px;
+}
+
+.lineas-dictado li {
+    display: grid;
+    grid-template-columns: auto 60px 84px minmax(0, 1fr);
+    align-items: center;
+    gap: 6px;
+    padding: 8px;
+    background: var(--morado-50);
+    border: 1px solid var(--morado-200);
+    border-radius: 10px;
+}
+
+.lineas-dictado li.sin-coincidencia {
+    background: #fffbeb;
+    border-color: #fde68a;
+}
+
+.lineas-dictado input[type="number"],
+.lineas-dictado select {
+    min-height: 40px;
+    padding: 6px 8px;
+}
+
+.mensaje-info {
+    color: var(--morado-900);
+    background: var(--morado-100);
+    border: 1px solid var(--morado-200);
+}
+
+/* ========================================
    CARRITO DE VENTA Y AUTORIZACIÓN
 ======================================== */
 

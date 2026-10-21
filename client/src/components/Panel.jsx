@@ -198,6 +198,7 @@ export default function Panel({ usuario, onSalir, onActualizarUsuario }) {
                             alertas={alertas}
                             errorAlertas={errorAlertas}
                             onIrA={cambiarVista}
+                            onError={manejarError}
                         />
                     )}
 

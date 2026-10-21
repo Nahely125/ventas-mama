@@ -14,8 +14,11 @@ export default function ModalEditarProducto({ producto, onCerrar, onGuardado, on
         nombre: producto.nombre,
         precio: String(producto.precio),
         precioDocena: String(producto.precioDocena ?? ""),
-        // Si el precio por docena coincide con mínimo × 12, se sigue calculando solo.
-        docenaAuto: Number(producto.precioDocena).toFixed(2) === (Number(producto.precioMinimo) * 12).toFixed(2),
+        // Los precios por docena se recalculan solos si coinciden con unidad × 12.
+        docenaAuto: Number(producto.precioDocena).toFixed(2) === (Number(producto.precio) * 12).toFixed(2),
+        precioMinimoDocena: String(producto.precioMinimoDocena ?? ""),
+        minimoDocenaAuto: Number(producto.precioMinimoDocena).toFixed(2) === (Number(producto.precioMinimo) * 12).toFixed(2),
+        stock2025: String(producto.stock2025 ?? 0),
         precioMinimo: String(producto.precioMinimo ?? ""),
         precioCompra: (Number(producto.precioCompra) * unidades).toFixed(2),
         unidadesPorCaja: String(unidades),

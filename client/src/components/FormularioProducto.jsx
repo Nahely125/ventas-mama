@@ -11,9 +11,12 @@ const VALORES_INICIALES = {
     precioDocena: "",
     docenaAuto: true,
     precioMinimo: "",
+    precioMinimoDocena: "",
+    minimoDocenaAuto: true,
     precioCompra: "",
     unidadesPorCaja: "1",
     stock: "",
+    stock2025: "",
     seccionId: "",
     categoriaId: "",
     foto: undefined

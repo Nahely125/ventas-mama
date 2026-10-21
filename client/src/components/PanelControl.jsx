@@ -1,10 +1,13 @@
 import Resumen from "./Resumen.jsx";
 import RecuperacionInversion from "./RecuperacionInversion.jsx";
+import GananciaDiaria from "./GananciaDiaria.jsx";
 
-export default function PanelControl({ esJefe, resumen, alertas, errorAlertas, onIrA }) {
+export default function PanelControl({ esJefe, resumen, alertas, errorAlertas, onIrA, onError }) {
     return (
         <div className="contenido-vista">
             <Resumen resumen={resumen} esJefe={esJefe} />
+
+            {esJefe && <GananciaDiaria onError={onError} />}
 
             {esJefe && (
                 <RecuperacionInversion resumen={resumen} onRegistrar={() => onIrA("inversion")} />

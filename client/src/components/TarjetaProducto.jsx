@@ -15,6 +15,12 @@ export default function TarjetaProducto({ producto, esJefe, retraso, onEditar, o
         detallesJefe = (
             <>
                 <dl className="detalles-producto detalles-jefe">
+                    {producto.stock2025 > 0 && (
+                        <div className="dato-2025">
+                            <dt>📦 Del inventario 2025</dt>
+                            <dd>{producto.stock2025} de {producto.stock} u.</dd>
+                        </div>
+                    )}
                     <div>
                         <dt>Costo por caja</dt>
                         <dd>{moneda(costoUnitario * unidadesPorCaja)}</dd>
@@ -76,7 +82,7 @@ export default function TarjetaProducto({ producto, esJefe, retraso, onEditar, o
                 </div>
                 <div>
                     <dt>Precio mínimo por docena</dt>
-                    <dd>{moneda(Number(producto.precioMinimo) * 12)}</dd>
+                    <dd>{moneda(producto.precioMinimoDocena)}</dd>
                 </div>
                 <div>
                     <dt>Stock disponible</dt>

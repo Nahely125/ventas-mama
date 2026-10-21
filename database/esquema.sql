@@ -70,10 +70,12 @@ CREATE TABLE IF NOT EXISTS productos (
     nombre             VARCHAR(150)  NOT NULL,
     precio             NUMERIC(10,2) NOT NULL CHECK (precio >= 0),          -- precio de venta por unidad
     precio_minimo      NUMERIC(10,2) NOT NULL CHECK (precio_minimo >= 0),   -- no se puede vender por debajo
-    precio_docena      NUMERIC(10,2) NOT NULL CHECK (precio_docena >= 0),   -- por defecto precio_minimo × 12
+    precio_docena      NUMERIC(10,2) NOT NULL CHECK (precio_docena >= 0),   -- precio de venta por docena
+    precio_minimo_docena NUMERIC(10,2) NOT NULL CHECK (precio_minimo_docena >= 0), -- no se puede vender la docena por debajo
     precio_compra      NUMERIC(10,2) CHECK (precio_compra >= 0),            -- costo por unidad
     unidades_por_caja  INTEGER       NOT NULL DEFAULT 1 CHECK (unidades_por_caja >= 1),
     stock              INTEGER       NOT NULL CHECK (stock >= 0),           -- siempre en unidades
+    stock_2025         INTEGER       NOT NULL DEFAULT 0,                    -- unidades del stock que son mercadería del 2025 (ya pagada)
     seccion_id         INTEGER REFERENCES secciones(id) ON DELETE SET NULL,
     categoria_id       INTEGER REFERENCES categorias(id) ON DELETE SET NULL,    -- la sección se toma de la categoría
     foto               BYTEA,                                               -- foto reducida (JPEG)
@@ -107,6 +109,7 @@ CREATE TABLE IF NOT EXISTS ventas (
     token            UUID          NOT NULL DEFAULT gen_random_uuid(),
     grupo            UUID          NOT NULL,                            -- une los productos de una misma venta; es la clave del enlace de la boleta
     autorizado_por   INTEGER       REFERENCES usuarios(id),             -- jefe que autorizó un precio bajo el mínimo
+    unidades_2025    INTEGER       NOT NULL DEFAULT 0,                  -- de la cantidad, cuántas eran del 2025 (su venta es ganancia neta completa)
     comprobante_url  TEXT,                                              -- en desuso (antigua foto del comprobante)
     fecha            TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP   -- hora de Lima
 );

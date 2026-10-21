@@ -15,6 +15,7 @@ const COLUMNAS_COMUNES = `
     precio,
     precio_minimo AS "precioMinimo",
     precio_docena AS "precioDocena",
+    precio_minimo_docena AS "precioMinimoDocena",
     stock,
     seccion_id AS "seccionId",
     categoria_id AS "categoriaId",
@@ -25,7 +26,8 @@ const COLUMNAS_COMUNES = `
 const COLUMNAS_JEFE = `
     ${COLUMNAS_COMUNES},
     precio_compra AS "precioCompra",
-    unidades_por_caja AS "unidadesPorCaja"
+    unidades_por_caja AS "unidadesPorCaja",
+    stock_2025 AS "stock2025"
 `;
 
 function columnasSegunRol(req) {
@@ -48,9 +50,11 @@ function validarProducto(cuerpo) {
         precio,
         precioDocena,
         precioMinimo,
+        precioMinimoDocena,
         precioCompra,
         unidadesPorCaja,
         stock,
+        stock2025 = 0,
         seccionId = null,
         categoriaId = null
     } = cuerpo;
@@ -67,12 +71,14 @@ function validarProducto(cuerpo) {
         !esNumero(precio) ||
         !esNumero(precioDocena) ||
         !esNumero(precioMinimo) ||
+        !esNumero(precioMinimoDocena) ||
         !esNumero(precioCompra) ||
         !Number.isInteger(unidadesPorCaja) ||
         !Number.isInteger(stock) ||
         precio < 0 ||
         precioDocena < 0 ||
         precioMinimo < 0 ||
+        precioMinimoDocena < 0 ||
         precioCompra < 0 ||
         unidadesPorCaja < 1 ||
         stock < 0
@@ -94,10 +100,12 @@ function validarProducto(cuerpo) {
         return { error: "El precio de venta no puede ser menor que el precio mínimo." };
     }
 
-    if (centimos(precioDocena) < centimos(precioMinimo * 12)) {
-        return {
-            error: `El precio por docena no puede ser menor que S/ ${(precioMinimo * 12).toFixed(2)} (precio mínimo × 12).`
-        };
+    if (centimos(precioDocena) < centimos(precioMinimoDocena)) {
+        return { error: "El precio por docena no puede ser menor que el precio mínimo por docena." };
+    }
+
+    if (!Number.isInteger(stock2025) || stock2025 < 0 || stock2025 > stock) {
+        return { error: "Las unidades del 2025 deben estar entre 0 y el stock total." };
     }
 
     return {
@@ -107,10 +115,12 @@ function validarProducto(cuerpo) {
             precio,
             precioDocena,
             precioMinimo,
+            precioMinimoDocena,
             // Se recibe el costo de la caja y se guarda el costo por unidad.
             costoUnitario: Number((precioCompra / unidadesPorCaja).toFixed(2)),
             unidadesPorCaja,
             stock,
+            stock2025,
             seccionId,
             categoriaId
         }
@@ -178,9 +188,10 @@ router.post("/", requiereJefe, async (req, res) => {
         const resultado = await pool.query(
             `INSERT INTO productos
                 (codigo, nombre, precio, precio_docena, precio_minimo,
-                 precio_compra, unidades_por_caja, stock, seccion_id, categoria_id)
+                 precio_compra, unidades_por_caja, stock, seccion_id, categoria_id,
+                 precio_minimo_docena, stock_2025)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8,
-                     COALESCE((SELECT seccion_id FROM categorias WHERE id = $10), $9), $10)
+                     COALESCE((SELECT seccion_id FROM categorias WHERE id = $10), $9), $10, $11, $12)
              RETURNING ${COLUMNAS_JEFE}`,
             [
                 datos.codigo,
@@ -192,7 +203,9 @@ router.post("/", requiereJefe, async (req, res) => {
                 datos.unidadesPorCaja,
                 datos.stock,
                 datos.seccionId,
-                datos.categoriaId
+                datos.categoriaId,
+                datos.precioMinimoDocena,
+                datos.stock2025
             ]
         );
 
@@ -233,7 +246,9 @@ router.put("/:id", requiereJefe, async (req, res) => {
                  unidades_por_caja = $7,
                  stock = $8,
                  seccion_id = COALESCE((SELECT seccion_id FROM categorias WHERE id = $11), $9),
-                 categoria_id = $11
+                 categoria_id = $11,
+                 precio_minimo_docena = $12,
+                 stock_2025 = $13
              WHERE id = $10
              RETURNING ${COLUMNAS_JEFE}`,
             [
@@ -247,7 +262,9 @@ router.put("/:id", requiereJefe, async (req, res) => {
                 datos.stock,
                 datos.seccionId,
                 id,
-                datos.categoriaId
+                datos.categoriaId,
+                datos.precioMinimoDocena,
+                datos.stock2025
             ]
         );
 

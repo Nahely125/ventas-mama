@@ -31,6 +31,7 @@ router.get("/catalogo", async (req, res) => {
                 productos.nombre,
                 productos.precio_minimo AS "precioMinimo",
                 productos.precio_docena AS "precioDocena",
+                productos.precio_minimo_docena AS "precioMinimoDocena",
                 productos.seccion_id AS "seccionId",
                 productos.categoria_id AS "categoriaId",
                 (productos.stock > 0) AS disponible,

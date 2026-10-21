@@ -1,9 +1,17 @@
 const express = require("express");
 const pool = require("../db");
-const { requiereSesion } = require("../autenticacion");
+const { requiereSesion, requiereJefe } = require("../autenticacion");
 const { STOCK_BAJO } = require("./productos");
 
 const router = express.Router();
+
+// Ganancia de una fila de ventas, separada según el origen de la mercadería:
+// - de este año: lo cobrado por esas unidades menos su costo;
+// - del 2025: todo lo cobrado (ya se pagó el año pasado).
+const GANANCIA_NUEVA = `
+    COALESCE(ventas.total * (ventas.cantidad - ventas.unidades_2025) / ventas.cantidad
+             - COALESCE(ventas.costo_unitario, 0) * (ventas.cantidad - ventas.unidades_2025), 0)`;
+const GANANCIA_2025 = `COALESCE(ventas.total * ventas.unidades_2025 / ventas.cantidad, 0)`;
 
 // Resumen general del inventario.
 router.get("/", requiereSesion, async (req, res) => {
@@ -22,34 +30,42 @@ router.get("/", requiereSesion, async (req, res) => {
         if (req.session.usuario.rol === "jefe") {
             const datos = await pool.query(
                 `SELECT
-                    (SELECT COALESCE(SUM(precio * stock), 0) FROM productos)
-                        AS "valorInventario",
-                    (SELECT COALESCE(SUM(total - costo_unitario * cantidad), 0) FROM ventas)
-                        AS "gananciaTotal",
-                    (SELECT COALESCE(SUM(monto), 0) FROM gastos)
-                        AS "gastosTotales",
-                    (SELECT COALESCE(SUM(monto), 0) FROM inversiones)
-                        AS "inversionTotal"`
+                    (SELECT COALESCE(SUM(precio * stock), 0) FROM productos) AS "valorInventario",
+                    (SELECT COALESCE(SUM(stock_2025), 0) FROM productos) AS "unidades2025",
+                    (SELECT COALESCE(SUM(precio * stock_2025), 0) FROM productos) AS "valorInventario2025",
+                    (SELECT COALESCE(SUM(${GANANCIA_NUEVA}), 0) FROM ventas) AS "gananciaVentasNuevas",
+                    (SELECT COALESCE(SUM(${GANANCIA_2025}), 0) FROM ventas) AS "ganancia2025",
+                    (SELECT COALESCE(SUM(monto), 0) FROM gastos) AS "gastosTotales",
+                    (SELECT COALESCE(SUM(monto), 0) FROM inversiones) AS "inversionTotal"`
             );
 
-            Object.assign(resumen, datos.rows[0]);
+            const fila = datos.rows[0];
+            const gananciaNueva = Number(fila.gananciaVentasNuevas);
+            const ganancia2025 = Number(fila.ganancia2025);
+            const gastos = Number(fila.gastosTotales);
+            const inversiones = Number(fila.inversionTotal);
 
-            const gananciaVentas = Number(resumen.gananciaTotal);
-            const gastos = Number(resumen.gastosTotales);
-            const inversiones = Number(resumen.inversionTotal);
+            resumen.valorInventario = Number(fila.valorInventario).toFixed(2);
+            resumen.unidades2025 = Number(fila.unidades2025);
+            resumen.valorInventario2025 = Number(fila.valorInventario2025).toFixed(2);
+            resumen.gastosTotales = gastos.toFixed(2);
+            resumen.ganancia2025 = ganancia2025.toFixed(2);
+            resumen.gananciaVentasNuevas = gananciaNueva.toFixed(2);
+            resumen.gananciaTotal = (gananciaNueva + ganancia2025).toFixed(2);
 
-            resumen.gananciaNeta = (gananciaVentas - gastos).toFixed(2);
+            // Ganancia neta: todas las ventas (incluido el inventario 2025) menos los gastos.
+            resumen.gananciaNeta = (gananciaNueva + ganancia2025 - gastos).toFixed(2);
 
-            // Los gastos también cuentan como inversión: todo lo que salió del bolsillo
-            // (inversiones + gastos) se recupera con la ganancia de las ventas.
+            // Recuperación: lo invertido este año (inversiones + gastos) se recupera solo con
+            // la ganancia de la mercadería de este año. El inventario 2025 va aparte.
             const totalInvertido = inversiones + gastos;
 
             resumen.inversionesRegistradas = inversiones.toFixed(2);
             resumen.inversionTotal = totalInvertido.toFixed(2);
-            resumen.inversionRecuperada = Math.min(Math.max(gananciaVentas, 0), totalInvertido).toFixed(2);
-            resumen.faltaRecuperar = Math.max(totalInvertido - gananciaVentas, 0).toFixed(2);
+            resumen.inversionRecuperada = Math.min(Math.max(gananciaNueva, 0), totalInvertido).toFixed(2);
+            resumen.faltaRecuperar = Math.max(totalInvertido - gananciaNueva, 0).toFixed(2);
             resumen.porcentajeRecuperado = totalInvertido > 0
-                ? Math.min(Math.max(gananciaVentas / totalInvertido, 0) * 100, 100).toFixed(1)
+                ? Math.min(Math.max(gananciaNueva / totalInvertido, 0) * 100, 100).toFixed(1)
                 : "0.0";
         }
 
@@ -57,6 +73,59 @@ router.get("/", requiereSesion, async (req, res) => {
     } catch (error) {
         console.error("Error al generar el resumen:", error.message);
         res.status(500).json({ error: "Error al generar el resumen del inventario" });
+    }
+});
+
+/* Ganancia neta por día de un mes: ?mes=YYYY-MM (por defecto, el mes actual en Lima).
+   Para cada día con ventas o gastos: ventas, total vendido, ganancia, gastos y ganancia neta. */
+router.get("/diario", requiereJefe, async (req, res) => {
+    const mes = typeof req.query.mes === "string" && /^\d{4}-(0[1-9]|1[0-2])$/.test(req.query.mes)
+        ? req.query.mes
+        : null;
+
+    try {
+        const resultado = await pool.query(
+            `WITH limites AS (
+                SELECT COALESCE(TO_DATE($1, 'YYYY-MM'),
+                                DATE_TRUNC('month', CURRENT_TIMESTAMP AT TIME ZONE 'America/Lima')::DATE) AS inicio
+            ),
+            por_venta AS (
+                SELECT
+                    ventas.fecha::DATE AS dia,
+                    COUNT(DISTINCT ventas.grupo) AS ventas,
+                    SUM(ventas.total) AS vendido,
+                    SUM(${GANANCIA_NUEVA}) AS ganancia_nueva,
+                    SUM(${GANANCIA_2025}) AS ganancia_2025
+                FROM ventas, limites
+                WHERE ventas.fecha >= limites.inicio
+                  AND ventas.fecha < limites.inicio + INTERVAL '1 month'
+                GROUP BY 1
+            ),
+            por_gasto AS (
+                SELECT gastos.fecha AS dia, SUM(gastos.monto) AS gastos
+                FROM gastos, limites
+                WHERE gastos.fecha >= limites.inicio
+                  AND gastos.fecha < limites.inicio + INTERVAL '1 month'
+                GROUP BY 1
+            )
+            SELECT
+                TO_CHAR(COALESCE(v.dia, g.dia), 'YYYY-MM-DD') AS dia,
+                COALESCE(v.ventas, 0)::INT AS ventas,
+                ROUND(COALESCE(v.vendido, 0), 2) AS vendido,
+                ROUND(COALESCE(v.ganancia_nueva, 0) + COALESCE(v.ganancia_2025, 0), 2) AS ganancia,
+                ROUND(COALESCE(v.ganancia_2025, 0), 2) AS "ganancia2025",
+                ROUND(COALESCE(g.gastos, 0), 2) AS gastos,
+                ROUND(COALESCE(v.ganancia_nueva, 0) + COALESCE(v.ganancia_2025, 0) - COALESCE(g.gastos, 0), 2) AS neta
+            FROM por_venta v
+            FULL OUTER JOIN por_gasto g ON v.dia = g.dia
+            ORDER BY 1 DESC`,
+            [mes]
+        );
+
+        res.json(resultado.rows);
+    } catch (error) {
+        console.error("Error al generar el resumen diario:", error.message);
+        res.status(500).json({ error: "No se pudo generar la ganancia por día." });
     }
 });
 

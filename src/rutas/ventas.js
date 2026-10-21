@@ -32,10 +32,13 @@ async function consultarVentas(esJefe, grupo = null) {
             autoriza.nombre AS "autorizadoPor"
             ${esJefe ? `,
             ventas.costo_unitario AS "costoUnitario",
+            ventas.unidades_2025 AS "unidades2025",
+            -- Las unidades del 2025 ya se pagaron el año pasado: no se les resta el costo.
             CASE
                 WHEN ventas.costo_unitario IS NOT NULL
-                THEN ROUND(ventas.total - ventas.costo_unitario * ventas.cantidad, 2)
-            END AS ganancia` : ""}
+                THEN ROUND(ventas.total - ventas.costo_unitario * (ventas.cantidad - ventas.unidades_2025), 2)
+            END AS ganancia,
+            ROUND(ventas.total * ventas.unidades_2025 / ventas.cantidad, 2) AS "ganancia2025"` : ""}
          FROM ventas
          INNER JOIN productos ON ventas.producto_id = productos.id
          LEFT JOIN usuarios ON ventas.usuario_id = usuarios.id
@@ -134,7 +137,7 @@ router.post("/", requiereSesion, async (req, res) => {
         // Se bloquean los productos en orden de id para evitar bloqueos cruzados.
         const ids = [...new Set(items.map((item) => item.productoId))].sort((a, b) => a - b);
         const resultado = await client.query(
-            `SELECT id, nombre, precio_minimo, precio_compra, stock
+            `SELECT id, nombre, precio_minimo, precio_minimo_docena, precio_compra, stock, stock_2025
              FROM productos
              WHERE id = ANY($1::int[])
              ORDER BY id
@@ -158,7 +161,7 @@ router.post("/", requiereSesion, async (req, res) => {
             const unidades = item.cantidad * (esDocena ? 12 : 1);
             unidadesPorProducto.set(producto.id, (unidadesPorProducto.get(producto.id) ?? 0) + unidades);
 
-            const minimo = Number(producto.precio_minimo) * (esDocena ? 12 : 1);
+            const minimo = Number(esDocena ? producto.precio_minimo_docena : producto.precio_minimo);
 
             if (Math.round(item.precio * 100) < Math.round(minimo * 100)) {
                 bajoMinimo.push(`${producto.nombre} (mínimo S/ ${minimo.toFixed(2)} por ${esDocena ? "docena" : "unidad"})`);
@@ -225,6 +228,9 @@ router.post("/", requiereSesion, async (req, res) => {
 
         const grupo = crypto.randomUUID();
 
+        // Unidades del 2025 que quedan por producto: se descuentan primero.
+        const quedan2025 = new Map([...productos.values()].map((p) => [p.id, p.stock_2025]));
+
         for (const item of items) {
             const producto = productos.get(item.productoId);
             const modalidad = item.modalidad ?? "unidad";
@@ -233,12 +239,14 @@ router.post("/", requiereSesion, async (req, res) => {
             const precioVenta = Number(item.precio.toFixed(2));
             const total = Number((precioVenta * item.cantidad).toFixed(2));
             const precioUnitario = Number((esDocena ? precioVenta / 12 : precioVenta).toFixed(2));
+            const unidades2025 = Math.min(quedan2025.get(producto.id), unidades);
+            quedan2025.set(producto.id, quedan2025.get(producto.id) - unidades2025);
 
             await client.query(
                 `INSERT INTO ventas
                     (producto_id, cantidad, precio_unitario, costo_unitario, total,
-                     usuario_id, metodo_pago, modalidad, grupo, autorizado_por, fecha)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+                     usuario_id, metodo_pago, modalidad, grupo, autorizado_por, unidades_2025, fecha)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
                          CURRENT_TIMESTAMP AT TIME ZONE 'America/Lima')`,
                 [
                     producto.id,
@@ -250,13 +258,17 @@ router.post("/", requiereSesion, async (req, res) => {
                     metodoPago,
                     modalidad,
                     grupo,
-                    autorizadoPor
+                    autorizadoPor,
+                    unidades2025
                 ]
             );
         }
 
         for (const [id, unidades] of unidadesPorProducto) {
-            await client.query(`UPDATE productos SET stock = stock - $1 WHERE id = $2`, [unidades, id]);
+            await client.query(
+                `UPDATE productos SET stock = stock - $1, stock_2025 = $2 WHERE id = $3`,
+                [unidades, quedan2025.get(id), id]
+            );
         }
 
         await client.query("COMMIT");
