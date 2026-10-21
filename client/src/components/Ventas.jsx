@@ -544,7 +544,12 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                     <fieldset className="grupo-campos agregar-obsequio">
                         <legend>🎁 Obsequio (opcional)</legend>
                         <p className="ayuda-campo">
-                            {esJefe && <>Solo aparecen los productos que se pueden regalar (costo menor a <strong>S/ 5</strong>). </>}
+                            {esJefe && (
+                                <>
+                                    Solo aparecen los que se pueden regalar: costo menor a <strong>S/ 5</strong>; los del
+                                    inventario 2025, precio por unidad en la docena menor a <strong>S/ 5</strong>.{" "}
+                                </>
+                            )}
                             Va gratis en la boleta y se descuenta del stock.
                         </p>
 

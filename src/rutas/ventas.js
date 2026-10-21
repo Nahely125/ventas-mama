@@ -17,7 +17,7 @@ const {
     totalesVentas,
     armarBoleta
 } = require("./consultasVentas");
-const { COSTO_MAXIMO_OBSEQUIO, OBSEQUIABLE, normalizarCodigo, resolverAjuste, repartirAjuste } = require("./ajustes");
+const { COSTO_MAXIMO_OBSEQUIO, OBSEQUIABLE, VALOR_OBSEQUIO, normalizarCodigo, resolverAjuste, repartirAjuste } = require("./ajustes");
 
 const NOMBRE_MODALIDAD = { unidad: "unidad", media: "media docena", docena: "docena" };
 
@@ -178,7 +178,8 @@ router.post("/", requiereSesion, async (req, res) => {
         const ids = [...new Set(items.map((item) => item.productoId))].sort((a, b) => a - b);
         const resultado = await client.query(
             `SELECT id, nombre, precio_minimo, precio_minimo_docena, precio_compra, stock, stock_2025,
-                    ${OBSEQUIABLE} AS obsequiable
+                    ${OBSEQUIABLE} AS obsequiable,
+                    ${VALOR_OBSEQUIO} AS valor_obsequio
              FROM productos
              WHERE id = ANY($1::int[])
              ORDER BY id
@@ -211,10 +212,10 @@ router.post("/", requiereSesion, async (req, res) => {
                     return res.status(400).json({ error: `${producto.nombre} no se puede obsequiar.` });
                 }
 
-                // Sin costo registrado no se sabe cuánto vale: para el empleado cuenta como que excede.
-                costoObsequios += producto.precio_compra === null
+                // Sin valor conocido (sin costo registrado): para el empleado cuenta como que excede.
+                costoObsequios += producto.valor_obsequio === null
                     ? Infinity
-                    : Number(producto.precio_compra) * unidades;
+                    : Number(producto.valor_obsequio) * unidades;
                 continue;
             }
 
@@ -225,7 +226,7 @@ router.post("/", requiereSesion, async (req, res) => {
             }
         }
 
-        // El empleado puede regalar como máximo S/ 5 (al costo) por venta; el jefe, lo que quiera.
+        // El empleado puede regalar como máximo S/ 5 por venta (ver VALOR_OBSEQUIO); el jefe, lo que quiera.
         // El mensaje no muestra el costo, que el empleado no ve.
         if (!esJefe && Math.round(costoObsequios * 100) > COSTO_MAXIMO_OBSEQUIO * 100) {
             await client.query("ROLLBACK");
