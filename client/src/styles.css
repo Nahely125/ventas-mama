@@ -1890,12 +1890,61 @@ input[aria-invalid="true"] {
     cursor: default;
 }
 
-.total-ganancia-2025 {
+@media (max-width: 599px) {
+    .totales-historial > :last-child:nth-child(odd) {
+        grid-column: 1 / -1;
+    }
+}
+
+.bloque-ganancias {
+    display: grid;
+    gap: 10px;
+}
+
+.ganancias-separadas {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.total-historial small {
+    color: var(--texto-suave);
+    font-size: 0.7rem;
+}
+
+.total-historial.total-ganancia-nueva {
+    background: #ecfdf5;
+    border-color: #a7f3d0;
+}
+
+.total-historial.total-ganancia-nueva strong {
+    color: #047857;
+}
+
+.ganancia-suma {
+    align-items: center;
+    text-align: center;
+    padding: 16px;
+}
+
+.ganancia-suma strong {
+    font-size: 1.8rem;
+}
+
+.ganancia-suma small {
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.precio-docena-calculado strong {
+    font-size: 1.05rem;
+}
+
+.total-historial.total-ganancia-2025 {
     background: #fffbeb;
     border-color: #fde68a;
 }
 
-.total-ganancia-2025 strong {
+.total-historial.total-ganancia-2025 strong {
     color: #b45309;
 }
 
@@ -1912,7 +1961,7 @@ input[aria-invalid="true"] {
 
 @media (min-width: 600px) {
     .totales-historial.con-ganancia {
-        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)) !important;
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
     }
 }
 

@@ -1,6 +1,7 @@
 const CAMPOS_NUMERICOS = [
     "precio",
     "precioMinimo",
+    "precioUnidadDocena",
     "precioCompra",
     "unidadesPorCaja",
     "stock"
@@ -13,8 +14,8 @@ export function validarProducto(valores) {
         codigo: valores.codigo.trim(),
         nombre: valores.nombre.trim(),
         precio: Number(valores.precio),
-        // El precio por docena se calcula: precio por unidad × 12.
-        precioDocena: Number((Number(valores.precio) * 12).toFixed(2)),
+        // Precio de la docena = precio por unidad en la docena × 12.
+        precioDocena: Number((Number(valores.precioUnidadDocena) * 12).toFixed(2)),
         precioMinimo: Number(valores.precioMinimo),
         // Mínimo por docena = mínimo por unidad × 12.
         precioMinimoDocena: Number((Number(valores.precioMinimo) * 12).toFixed(2)),
@@ -54,6 +55,10 @@ export function validarProducto(valores) {
         return {
             error: "Verifica los datos ingresados. Los precios no pueden ser negativos, las unidades por caja deben ser un entero mayor que cero y el stock debe ser un entero no negativo."
         };
+    }
+
+    if (Number(valores.precioUnidadDocena) < datos.precioMinimo) {
+        return { error: "El precio por unidad en la docena no puede ser menor que el precio mínimo por unidad." };
     }
 
     if (datos.precio < datos.precioMinimo) {
@@ -99,7 +104,8 @@ export function calcularGanancias(valores) {
 
     const precio = numero("precio");
     const minimo = numero("precioMinimo");
-    const docena = precio === null ? null : precio * 12;
+    const unidadDocena = numero("precioUnidadDocena");
+    const docena = unidadDocena === null ? null : unidadDocena * 12;
     const minimoDocena = minimo === null ? null : minimo * 12;
 
     const resultado = {

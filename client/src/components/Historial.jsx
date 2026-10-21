@@ -113,19 +113,32 @@ export default function Historial({ esJefe, ventas, error }) {
                             <strong>{moneda(totalVendido)}</strong>
                         </div>
                     )}
-                    {esJefe && (
-                        <div className="total-historial total-ganancia">
-                            <span>Ganancia</span>
-                            <strong>{moneda(ganancia - ganancia2025)}</strong>
-                        </div>
-                    )}
-                    {esJefe && (
-                        <div className="total-historial total-ganancia-2025">
-                            <span>📦 Ganancia 2025</span>
-                            <strong>{moneda(ganancia2025)}</strong>
-                        </div>
-                    )}
                 </div>
+
+                {/* Ganancia separada por origen de la mercadería y, debajo, el total. */}
+                {esJefe && (
+                    <div className="bloque-ganancias">
+                        <div className="ganancias-separadas">
+                            <div className="total-historial total-ganancia-nueva">
+                                <span>🆕 Ganancia por productos nuevos</span>
+                                <strong>{moneda(ganancia - ganancia2025)}</strong>
+                                <small>Venta menos costo</small>
+                            </div>
+                            <div className="total-historial total-ganancia-2025">
+                                <span>📦 Ganancia por inventario 2025</span>
+                                <strong>{moneda(ganancia2025)}</strong>
+                                <small>Todo lo cobrado (ya se pagó en 2025)</small>
+                            </div>
+                        </div>
+                        <div className="total-historial total-ganancia ganancia-suma">
+                            <span>✨ Ganancia total</span>
+                            <strong>{moneda(ganancia)}</strong>
+                            <small>
+                                {moneda(ganancia - ganancia2025)} + {moneda(ganancia2025)}
+                            </small>
+                        </div>
+                    </div>
+                )}
 
                 {esJefe && porMetodo.length > 0 && (
                     <ul className="totales-metodo" aria-label="Total por método de pago">

@@ -91,7 +91,15 @@ export default function CamposProducto({ valores, onCambio, prefijo, etiquetaCom
                 }
             }
 
-            // Los precios por docena se calculan solos (× 12) hasta que se escriban a mano.
+            // El precio por unidad en la docena sigue al precio por unidad hasta que se escriba a mano.
+            if (name === "precioUnidadDocena") {
+                nuevos.unidadDocenaAuto = false;
+            }
+
+            if (name === "precio" && anteriores.unidadDocenaAuto) {
+                nuevos.precioUnidadDocena = value;
+            }
+
             return nuevos;
         });
     }
@@ -297,20 +305,32 @@ export default function CamposProducto({ valores, onCambio, prefijo, etiquetaCom
                     </div>
 
                     <div className="campo">
-                        <label htmlFor={id("precioDocena")}>Precio por docena (S/)</label>
+                        <label htmlFor={id("precioUnidadDocena")}>Precio por unidad en la docena (S/)</label>
                         <input
-                            type="text"
-                            id={id("precioDocena")}
-                            className="campo-calculado"
-                            value={porDocena(valores.precio) || "—"}
-                            readOnly
-                            tabIndex={-1}
+                            type="number"
+                            id={id("precioUnidadDocena")}
+                            name="precioUnidadDocena"
+                            min="0"
+                            step="0.01"
+                            inputMode="decimal"
+                            placeholder="2.50"
+                            value={valores.precioUnidadDocena}
+                            onChange={cambiar}
+                            required
                         />
-                        <span className="ayuda-campo dato-calculado">
-                            Precio por unidad × 12. Mínimo por docena: <strong>S/ {porDocena(valores.precioMinimo) || "0.00"}</strong>
+                        <span className="ayuda-campo">
+                            A cuánto sale cada unidad si compran por docena
+                            {valores.unidadDocenaAuto ? " (igual al precio por unidad; cámbialo si haces precio por mayor)." : "."}
                         </span>
                     </div>
                 </div>
+
+                <p className="costo-calculado precio-docena-calculado">
+                    La docena se vende a: <strong>S/ {porDocena(valores.precioUnidadDocena) || "0.00"}</strong>
+                    <small>
+                        {" "}= {valores.precioUnidadDocena || "0.00"} × 12 · Mínimo por docena: S/ {porDocena(valores.precioMinimo) || "0.00"}
+                    </small>
+                </p>
 
                 <ResumenGanancia ganancias={calcularGanancias(valores)} es2025={Boolean(valores.es2025)} />
             </fieldset>
