@@ -89,13 +89,16 @@ CREATE TABLE IF NOT EXISTS ventas (
     costo_unitario   NUMERIC(10,2),
     total            NUMERIC(10,2) NOT NULL CHECK (total >= 0),
     metodo_pago      VARCHAR(20)   NOT NULL DEFAULT 'efectivo',         -- efectivo, yape, plin, transferencia
-    token            UUID          NOT NULL DEFAULT gen_random_uuid(),  -- enlace público de la boleta
+    token            UUID          NOT NULL DEFAULT gen_random_uuid(),
+    grupo            UUID          NOT NULL,                            -- une los productos de una misma venta; es la clave del enlace de la boleta
+    autorizado_por   INTEGER       REFERENCES usuarios(id),             -- jefe que autorizó un precio bajo el mínimo
     comprobante_url  TEXT,                                              -- en desuso (antigua foto del comprobante)
     fecha            TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP   -- hora de Lima
 );
 
 CREATE INDEX IF NOT EXISTS ventas_fecha_idx ON ventas (fecha);
 CREATE UNIQUE INDEX IF NOT EXISTS ventas_token_unico ON ventas (token);
+CREATE INDEX IF NOT EXISTS ventas_grupo_idx ON ventas (grupo);
 
 -- ---------------------------------------------------------------------
 -- gastos: gastos del negocio (transporte, alquiler, etc.).

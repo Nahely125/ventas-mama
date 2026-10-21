@@ -1,5 +1,6 @@
 const express = require("express");
 const pool = require("../db");
+const { consultarVentas, armarBoleta } = require("./ventas");
 
 // Rutas públicas: se abren sin iniciar sesión (catálogo y boletas enviadas a clientes).
 // Nunca devuelven costos, ganancias ni datos internos.
@@ -50,31 +51,15 @@ router.get("/boletas/:token", async (req, res) => {
     }
 
     try {
-        const resultado = await pool.query(
-            `SELECT
-                ventas.id,
-                ventas.token,
-                TO_CHAR(ventas.fecha, 'YYYY-MM-DD"T"HH24:MI:SS') AS fecha,
-                productos.nombre AS producto,
-                productos.codigo,
-                ventas.modalidad,
-                ventas.cantidad,
-                ventas.precio_unitario AS "precioUnitario",
-                ventas.total,
-                ventas.metodo_pago AS "metodoPago",
-                COALESCE(usuarios.nombre, 'Mil Deseos') AS vendedor
-             FROM ventas
-             INNER JOIN productos ON ventas.producto_id = productos.id
-             LEFT JOIN usuarios ON ventas.usuario_id = usuarios.id
-             WHERE ventas.token = $1`,
-            [req.params.token]
-        );
+        // El enlace usa el grupo de la venta. Los enlaces antiguos (de una sola fila) usaban
+        // su token, que es igual al grupo de esas ventas.
+        const filas = await consultarVentas(false, req.params.token);
 
-        if (resultado.rows.length === 0) {
+        if (filas.length === 0) {
             return res.status(404).json({ error: "Boleta no encontrada." });
         }
 
-        res.json(resultado.rows[0]);
+        res.json(armarBoleta(filas));
     } catch (error) {
         console.error("Error al consultar la boleta:", error.message);
         res.status(500).json({ error: "No se pudo cargar la boleta." });

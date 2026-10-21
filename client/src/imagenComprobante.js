@@ -11,10 +11,13 @@ import {
 const ANCHO = 600;
 const ESCALA = 2; // Doble resolución para que se vea nítida en el celular.
 const MARGEN = 40;
+const IZQUIERDA = MARGEN + 20;
+const DERECHA = ANCHO - MARGEN - 20;
 
 const COLORES = {
     fondo: "#ffffff",
     morado: "#6d28d9",
+    moradoOscuro: "#4c1d95",
     moradoClaro: "#a78bfa",
     lila: "#f5f0ff",
     borde: "#e9d5ff",
@@ -51,16 +54,16 @@ function rectanguloRedondeado(ctx, x, y, ancho, alto, radio) {
     ctx.roundRect(x, y, ancho, alto, radio);
 }
 
-function fila(ctx, y, etiqueta, valor, { negrita = true } = {}) {
+function fila(ctx, y, etiqueta, valor) {
     ctx.font = `500 17px ${SANS}`;
     ctx.fillStyle = COLORES.suave;
     ctx.textAlign = "left";
-    ctx.fillText(etiqueta, MARGEN + 20, y);
+    ctx.fillText(etiqueta, IZQUIERDA, y);
 
-    ctx.font = `${negrita ? 700 : 500} 17px ${SANS}`;
+    ctx.font = `600 17px ${SANS}`;
     ctx.fillStyle = COLORES.texto;
     ctx.textAlign = "right";
-    ctx.fillText(valor, ANCHO - MARGEN - 20, y);
+    ctx.fillText(valor, DERECHA, y);
     ctx.textAlign = "left";
 }
 
@@ -70,14 +73,27 @@ function lineaPunteada(ctx, y) {
     ctx.lineWidth = 1.5;
     ctx.setLineDash([6, 6]);
     ctx.beginPath();
-    ctx.moveTo(MARGEN + 20, y);
-    ctx.lineTo(ANCHO - MARGEN - 20, y);
+    ctx.moveTo(IZQUIERDA, y);
+    ctx.lineTo(DERECHA, y);
     ctx.stroke();
     ctx.restore();
 }
 
-// Dibuja el comprobante y devuelve un archivo PNG listo para compartir.
-export async function generarImagenComprobante(venta) {
+// Prepara cada producto: líneas del nombre y alto que ocupa.
+function medirItems(ctx, items) {
+    ctx.font = `700 18px ${SANS}`;
+
+    return items.map((item) => {
+        // El nombre deja espacio a la derecha para el importe.
+        const lineas = partirTexto(ctx, item.producto, DERECHA - IZQUIERDA - 130);
+        const porDocena = item.modalidad === "docena";
+        const detalle = `${describirCantidad(item)} × ${moneda(precioCobrado(item))}${porDocena ? " c/docena" : ""}`;
+        return { item, lineas, detalle, alto: lineas.length * 24 + (item.codigo ? 20 : 0) + 26 + 18 };
+    });
+}
+
+// Dibuja la boleta (uno o varios productos) y devuelve un archivo PNG listo para compartir.
+export async function generarImagenComprobante(boleta) {
     // Espera a que carguen las fuentes de la página para usarlas en el dibujo.
     if (document.fonts?.ready) {
         await document.fonts.ready;
@@ -86,23 +102,19 @@ export async function generarImagenComprobante(venta) {
     const lienzo = document.createElement("canvas");
     const ctx = lienzo.getContext("2d");
 
-    // Primero se calcula cuántas líneas ocupa el nombre del producto.
-    ctx.font = `700 22px ${SANS}`;
-    const lineasProducto = partirTexto(ctx, venta.producto, ANCHO - MARGEN * 2 - 40);
-    const altoProducto = 30 + lineasProducto.length * 28 + (venta.codigo ? 24 : 0) + 10;
-
-    const alto = 170 + 90 + altoProducto + 150 + 120 + 90 + 64;
+    const medidos = medirItems(ctx, boleta.items);
+    const altoItems = medidos.reduce((suma, m) => suma + m.alto, 0);
+    const alto = 150 + 110 + 50 + altoItems + 40 + 120 + 140;
 
     lienzo.width = ANCHO * ESCALA;
     lienzo.height = alto * ESCALA;
     ctx.scale(ESCALA, ESCALA);
     ctx.textBaseline = "alphabetic";
 
-    // Fondo
+    // Fondo y tarjeta
     ctx.fillStyle = "#faf7ff";
     ctx.fillRect(0, 0, ANCHO, alto);
 
-    // Tarjeta blanca
     rectanguloRedondeado(ctx, 20, 20, ANCHO - 40, alto - 40, 24);
     ctx.fillStyle = COLORES.fondo;
     ctx.fill();
@@ -125,57 +137,83 @@ export async function generarImagenComprobante(venta) {
     ctx.font = `700 38px ${SERIF}`;
     ctx.fillText("Mil Deseos", ANCHO / 2, 85);
     ctx.font = `500 17px ${SANS}`;
-    ctx.fillText(`Boleta de venta N° ${numeroComprobante(venta)}`, ANCHO / 2, 120);
+    ctx.fillText(`Boleta de venta N° ${numeroComprobante(boleta)}`, ANCHO / 2, 120);
     ctx.textAlign = "left";
 
     let y = 195;
-
-    fila(ctx, y, "Fecha", formatearFecha(venta.fecha), { negrita: false });
+    fila(ctx, y, "Fecha", formatearFecha(boleta.fecha));
     y += 32;
-    fila(ctx, y, "Atendido por", venta.vendedor, { negrita: false });
-    y += 30;
+    fila(ctx, y, "Atendido por", boleta.vendedor);
+    y += 32;
+    fila(ctx, y, "Método de pago", nombreMetodoPago(boleta.metodoPago));
+    y += 26;
 
-    // Recuadro del producto
-    rectanguloRedondeado(ctx, MARGEN, y, ANCHO - MARGEN * 2, altoProducto, 14);
+    // Encabezado de la lista
+    rectanguloRedondeado(ctx, MARGEN, y, ANCHO - MARGEN * 2, 34, 10);
     ctx.fillStyle = COLORES.lila;
     ctx.fill();
+    ctx.font = `700 14px ${SANS}`;
+    ctx.fillStyle = COLORES.moradoOscuro;
+    ctx.fillText(`PRODUCTOS (${boleta.items.length})`, IZQUIERDA, y + 22);
+    ctx.textAlign = "right";
+    ctx.fillText("IMPORTE", DERECHA, y + 22);
+    ctx.textAlign = "left";
+    y += 34 + 16;
 
-    let yProducto = y + 36;
-    ctx.fillStyle = "#4c1d95";
-    ctx.font = `700 22px ${SANS}`;
-    for (const linea of lineasProducto) {
-        ctx.fillText(linea, MARGEN + 20, yProducto);
-        yProducto += 28;
-    }
+    // Productos
+    medidos.forEach(({ item, lineas, detalle, alto: altoItem }, indice) => {
+        let yItem = y + 22;
 
-    if (venta.codigo) {
-        ctx.fillStyle = COLORES.suave;
+        ctx.font = `700 18px ${SANS}`;
+        ctx.fillStyle = COLORES.moradoOscuro;
+        lineas.forEach((linea, i) => {
+            ctx.fillText(linea, IZQUIERDA, yItem + i * 24);
+        });
+
+        ctx.textAlign = "right";
+        ctx.fillStyle = COLORES.texto;
+        ctx.fillText(moneda(item.total), DERECHA, yItem);
+        ctx.textAlign = "left";
+
+        yItem += (lineas.length - 1) * 24;
+
+        if (item.codigo) {
+            yItem += 20;
+            ctx.font = `500 13px ${SANS}`;
+            ctx.fillStyle = COLORES.suave;
+            ctx.fillText(`Código: ${item.codigo}`, IZQUIERDA, yItem);
+        }
+
+        yItem += 24;
         ctx.font = `500 15px ${SANS}`;
-        ctx.fillText(`Código: ${venta.codigo}`, MARGEN + 20, yProducto);
-    }
+        ctx.fillStyle = COLORES.suave;
+        ctx.fillText(detalle, IZQUIERDA, yItem);
 
-    y += altoProducto + 38;
+        y += altoItem;
 
-    const porDocena = venta.modalidad === "docena";
-    fila(ctx, y, "Cantidad", describirCantidad(venta));
-    y += 34;
-    fila(ctx, y, `Precio por ${porDocena ? "docena" : "unidad"}`, moneda(precioCobrado(venta)));
-    y += 34;
-    fila(ctx, y, "Método de pago", nombreMetodoPago(venta.metodoPago));
-    y += 30;
+        if (indice < medidos.length - 1) {
+            lineaPunteada(ctx, y - 6);
+        }
+    });
 
-    lineaPunteada(ctx, y);
-    y += 58;
+    y += 10;
+    ctx.strokeStyle = COLORES.borde;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(IZQUIERDA, y);
+    ctx.lineTo(DERECHA, y);
+    ctx.stroke();
+    y += 52;
 
     // Total
     ctx.font = `700 22px ${SANS}`;
     ctx.fillStyle = COLORES.morado;
-    ctx.fillText("Total", MARGEN + 20, y);
+    ctx.fillText("Total", IZQUIERDA, y);
     ctx.font = `800 40px ${SANS}`;
     ctx.textAlign = "right";
-    ctx.fillText(moneda(venta.total), ANCHO - MARGEN - 20, y + 4);
+    ctx.fillText(moneda(boleta.total), DERECHA, y + 4);
     ctx.textAlign = "left";
-    y += 40;
+    y += 38;
 
     lineaPunteada(ctx, y);
     y += 46;
@@ -196,8 +234,11 @@ export async function generarImagenComprobante(venta) {
     ctx.textAlign = "left";
 
     const blob = await new Promise((resolver, rechazar) =>
-        lienzo.toBlob((resultado) => (resultado ? resolver(resultado) : rechazar(new Error("No se pudo crear la imagen."))), "image/png")
+        lienzo.toBlob(
+            (resultado) => (resultado ? resolver(resultado) : rechazar(new Error("No se pudo crear la imagen."))),
+            "image/png"
+        )
     );
 
-    return new File([blob], `comprobante-${numeroComprobante(venta)}.png`, { type: "image/png" });
+    return new File([blob], `boleta-${numeroComprobante(boleta)}.png`, { type: "image/png" });
 }

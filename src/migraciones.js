@@ -51,6 +51,16 @@ const MIGRACIONES = `
     ALTER TABLE productos
         ADD COLUMN IF NOT EXISTS seccion_id INTEGER REFERENCES secciones(id) ON DELETE SET NULL;
 
+    -- Ventas con varios productos: cada producto es una fila y todas las filas de la
+    -- misma venta comparten "grupo" (que también es la clave del enlace de la boleta).
+    ALTER TABLE ventas ADD COLUMN IF NOT EXISTS grupo UUID;
+    UPDATE ventas SET grupo = token WHERE grupo IS NULL;
+    ALTER TABLE ventas ALTER COLUMN grupo SET NOT NULL;
+    CREATE INDEX IF NOT EXISTS ventas_grupo_idx ON ventas (grupo);
+
+    -- Jefe que autorizó vender por debajo del precio mínimo (NULL si no hizo falta).
+    ALTER TABLE ventas ADD COLUMN IF NOT EXISTS autorizado_por INTEGER REFERENCES usuarios(id);
+
     -- Acelera los filtros del historial por día y mes.
     CREATE INDEX IF NOT EXISTS ventas_fecha_idx ON ventas (fecha);
 

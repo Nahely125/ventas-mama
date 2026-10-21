@@ -6,6 +6,13 @@ function monedaOpcional(valor) {
 }
 
 export default function HistorialVentas({ ventas, error, esJefe, textoVacio, onVerComprobante }) {
+    // Número de boleta = el id más bajo de las filas de la misma venta.
+    const numeros = new Map();
+    for (const venta of ventas ?? []) {
+        numeros.set(venta.grupo, Math.min(numeros.get(venta.grupo) ?? Infinity, venta.id));
+    }
+    const boletaDe = (venta) => numeros.get(venta.grupo) ?? venta.id;
+
     const columnas = esJefe ? 10 : 8;
 
     let filas;
@@ -22,6 +29,7 @@ export default function HistorialVentas({ ventas, error, esJefe, textoVacio, onV
                 <td data-etiqueta="Producto" className="celda-producto">
                     {venta.codigo && <span className="codigo-producto">{venta.codigo}</span>}
                     {venta.producto}
+                    <small className="numero-boleta">Boleta N° {String(boletaDe(venta)).padStart(6, "0")}</small>
                 </td>
                 <td data-etiqueta="Vendedor" className="celda-flexible">{venta.vendedor || "No registrado"}</td>
                 <td data-etiqueta="Cantidad" className="celda-flexible">{describirCantidad(venta)}</td>

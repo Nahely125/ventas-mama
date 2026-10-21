@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { moneda } from "../api.js";
 import { formatearDia, hoy, mesesDisponibles, nombreMes } from "../fechas.js";
-import { METODOS_PAGO } from "../venta.js";
+import { METODOS_PAGO, boletaDesdeFilas } from "../venta.js";
 import Comprobante from "./Comprobante.jsx";
 import HistorialVentas from "./HistorialVentas.jsx";
 
@@ -138,11 +138,13 @@ export default function Historial({ esJefe, ventas, error }) {
                 textoVacio={modo === "todo"
                     ? "Todavía no hay ventas registradas."
                     : "No hay ventas en este periodo."}
-                onVerComprobante={setComprobante}
+                onVerComprobante={(venta) =>
+                    setComprobante(boletaDesdeFilas(todas.filter((v) => v.grupo === venta.grupo)))
+                }
             />
 
             {comprobante && (
-                <Comprobante venta={comprobante} onCerrar={() => setComprobante(null)} />
+                <Comprobante boleta={comprobante} onCerrar={() => setComprobante(null)} />
             )}
         </div>
     );

@@ -13,7 +13,8 @@ function descargar(archivo) {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export default function Comprobante({ venta, onCerrar }) {
+// boleta: { numero, grupo, fecha, vendedor, metodoPago, total, items[] }
+export default function Comprobante({ boleta: venta, onCerrar }) {
     const dialogo = useRef(null);
     const [archivo, setArchivo] = useState(null);
     const [vistaPrevia, setVistaPrevia] = useState("");

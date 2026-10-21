@@ -176,7 +176,7 @@ app.post("/api/logout", (req, res) => {
 
 app.use("/api/publico", require("./rutas/publico"));
 app.use("/api/productos", require("./rutas/productos").router);
-app.use("/api/ventas", require("./rutas/ventas"));
+app.use("/api/ventas", require("./rutas/ventas").router);
 app.use("/api/resumen", require("./rutas/resumen"));
 app.use("/api/usuarios", require("./rutas/usuarios"));
 app.use("/api/gastos", require("./rutas/gastos"));

@@ -39,8 +39,25 @@ export function precioCobrado(venta) {
         : Number(venta.precioUnitario);
 }
 
-export function numeroComprobante(venta) {
-    return String(venta.id).padStart(6, "0");
+// Una boleta junta todos los productos de una misma venta (mismo "grupo").
+export function numeroComprobante(boleta) {
+    return String(boleta.numero).padStart(6, "0");
+}
+
+// Agrupa las filas del historial (una por producto) en boletas.
+export function boletaDesdeFilas(filas) {
+    const ordenadas = [...filas].sort((a, b) => a.id - b.id);
+    const primera = ordenadas[0];
+
+    return {
+        numero: primera.id,
+        grupo: primera.grupo,
+        fecha: primera.fecha,
+        vendedor: primera.vendedor,
+        metodoPago: primera.metodoPago,
+        total: ordenadas.reduce((suma, f) => suma + Number(f.total), 0).toFixed(2),
+        items: ordenadas
+    };
 }
 
 // Enlaces públicos (se abren sin iniciar sesión).
@@ -48,30 +65,8 @@ export function enlaceCatalogo() {
     return `${window.location.origin}/catalogo`;
 }
 
-export function enlaceBoleta(venta) {
-    return venta.token ? `${window.location.origin}/boleta/${venta.token}` : null;
-}
-
-export function textoComprobante(venta) {
-    const porDocena = venta.modalidad === "docena";
-
-    return [
-        "*Mil Deseos*",
-        `Boleta de venta N° ${numeroComprobante(venta)}`,
-        `Fecha: ${formatearFecha(venta.fecha)}`,
-        `Atendido por: ${venta.vendedor}`,
-        "",
-        `Producto: ${venta.producto}${venta.codigo ? ` (${venta.codigo})` : ""}`,
-        `Cantidad: ${describirCantidad(venta)}`,
-        `Precio por ${porDocena ? "docena" : "unidad"}: ${moneda(precioCobrado(venta))}`,
-        `*Total: ${moneda(venta.total)}*`,
-        `Método de pago: ${nombreMetodoPago(venta.metodoPago)}`,
-        "",
-        ...(enlaceBoleta(venta) ? [`🧾 Ver boleta: ${enlaceBoleta(venta)}`] : []),
-        `🛍️ Catálogo: ${enlaceCatalogo()}`,
-        "",
-        "¡Gracias por su compra!"
-    ].join("\n");
+export function enlaceBoleta(boleta) {
+    return boleta.grupo ? `${window.location.origin}/boleta/${boleta.grupo}` : null;
 }
 
 // Devuelve el número listo para wa.me (con código de país) o null si no es válido.
