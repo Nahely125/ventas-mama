@@ -18,7 +18,7 @@ export default function ModalEditarProducto({ producto, onCerrar, onGuardado, on
         precioMinimo: String(producto.precioMinimo ?? ""),
         // Precio por unidad en la docena = precio de la docena ÷ 12.
         precioUnidadDocena: (Number(producto.precioDocena) / 12).toFixed(2),
-        unidadDocenaAuto: (Number(producto.precioDocena) / 12).toFixed(2) === Number(producto.precio).toFixed(2),
+        precioMinimoDocena: String(producto.precioMinimoDocena ?? ""),
         precioCompra: (Number(producto.precioCompra) * unidades).toFixed(2),
         unidadesPorCaja: String(unidades),
         stock: String(producto.stock),

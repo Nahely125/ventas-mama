@@ -2,6 +2,7 @@ const CAMPOS_NUMERICOS = [
     "precio",
     "precioMinimo",
     "precioUnidadDocena",
+    "precioMinimoDocena",
     "precioCompra",
     "unidadesPorCaja",
     "stock"
@@ -17,9 +18,8 @@ export function validarProducto(valores) {
         // Precio de la docena = precio por unidad en la docena × 12.
         precioDocena: Number((Number(valores.precioUnidadDocena) * 12).toFixed(2)),
         precioMinimo: Number(valores.precioMinimo),
-        // Mínimo por docena = mínimo × 12, pero nunca más alto que el precio de la docena
-        // (así vender a ese precio por docena no pide autorización).
-        precioMinimoDocena: Number(Math.min(Number(valores.precioMinimo) * 12, Number(valores.precioUnidadDocena) * 12).toFixed(2)),
+        // El mínimo por docena se escribe aparte (es el precio de la docena completa).
+        precioMinimoDocena: Number(valores.precioMinimoDocena),
         precioCompra: Number(valores.precioCompra),
         unidadesPorCaja: Number(valores.unidadesPorCaja),
         stock: Number(valores.stock),
@@ -99,7 +99,7 @@ export function calcularGanancias(valores) {
     const minimo = numero("precioMinimo");
     const unidadDocena = numero("precioUnidadDocena");
     const docena = unidadDocena === null ? null : unidadDocena * 12;
-    const minimoDocena = minimo === null ? null : minimo * 12;
+    const minimoDocena = numero("precioMinimoDocena");
 
     const resultado = {
         costo,

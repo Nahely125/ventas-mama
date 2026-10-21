@@ -10,7 +10,7 @@ const VALORES_INICIALES = {
     precio: "",
     precioMinimo: "",
     precioUnidadDocena: "",
-    unidadDocenaAuto: true,
+    precioMinimoDocena: "",
     precioCompra: "",
     unidadesPorCaja: "1",
     stock: "",

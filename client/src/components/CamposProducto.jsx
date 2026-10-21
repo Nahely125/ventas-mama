@@ -91,15 +91,6 @@ export default function CamposProducto({ valores, onCambio, prefijo, etiquetaCom
                 }
             }
 
-            // El precio por unidad en la docena sigue al precio por unidad hasta que se escriba a mano.
-            if (name === "precioUnidadDocena") {
-                nuevos.unidadDocenaAuto = false;
-            }
-
-            if (name === "precio" && anteriores.unidadDocenaAuto) {
-                nuevos.precioUnidadDocena = value;
-            }
-
             return nuevos;
         });
     }
@@ -271,7 +262,7 @@ export default function CamposProducto({ valores, onCambio, prefijo, etiquetaCom
             <fieldset className="grupo-campos">
                 <legend>Precios de venta</legend>
 
-                <div className="fila-campos tabla-precios">
+                <div className="fila-campos fila-dos tabla-precios">
                     <div className="campo">
                         <label htmlFor={id("precio")}>Precio por unidad (S/)</label>
                         <input
@@ -318,10 +309,24 @@ export default function CamposProducto({ valores, onCambio, prefijo, etiquetaCom
                             onChange={cambiar}
                             required
                         />
-                        <span className="ayuda-campo">
-                            A cuánto sale cada unidad si compran por docena
-                            {valores.unidadDocenaAuto ? " (igual al precio por unidad; cámbialo si haces precio por mayor)." : "."}
-                        </span>
+                        <span className="ayuda-campo">A cuánto sale cada unidad cuando compran por docena.</span>
+                    </div>
+
+                    <div className="campo">
+                        <label htmlFor={id("precioMinimoDocena")}>Precio mínimo por docena (S/)</label>
+                        <input
+                            type="number"
+                            id={id("precioMinimoDocena")}
+                            name="precioMinimoDocena"
+                            min="0"
+                            step="0.01"
+                            inputMode="decimal"
+                            placeholder="24.00"
+                            value={valores.precioMinimoDocena}
+                            onChange={cambiar}
+                            required
+                        />
+                        <span className="ayuda-campo">Lo menos que un empleado puede cobrar por la docena completa.</span>
                     </div>
                 </div>
 
