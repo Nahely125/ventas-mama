@@ -156,9 +156,10 @@ export default function DictadoVenta({ productos, onAgregar, onCerrar }) {
                                 <select
                                     value={linea.modalidad}
                                     onChange={(e) => cambiarLinea(linea.clave, { modalidad: e.target.value })}
-                                    aria-label="Unidad o docena"
+                                    aria-label="Unidad, media docena o docena"
                                 >
                                     <option value="unidad">u.</option>
+                                    <option value="media">½ doc.</option>
                                     <option value="docena">doc.</option>
                                 </select>
                                 <select

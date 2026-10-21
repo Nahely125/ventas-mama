@@ -23,20 +23,33 @@ export function formatearFecha(fecha) {
     });
 }
 
-// En la base de datos la cantidad siempre está en unidades.
-export function describirCantidad(venta) {
-    if (venta.modalidad === "docena") {
-        const docenas = venta.cantidad / 12;
-        return `${docenas} ${docenas === 1 ? "docena" : "docenas"} (${venta.cantidad} u.)`;
-    }
+// Unidades que trae cada modalidad de venta (media = media docena).
+export const UNIDADES_MODALIDAD = { unidad: 1, media: 6, docena: 12, obsequio: 1 };
 
-    return `${venta.cantidad} ${venta.cantidad === 1 ? "unidad" : "unidades"}`;
+export function nombreModalidad(modalidad, cantidad = 1) {
+    const uno = cantidad === 1;
+    if (modalidad === "docena") return uno ? "docena" : "docenas";
+    if (modalidad === "media") return uno ? "media docena" : "medias docenas";
+    return uno ? "unidad" : "unidades";
 }
 
-// Precio cobrado por unidad o por docena, según cómo se vendió.
+// En la base de datos la cantidad siempre está en unidades.
+export function describirCantidad(venta) {
+    const porPaquete = UNIDADES_MODALIDAD[venta.modalidad] ?? 1;
+
+    if (porPaquete > 1) {
+        const paquetes = venta.cantidad / porPaquete;
+        return `${paquetes} ${nombreModalidad(venta.modalidad, paquetes)} (${venta.cantidad} u.)`;
+    }
+
+    return `${venta.cantidad} ${nombreModalidad("unidad", venta.cantidad)}`;
+}
+
+// Precio cobrado por unidad, por media docena o por docena, según cómo se vendió.
 export function precioCobrado(venta) {
-    return venta.modalidad === "docena"
-        ? importeItem(venta) / (venta.cantidad / 12)
+    const porPaquete = UNIDADES_MODALIDAD[venta.modalidad] ?? 1;
+    return porPaquete > 1
+        ? importeItem(venta) / (venta.cantidad / porPaquete)
         : Number(venta.precioUnitario);
 }
 

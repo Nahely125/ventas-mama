@@ -87,10 +87,10 @@ function medirItems(ctx, items) {
     return items.map((item) => {
         // El nombre deja espacio a la derecha para el importe.
         const lineas = partirTexto(ctx, item.producto, DERECHA - IZQUIERDA - 130);
-        const porDocena = item.modalidad === "docena";
+        const porPaquete = item.modalidad === "docena" ? " c/docena" : item.modalidad === "media" ? " c/media docena" : "";
         const detalle = item.obsequio
             ? `${describirCantidad(item)} · 🎁 Obsequio`
-            : `${describirCantidad(item)} × ${moneda(precioCobrado(item))}${porDocena ? " c/docena" : ""}`;
+            : `${describirCantidad(item)} × ${moneda(precioCobrado(item))}${porPaquete}`;
         return { item, lineas, detalle, alto: lineas.length * 24 + (item.codigo ? 20 : 0) + 26 + 18 };
     });
 }

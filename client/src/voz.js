@@ -12,7 +12,7 @@ const NUMEROS = {
 
 // Palabras que no ayudan a identificar el producto.
 const RELLENO = new Set([
-    "de", "del", "la", "las", "el", "los", "unidad", "unidades", "docena", "docenas", "media",
+    "de", "del", "la", "las", "el", "los", "unidad", "unidades", "docena", "docenas", "media", "medias",
     "quiero", "dame", "deme", "vende", "vendo", "agrega", "agregar", "pon", "ponme", "por", "favor",
     "con", "para", "porfa", "porfavor", "x", "pieza", "piezas"
 ]);
@@ -97,7 +97,7 @@ function mejorProducto(tokens, productos) {
 }
 
 /* Devuelve una lista de { texto, cantidad, modalidad, producto | null }.
-   "media docena" se toma como 6 unidades. Si no se dice cantidad, es 1. */
+   "media docena" se vende como media docena (6 u.). Si no se dice cantidad, es 1. */
 export function interpretarPedido(texto, productos) {
     // Primero se separa por comas, punto y coma o puntos (que no sean decimales como "1.80"),
     // y luego por "y", "más", "además"... salvo en números como "treinta y dos".
@@ -122,8 +122,8 @@ export function interpretarPedido(texto, productos) {
                 tokens.splice(lectura.indice, lectura.largo ?? 1);
             }
 
-            if (/\bmedia docena\b/.test(fragmento)) {
-                cantidad = 6 * (lectura ? lectura.cantidad : 1);
+            if (/\bmedias? docenas?\b/.test(fragmento)) {
+                modalidad = "media";
             } else if (/\bdocenas?\b/.test(fragmento)) {
                 modalidad = "docena";
             }

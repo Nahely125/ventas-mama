@@ -48,7 +48,7 @@ export default function HistorialVentas({ ventas, error, esJefe, textoVacio, onV
                 </td>
                 <td data-etiqueta="Vendedor" className="celda-flexible">{venta.vendedor || "No registrado"}</td>
                 <td data-etiqueta="Cantidad" className="celda-flexible">{describirCantidad(venta)}</td>
-                <td data-etiqueta={venta.modalidad === "docena" ? "Precio docena" : "Precio unitario"}>
+                <td data-etiqueta={venta.modalidad === "docena" ? "Precio docena" : venta.modalidad === "media" ? "Precio media docena" : "Precio unitario"}>
                     {moneda(precioCobrado(venta))}
                 </td>
                 <td data-etiqueta="Total" className="celda-total">{moneda(venta.total)}</td>

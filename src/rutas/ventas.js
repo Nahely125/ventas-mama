@@ -9,6 +9,7 @@ const router = express.Router();
 const {
     METODOS_PAGO,
     MODALIDADES,
+    UNIDADES_MODALIDAD,
     MAXIMO_PRODUCTOS,
     INTENTOS_MAXIMOS,
     BLOQUEO_MS,
@@ -17,6 +18,15 @@ const {
     armarBoleta
 } = require("./consultasVentas");
 const { COSTO_MAXIMO_OBSEQUIO, normalizarCodigo, resolverAjuste, repartirAjuste } = require("./ajustes");
+
+const NOMBRE_MODALIDAD = { unidad: "unidad", media: "media docena", docena: "docena" };
+
+// Precio mínimo de la modalidad: la media docena tiene la mitad del mínimo de la docena.
+function minimoDe(producto, modalidad) {
+    if (modalidad === "docena") return Number(producto.precio_minimo_docena);
+    if (modalidad === "media") return Number((Number(producto.precio_minimo_docena) / 2).toFixed(2));
+    return Number(producto.precio_minimo);
+}
 
 function validarItems(items) {
     if (!Array.isArray(items) || items.length === 0 || items.length > MAXIMO_PRODUCTOS) {
@@ -107,8 +117,8 @@ router.post("/validar-ajuste", requiereSesion, async (req, res) => {
 
 /* Registrar una venta con uno o varios productos.
    items: [{ productoId, cantidad, modalidad, precio, obsequio }]
-     cantidad: número de unidades o de docenas, según la modalidad.
-     precio: precio por unidad o por docena; puede ajustarse. Obsequio: precio 0, por unidad.
+     cantidad: número de unidades, medias docenas o docenas, según la modalidad.
+     precio: precio por unidad, por media docena o por docena; puede ajustarse. Obsequio: precio 0, por unidad.
    ajuste: { codigo, monto } descuento sobre el total con un código que registró el jefe,
            o { libre: true, monto } ajuste directo del jefe (sin código).
    Si algún precio está por debajo del mínimo, un trabajador necesita passwordJefe. */
@@ -187,8 +197,8 @@ router.post("/", requiereSesion, async (req, res) => {
                 return res.status(404).json({ error: "Uno de los productos ya no existe." });
             }
 
-            const esDocena = (item.modalidad ?? "unidad") === "docena";
-            const unidades = item.cantidad * (esDocena ? 12 : 1);
+            const modalidad = item.modalidad ?? "unidad";
+            const unidades = item.cantidad * UNIDADES_MODALIDAD[modalidad];
             unidadesPorProducto.set(producto.id, (unidadesPorProducto.get(producto.id) ?? 0) + unidades);
 
             if (item.obsequio === true) {
@@ -205,10 +215,10 @@ router.post("/", requiereSesion, async (req, res) => {
                 continue;
             }
 
-            const minimo = Number(esDocena ? producto.precio_minimo_docena : producto.precio_minimo);
+            const minimo = minimoDe(producto, modalidad);
 
             if (Math.round(item.precio * 100) < Math.round(minimo * 100)) {
-                bajoMinimo.push(`${producto.nombre} (mínimo S/ ${minimo.toFixed(2)} por ${esDocena ? "docena" : "unidad"})`);
+                bajoMinimo.push(`${producto.nombre} (mínimo S/ ${minimo.toFixed(2)} por ${NOMBRE_MODALIDAD[modalidad]})`);
             }
         }
 
@@ -273,12 +283,11 @@ router.post("/", requiereSesion, async (req, res) => {
         for (const [indice, item] of items.entries()) {
             const producto = productos.get(item.productoId);
             const modalidad = item.modalidad ?? "unidad";
-            const esDocena = modalidad === "docena";
-            const unidades = item.cantidad * (esDocena ? 12 : 1);
+            const unidades = item.cantidad * UNIDADES_MODALIDAD[modalidad];
             const precioVenta = Number(item.precio.toFixed(2));
             const descuento = descuentos[indice];
             const total = Number((importes[indice] - descuento).toFixed(2));
-            const precioUnitario = Number((esDocena ? precioVenta / 12 : precioVenta).toFixed(2));
+            const precioUnitario = Number((precioVenta / UNIDADES_MODALIDAD[modalidad]).toFixed(2));
             const unidades2025 = Math.min(quedan2025.get(producto.id), unidades);
             quedan2025.set(producto.id, quedan2025.get(producto.id) - unidades2025);
 

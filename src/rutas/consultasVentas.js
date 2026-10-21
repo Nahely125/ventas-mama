@@ -1,5 +1,7 @@
 const METODOS_PAGO = ["efectivo", "yape", "plin", "transferencia", "fiado"];
-const MODALIDADES = ["unidad", "docena"];
+const MODALIDADES = ["unidad", "media", "docena"];
+// Unidades que trae cada modalidad (media = media docena).
+const UNIDADES_MODALIDAD = { unidad: 1, media: 6, docena: 12 };
 const MAXIMO_PRODUCTOS = 40;
 const POR_PAGINA = 30;
 
@@ -171,6 +173,7 @@ function armarBoleta(filas) {
 module.exports = {
     METODOS_PAGO,
     MODALIDADES,
+    UNIDADES_MODALIDAD,
     MAXIMO_PRODUCTOS,
     POR_PAGINA,
     INTENTOS_MAXIMOS,

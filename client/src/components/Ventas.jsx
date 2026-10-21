@@ -1,26 +1,37 @@
 import { useEffect, useRef, useState } from "react";
 import { moneda, pedir } from "../api.js";
-import { METODOS_PAGO } from "../venta.js";
+import { METODOS_PAGO, UNIDADES_MODALIDAD, nombreModalidad } from "../venta.js";
 import BuscadorProducto from "./BuscadorProducto.jsx";
 import Comprobante from "./Comprobante.jsx";
 import DatosPago from "./DatosPago.jsx";
 import DictadoVenta from "./DictadoVenta.jsx";
 import SelectorCliente from "./SelectorCliente.jsx";
 
-// Precio de lista de la modalidad: por unidad, por docena completa o gratis (obsequio).
-function precioDeLista(producto, modalidad) {
-    if (!producto) return "";
-    if (modalidad === "obsequio") return "0.00";
-    return Number(modalidad === "docena" ? producto.precioDocena : producto.precio).toFixed(2);
+const unidadesDe = (modalidad) => UNIDADES_MODALIDAD[modalidad] ?? 1;
+// Docena y media docena: se escribe el precio por unidad y se calcula el del paquete.
+const esPaquete = (modalidad) => modalidad === "docena" || modalidad === "media";
+
+// Precio de lista del paquete: unidad, media docena (mitad de la docena), docena o gratis (obsequio).
+function precioPaquete(producto, modalidad) {
+    if (modalidad === "obsequio") return 0;
+    if (modalidad === "docena") return Number(producto.precioDocena);
+    if (modalidad === "media") return Number((Number(producto.precioDocena) / 2).toFixed(2));
+    return Number(producto.precio);
 }
 
-// Mínimo de la unidad o de la docena completa (el que valida el servidor).
+// Mínimo del paquete (el que valida el servidor): la media docena tiene la mitad del de la docena.
 function minimoDe(producto, modalidad) {
     if (modalidad === "obsequio") return 0;
-    return Number(modalidad === "docena" ? producto.precioMinimoDocena : producto.precioMinimo);
+    if (modalidad === "docena") return Number(producto.precioMinimoDocena);
+    if (modalidad === "media") return Number((Number(producto.precioMinimoDocena) / 2).toFixed(2));
+    return Number(producto.precioMinimo);
 }
 
-const unidadesDe = (modalidad) => (modalidad === "docena" ? 12 : 1);
+// Lo que se escribe en el formulario: siempre el precio por unidad.
+function precioDeLista(producto, modalidad) {
+    if (!producto) return "";
+    return (precioPaquete(producto, modalidad) / unidadesDe(modalidad)).toFixed(2);
+}
 
 function centimos(valor) {
     return Math.round(Number(valor) * 100);
@@ -58,7 +69,7 @@ function ModalAutorizacion({ productos, error, enviando, onConfirmar, onCerrar }
                     {productos.map((item) => (
                         <li key={item.clave}>
                             <strong>{item.producto.nombre}</strong>: {moneda(item.precio)} (mínimo{" "}
-                            {moneda(minimoDe(item.producto, item.modalidad))} por {item.modalidad})
+                            {moneda(minimoDe(item.producto, item.modalidad))} por {nombreModalidad(item.modalidad)})
                         </li>
                     ))}
                 </ul>
@@ -122,7 +133,8 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
     // Usar siempre los datos más recientes del producto (por ejemplo, el stock).
     const productoActual = producto ? buscarActual(producto.id) ?? producto : null;
 
-    const esDocena = modalidad === "docena";
+    const porUnidades = unidadesDe(modalidad);
+    const esDePaquete = esPaquete(modalidad);
     const esObsequio = modalidad === "obsequio";
     // El jefe puede obsequiar cualquier producto; un empleado, solo los de costo menor a S/ 5.
     const puedeObsequiar = Boolean(productoActual && (esJefe || productoActual.obsequiable));
@@ -131,10 +143,17 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
     const precioNumero = Number(precio);
     const precioValido = precio !== "" && Number.isFinite(precioNumero) && precioNumero > 0 ? precioNumero : 0;
     const lista = precioDeLista(productoActual, modalidad);
-    const minimo = productoActual ? minimoDe(productoActual, modalidad) : null;
+    const minimoPaquete = productoActual ? minimoDe(productoActual, modalidad) : null;
+    const minimo = minimoPaquete === null ? null : minimoPaquete / porUnidades;
+    // Precio del paquete: precio por unidad × unidades (al precio de lista, exactamente el registrado).
+    const precioDelPaquete = !productoActual || esObsequio
+        ? 0
+        : precio === lista
+            ? precioPaquete(productoActual, modalidad)
+            : Number((precioValido * porUnidades).toFixed(2));
     // El precio mínimo solo limita a los empleados; el jefe vende al precio que quiera.
-    const bajoMinimo = !esJefe && !esObsequio && minimo !== null && precioValido > 0
-        && centimos(precioValido) < centimos(minimo);
+    const bajoMinimo = !esJefe && !esObsequio && minimoPaquete !== null && precioValido > 0
+        && centimos(precioDelPaquete) < centimos(minimoPaquete);
 
     // Unidades ya puestas en el carrito por producto (para avisar del stock).
     const unidadesEnCarrito = (id) =>
@@ -192,7 +211,7 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                 producto: productoActual,
                 modalidad,
                 cantidad: cantidadValida,
-                precio: esObsequio ? 0 : Number(precioValido.toFixed(2))
+                precio: precioDelPaquete
             }
         ]);
         setProducto(null);
@@ -225,7 +244,7 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                 producto: actual,
                 modalidad: linea.modalidad,
                 cantidad: linea.cantidad,
-                precio: Number(precioDeLista(actual, linea.modalidad))
+                precio: precioPaquete(actual, linea.modalidad)
             });
         }
 
@@ -387,6 +406,7 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                                     <div className="selector-modalidad" role="radiogroup" aria-labelledby="etiqueta-modalidad">
                                         {[
                                             { valor: "unidad", texto: "Unidad" },
+                                            { valor: "media", texto: "Media docena (6 u.)" },
                                             { valor: "docena", texto: "Docena (12 u.)" },
                                             puedeObsequiar && { valor: "obsequio", texto: "🎁 Obsequio" }
                                         ].filter(Boolean).map((opcion) => (
@@ -407,7 +427,7 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                                 <div className="fila-campos fila-cantidad-precio">
                                     <div className="campo">
                                         <label htmlFor="cantidad-venta">
-                                            Cantidad ({esDocena ? "docenas" : "unidades"})
+                                            Cantidad ({nombreModalidad(modalidad, 2)})
                                         </label>
                                         <input
                                             type="number"
@@ -418,8 +438,8 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                                             value={cantidad}
                                             onChange={(e) => setCantidad(e.target.value)}
                                         />
-                                        {esDocena && cantidadValida > 0 && (
-                                            <span className="ayuda-campo">= {cantidadValida * 12} unidades</span>
+                                        {esDePaquete && cantidadValida > 0 && (
+                                            <span className="ayuda-campo">= {cantidadValida * porUnidades} unidades</span>
                                         )}
                                     </div>
 
@@ -434,7 +454,7 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                                     ) : (
                                         <div className="campo">
                                             <label htmlFor="precio-venta">
-                                                Precio por {esDocena ? "docena (12 u.)" : "unidad"} (S/)
+                                                {esDePaquete ? `Precio por unidad en la ${nombreModalidad(modalidad)}` : "Precio por unidad"} (S/)
                                             </label>
                                             <input
                                                 type="number"
@@ -457,10 +477,15 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                                                     </>
                                                 )}
                                                 {!esJefe && (
-                                                    <>{" "}· Mínimo{esDocena ? " por docena" : ""}: <strong>{moneda(minimo)}</strong></>
+                                                    <>{" "}· Mínimo: <strong>{moneda(minimo)}</strong>{esDePaquete && " c/u"}</>
                                                 )}
-                                                {esDocena && precioValido > 0 && (
-                                                    <><br />Sale a {moneda(precioValido / 12)} cada unidad</>
+                                                {esDePaquete && precioValido > 0 && (
+                                                    <>
+                                                        <br />
+                                                        La {nombreModalidad(modalidad)} sale a <strong>{moneda(precioDelPaquete)}</strong>{" "}
+                                                        ({moneda(precioValido)} × {porUnidades})
+                                                        {!esJefe && <> · mínimo {moneda(minimoPaquete)}</>}
+                                                    </>
                                                 )}
                                                 {bajoMinimo && (
                                                     <><br />🔒 Bajo el mínimo: necesitará la contraseña del jefe.</>
@@ -472,7 +497,7 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
 
                                 <button type="button" className="boton-agregar" onClick={agregar}>
                                     ＋ Agregar a la venta
-                                    {cantidadValida > 0 && (esObsequio ? <> · Gratis</> : precioValido > 0 && <> · {moneda(precioValido * cantidadValida)}</>)}
+                                    {cantidadValida > 0 && (esObsequio ? <> · Gratis</> : precioValido > 0 && <> · {moneda(precioDelPaquete * cantidadValida)}</>)}
                                 </button>
                             </>
                         )}
@@ -498,13 +523,14 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                                             <div className="item-carrito-datos">
                                                 <strong>{item.producto.nombre}</strong>
                                                 <span>
-                                                    {item.cantidad} {item.modalidad === "docena"
-                                                        ? (item.cantidad === 1 ? "docena" : "docenas")
-                                                        : (item.cantidad === 1 ? "unidad" : "unidades")}{" "}
+                                                    {item.cantidad} {nombreModalidad(item.modalidad, item.cantidad)}{" "}
                                                     {item.modalidad === "obsequio" ? (
                                                         <span className="etiqueta etiqueta-obsequio">🎁 Obsequio</span>
                                                     ) : (
                                                         <>× {moneda(item.precio)}</>
+                                                    )}
+                                                    {esPaquete(item.modalidad) && (
+                                                        <small> ({moneda(item.precio / unidadesDe(item.modalidad))} c/u)</small>
                                                     )}
                                                     {bajo && !esJefe && <span className="etiqueta etiqueta-ajustado">🔒 Bajo mínimo</span>}
                                                 </span>
