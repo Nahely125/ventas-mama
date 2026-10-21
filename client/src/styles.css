@@ -1832,6 +1832,24 @@ input[aria-invalid="true"] {
     color: var(--rojo);
 }
 
+.resumen-ganancia dl.ganancia-caja div:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+}
+
+@media (min-width: 640px) {
+    .resumen-ganancia dl.ganancia-caja {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .resumen-ganancia dl.ganancia-caja div:last-child:nth-child(odd) {
+        grid-column: auto;
+    }
+}
+
+.tabla-precios {
+    align-items: start;
+}
+
 .ganancia-total-stock {
     font-size: 0.85rem;
 }

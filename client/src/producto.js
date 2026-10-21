@@ -2,7 +2,6 @@ const CAMPOS_NUMERICOS = [
     "precio",
     "precioMinimo",
     "precioUnidadDocena",
-    "precioMinimoUnidadDocena",
     "precioCompra",
     "unidadesPorCaja",
     "stock"
@@ -18,8 +17,8 @@ export function validarProducto(valores) {
         // Precio de la docena = precio por unidad en la docena × 12.
         precioDocena: Number((Number(valores.precioUnidadDocena) * 12).toFixed(2)),
         precioMinimo: Number(valores.precioMinimo),
-        // Mínimo por docena = mínimo por unidad en la docena × 12.
-        precioMinimoDocena: Number((Number(valores.precioMinimoUnidadDocena) * 12).toFixed(2)),
+        // Mínimo por docena = precio por unidad en la docena × 12 (un empleado no cobra menos).
+        precioMinimoDocena: Number((Number(valores.precioUnidadDocena) * 12).toFixed(2)),
         precioCompra: Number(valores.precioCompra),
         unidadesPorCaja: Number(valores.unidadesPorCaja),
         stock: Number(valores.stock),
@@ -98,20 +97,25 @@ export function calcularGanancias(valores) {
     const precio = numero("precio");
     const minimo = numero("precioMinimo");
     const unidadDocena = numero("precioUnidadDocena");
-    const docena = unidadDocena === null ? null : unidadDocena * 12;
-    const minimoUnidadDocena = numero("precioMinimoUnidadDocena");
-    const minimoDocena = minimoUnidadDocena === null ? null : minimoUnidadDocena * 12;
+    const porCaja = (precioUnidad) =>
+        precioUnidad === null || !Number.isFinite(precioUnidad) ? null : precioUnidad * unidades - costoCaja;
 
     const resultado = {
         costo,
+        unidades,
         unidad: ganancia(precio, false),
         minimo: ganancia(minimo, false),
-        docena: ganancia(docena, true),
-        minimoDocena: ganancia(minimoDocena, true)
+        unidadDocena: ganancia(unidadDocena, false),
+        docena: ganancia(unidadDocena === null ? null : unidadDocena * 12, true),
+        // Ganancia de vender toda la caja a cada precio.
+        cajaUnidad: porCaja(precio),
+        cajaMinimo: porCaja(minimo),
+        cajaDocena: porCaja(unidadDocena)
     };
 
     resultado.margenUnidad = margen(precio, resultado.unidad);
     resultado.margenMinimo = margen(minimo, resultado.minimo);
+    resultado.margenDocena = margen(unidadDocena, resultado.unidadDocena);
 
     // Ganancia si se vende todo el stock al precio por unidad (las unidades del 2025 no restan costo).
     const stock = Number(valores.stock);

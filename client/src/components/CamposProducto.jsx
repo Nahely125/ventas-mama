@@ -14,32 +14,44 @@ function ResumenGanancia({ ganancias, es2025 }) {
 
     const filas = [
         { texto: "Por unidad", valor: ganancias.unidad, margen: ganancias.margenUnidad },
-        { texto: "Por docena", valor: ganancias.docena },
         { texto: "Al mínimo por unidad", valor: ganancias.minimo, margen: ganancias.margenMinimo },
-        { texto: "Al mínimo por docena", valor: ganancias.minimoDocena }
+        { texto: "Por unidad en la docena", valor: ganancias.unidadDocena, margen: ganancias.margenDocena },
+        { texto: "Por docena (12 u.)", valor: ganancias.docena }
     ];
+
+    const filasCaja = [
+        { texto: "Por unidad", valor: ganancias.cajaUnidad },
+        { texto: "Al mínimo por unidad", valor: ganancias.cajaMinimo },
+        { texto: "Por docenas", valor: ganancias.cajaDocena }
+    ];
+
+    const lista = (items, clase) => (
+        <dl className={clase}>
+            {items.map((fila) => (
+                <div key={fila.texto} className={fila.valor !== null && fila.valor < 0 ? "perdida" : ""}>
+                    <dt>{fila.texto}</dt>
+                    <dd>
+                        {fila.valor === null ? "—" : moneda(fila.valor)}
+                        {fila.margen != null && Number.isFinite(fila.margen) && <small> ({fila.margen.toFixed(0)}%)</small>}
+                    </dd>
+                </div>
+            ))}
+        </dl>
+    );
 
     return (
         <div className="resumen-ganancia" aria-live="polite">
             <h4>💰 Ganancia al vender</h4>
-            <dl>
-                {filas.map((fila) => (
-                    <div key={fila.texto} className={fila.valor !== null && fila.valor < 0 ? "perdida" : ""}>
-                        <dt>{fila.texto}</dt>
-                        <dd>
-                            {fila.valor === null ? "—" : moneda(fila.valor)}
-                            {fila.margen != null && Number.isFinite(fila.margen) && <small> ({fila.margen.toFixed(0)}%)</small>}
-                        </dd>
-                    </div>
-                ))}
-            </dl>
+            {lista(filas)}
+            <h4>📦 Ganancia por caja ({ganancias.unidades} u.) si la vendes toda</h4>
+            {lista(filasCaja, "ganancia-caja")}
             {ganancias.todoElStock !== null && (
                 <p className="ganancia-total-stock">
                     Si vendes todo el stock por unidad: <strong>{moneda(ganancias.todoElStock)}</strong>
                     {es2025 && <small> (mercadería 2025: todo es ganancia del inventario 2025)</small>}
                 </p>
             )}
-            {filas.some((f) => f.valor !== null && f.valor < 0) && (
+            {[...filas, ...filasCaja].some((f) => f.valor !== null && f.valor < 0) && (
                 <p className="texto-error">⚠️ Algún precio está por debajo del costo: venderías con pérdida.</p>
             )}
         </div>
@@ -54,7 +66,7 @@ function valorUbicacion(valores) {
 }
 
 /* Campos compartidos por el formulario de registro y el modal de edición.
-   Los precios por docena no se escriben: docena = precio × 12 y mínimo por docena = mínimo × 12.
+   La docena = precio por unidad en la docena × 12, y ese es también el mínimo por docena.
    valores.es2025: casilla de mercadería sobrante del año pasado (todo su stock cuenta como 2025).
    valores.foto: data URL nueva, null para quitarla, undefined para dejarla igual.
    valores.fotoActual: URL de la foto ya guardada (solo al editar). */
@@ -262,7 +274,7 @@ export default function CamposProducto({ valores, onCambio, prefijo, etiquetaCom
             <fieldset className="grupo-campos">
                 <legend>Precios de venta</legend>
 
-                <div className="fila-campos fila-dos tabla-precios">
+                <div className="fila-campos tabla-precios">
                     <div className="campo">
                         <label htmlFor={id("precio")}>Precio por unidad (S/)</label>
                         <input
@@ -312,30 +324,12 @@ export default function CamposProducto({ valores, onCambio, prefijo, etiquetaCom
                         <span className="ayuda-campo">A cuánto sale cada unidad cuando compran por docena.</span>
                     </div>
 
-                    <div className="campo">
-                        <label htmlFor={id("precioMinimoUnidadDocena")}>Precio mínimo por unidad en la docena (S/)</label>
-                        <input
-                            type="number"
-                            id={id("precioMinimoUnidadDocena")}
-                            name="precioMinimoUnidadDocena"
-                            min="0"
-                            step="0.01"
-                            inputMode="decimal"
-                            placeholder="2.00"
-                            value={valores.precioMinimoUnidadDocena}
-                            onChange={cambiar}
-                            required
-                        />
-                        <span className="ayuda-campo dato-calculado">
-                            Mínimo por docena: <strong>S/ {porDocena(valores.precioMinimoUnidadDocena) || "0.00"}</strong> (× 12). Un empleado no puede cobrar menos.
-                        </span>
-                    </div>
                 </div>
 
                 <p className="costo-calculado precio-docena-calculado">
                     La docena se vende a: <strong>S/ {porDocena(valores.precioUnidadDocena) || "0.00"}</strong>
                     <small>
-                        {" "}= {valores.precioUnidadDocena || "0.00"} × 12
+                        {" "}= {valores.precioUnidadDocena || "0.00"} × 12 · Es el mínimo por docena: un empleado no puede cobrar menos.
                     </small>
                 </p>
 
