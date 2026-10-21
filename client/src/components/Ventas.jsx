@@ -136,8 +136,6 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
     const porUnidades = unidadesDe(modalidad);
     const esDePaquete = esPaquete(modalidad);
     const esObsequio = modalidad === "obsequio";
-    // El jefe puede obsequiar cualquier producto; un empleado, solo los de costo menor a S/ 5.
-    const puedeObsequiar = Boolean(productoActual && (esJefe || productoActual.obsequiable));
     const cantidadNumero = Number(cantidad);
     const cantidadValida = Number.isInteger(cantidadNumero) && cantidadNumero > 0 ? cantidadNumero : 0;
     const precioNumero = Number(precio);
@@ -172,10 +170,8 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
     const itemsBajoMinimo = esJefe ? [] : carrito.filter(estaBajoMinimo);
 
     function seleccionarProducto(nuevo) {
-        const nuevaModalidad = modalidad === "obsequio" && !(esJefe || nuevo?.obsequiable) ? "unidad" : modalidad;
         setProducto(nuevo);
-        setModalidad(nuevaModalidad);
-        setPrecio(precioDeLista(nuevo, nuevaModalidad));
+        setPrecio(precioDeLista(nuevo, modalidad));
         setCantidad("1");
         setErrorItem("");
     }
@@ -408,8 +404,8 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                                             { valor: "unidad", texto: "Unidad" },
                                             { valor: "media", texto: "Media docena (6 u.)" },
                                             { valor: "docena", texto: "Docena (12 u.)" },
-                                            puedeObsequiar && { valor: "obsequio", texto: "🎁 Obsequio" }
-                                        ].filter(Boolean).map((opcion) => (
+                                            { valor: "obsequio", texto: "🎁 Obsequio" }
+                                        ].map((opcion) => (
                                             <button
                                                 key={opcion.valor}
                                                 type="button"
@@ -447,8 +443,11 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                                         <div className="campo aviso-obsequio">
                                             <span className="etiqueta-campo">Precio</span>
                                             <p>
-                                                🎁 <strong>Gratis.</strong> Se descuenta del stock y su costo cuenta como gasto en la ganancia.
-                                                {!esJefe && <> Solo mercadería que cueste menos de S/ 5 por unidad.</>}
+                                                {esJefe ? (
+                                                    <>🎁 <strong>Gratis.</strong> Se descuenta del stock y su costo cuenta como gasto en la ganancia.</>
+                                                ) : (
+                                                    <>🎁 <strong>Gratis.</strong> El obsequio debe valer como máximo <strong>S/ 5</strong>.</>
+                                                )}
                                             </p>
                                         </div>
                                     ) : (

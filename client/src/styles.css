@@ -3350,6 +3350,281 @@ textarea {
     background: #1ebe5b;
 }
 
+/* ---------- Pedido (carrito) del catálogo ---------- */
+.cat-agregar {
+    min-height: 38px;
+    border: 1px solid var(--morado-900);
+    border-radius: 999px;
+    background: var(--morado-900);
+    color: #ffffff;
+    font-size: 0.8rem;
+    font-weight: 700;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.cat-agregar:hover:not(:disabled) {
+    background: var(--morado-700);
+}
+
+.cat-agregar.en-pedido {
+    background: #ffffff;
+    color: var(--morado-900);
+}
+
+.cat-agregar:disabled {
+    border-color: var(--morado-150);
+    background: var(--morado-50);
+    color: var(--texto-suave);
+    cursor: not-allowed;
+}
+
+.cat-agregar-grande {
+    min-height: 50px;
+    margin-top: 6px;
+    font-size: 1rem;
+}
+
+.cat-detalle-datos .cat-pedir:not(.cat-pedir-grande) {
+    min-height: 44px;
+}
+
+.cat-boton-pedido {
+    position: relative;
+}
+
+.cat-contador {
+    position: absolute;
+    top: 2px;
+    right: 0;
+    min-width: 19px;
+    height: 19px;
+    padding: 0 5px;
+    border-radius: 999px;
+    background: var(--morado-600);
+    color: #ffffff;
+    font-size: 0.68rem;
+    font-weight: 700;
+    line-height: 19px;
+    text-align: center;
+}
+
+.cat-barra-pedido {
+    position: fixed;
+    right: 16px;
+    bottom: max(16px, env(safe-area-inset-bottom));
+    left: 16px;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 14px 20px;
+    border: none;
+    border-radius: 999px;
+    background: var(--morado-900);
+    box-shadow: 0 10px 30px rgba(46, 16, 101, 0.35);
+    color: #ffffff;
+    font-size: 0.95rem;
+    font-weight: 700;
+}
+
+.cat-barra-pedido strong {
+    font-size: 1.05rem;
+}
+
+.cat-carrito-contenido {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 20px;
+}
+
+.cat-carrito-encabezado {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.cat-carrito-encabezado h2 {
+    margin: 0;
+    color: var(--morado-900);
+    font-family: 'Playfair Display', serif;
+    font-size: 1.5rem;
+}
+
+.cat-carrito-vacio {
+    display: grid;
+    gap: 10px;
+    padding: 24px 0;
+    text-align: center;
+}
+
+.cat-boton-oscuro {
+    justify-self: center;
+    min-height: 44px;
+    padding: 0 24px;
+    border: none;
+    border-radius: 999px;
+    background: var(--morado-900);
+    color: #ffffff;
+    font-weight: 700;
+}
+
+.cat-carrito-lista {
+    display: grid;
+    gap: 10px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.cat-carrito-item {
+    display: grid;
+    grid-template-columns: 58px minmax(0, 1fr) auto;
+    gap: 12px;
+    align-items: start;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--morado-150);
+}
+
+.cat-carrito-foto {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 58px;
+    height: 58px;
+    overflow: hidden;
+    border-radius: 10px;
+    background: var(--morado-50);
+    color: var(--morado-300);
+}
+
+.cat-carrito-foto img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.cat-carrito-datos {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.cat-carrito-datos strong {
+    color: var(--texto);
+    font-size: 0.9rem;
+    overflow-wrap: anywhere;
+}
+
+.cat-carrito-precio {
+    color: var(--texto-suave);
+    font-size: 0.78rem;
+}
+
+.cat-carrito-precio em {
+    color: var(--rojo);
+    font-style: normal;
+}
+
+.cat-carrito-controles {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.cat-carrito-controles select {
+    width: auto;
+    min-height: 34px;
+    padding: 4px 8px;
+    font-size: 0.82rem;
+}
+
+.cat-cantidad {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid var(--morado-200);
+    border-radius: 999px;
+}
+
+.cat-cantidad button {
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: transparent;
+    color: var(--morado-900);
+    font-size: 1.1rem;
+    font-weight: 700;
+}
+
+.cat-cantidad button:disabled {
+    color: var(--morado-200);
+}
+
+.cat-cantidad span {
+    min-width: 26px;
+    font-weight: 700;
+    text-align: center;
+}
+
+.cat-carrito-fin {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+}
+
+.cat-carrito-fin strong {
+    color: var(--morado-900);
+}
+
+.cat-carrito-quitar,
+.cat-carrito-vaciar {
+    border: none;
+    background: none;
+    color: var(--texto-suave);
+    font-size: 0.78rem;
+    text-decoration: underline;
+}
+
+.cat-carrito-vaciar {
+    justify-self: center;
+}
+
+.cat-carrito-total {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: var(--morado-900);
+    font-weight: 700;
+}
+
+.cat-carrito-total strong {
+    font-size: 1.4rem;
+}
+
+.cat-carrito-nota {
+    margin: -6px 0 0;
+    color: var(--texto-suave);
+    font-size: 0.8rem;
+}
+
+@media (min-width: 720px) {
+    .modal.cat-carrito {
+        max-width: 520px;
+        margin: auto;
+    }
+}
+
+/* Espacio para que la barra del pedido no tape el pie de página. */
+.cat-pagina:has(.cat-barra-pedido) .cat-pie {
+    padding-bottom: 96px;
+}
+
 .cat-vacio {
     padding: 60px 16px;
     text-align: center;

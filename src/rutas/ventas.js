@@ -188,6 +188,8 @@ router.post("/", requiereSesion, async (req, res) => {
         const productos = new Map(resultado.rows.map((p) => [p.id, p]));
         const unidadesPorProducto = new Map();
         const bajoMinimo = [];
+        // Costo de lo que se regala en esta venta (un empleado tiene un máximo).
+        let costoObsequios = 0;
 
         for (const item of items) {
             const producto = productos.get(item.productoId);
@@ -202,16 +204,10 @@ router.post("/", requiereSesion, async (req, res) => {
             unidadesPorProducto.set(producto.id, (unidadesPorProducto.get(producto.id) ?? 0) + unidades);
 
             if (item.obsequio === true) {
-                // Un empleado solo puede obsequiar mercadería barata; el jefe, cualquiera.
-                const costo = producto.precio_compra === null ? null : Number(producto.precio_compra);
-
-                if (!esJefe && (costo === null || costo >= COSTO_MAXIMO_OBSEQUIO)) {
-                    await client.query("ROLLBACK");
-                    return res.status(400).json({
-                        error: `${producto.nombre} no se puede obsequiar: solo mercadería que cueste menos de S/ ${COSTO_MAXIMO_OBSEQUIO.toFixed(2)} por unidad.`
-                    });
-                }
-
+                // Sin costo registrado no se sabe cuánto vale: para el empleado cuenta como que excede.
+                costoObsequios += producto.precio_compra === null
+                    ? Infinity
+                    : Number(producto.precio_compra) * unidades;
                 continue;
             }
 
@@ -220,6 +216,15 @@ router.post("/", requiereSesion, async (req, res) => {
             if (Math.round(item.precio * 100) < Math.round(minimo * 100)) {
                 bajoMinimo.push(`${producto.nombre} (mínimo S/ ${minimo.toFixed(2)} por ${NOMBRE_MODALIDAD[modalidad]})`);
             }
+        }
+
+        // El empleado puede regalar como máximo S/ 5 (al costo) por venta; el jefe, lo que quiera.
+        // El mensaje no muestra el costo, que el empleado no ve.
+        if (!esJefe && Math.round(costoObsequios * 100) > COSTO_MAXIMO_OBSEQUIO * 100) {
+            await client.query("ROLLBACK");
+            return res.status(400).json({
+                error: `El obsequio pasa del máximo de S/ ${COSTO_MAXIMO_OBSEQUIO.toFixed(2)}. Regala menos unidades u otro producto, o pídeselo al jefe.`
+            });
         }
 
         for (const [id, unidades] of unidadesPorProducto) {

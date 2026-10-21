@@ -3,6 +3,7 @@ import { moneda, pedir } from "../api.js";
 import { urlFoto } from "../fotos.js";
 import { iconoTema } from "../secciones.js";
 import { WHATSAPP_NEGOCIO } from "../datosPago.js";
+import CarritoCatalogo, { detalleCarrito, useCarrito } from "./CarritoCatalogo.jsx";
 
 // Enlace para pedir un producto por WhatsApp con el mensaje ya escrito.
 function enlacePedido(producto) {
@@ -26,7 +27,7 @@ function BotonPedir({ producto, grande = false }) {
             rel="noopener"
             aria-label={`Pedir ${producto.nombre} por WhatsApp`}
         >
-            <span aria-hidden="true">💬</span> {grande ? "Pedir por WhatsApp" : "Pedir"}
+            <span aria-hidden="true">💬</span> {grande ? "Pedir por WhatsApp" : "Pedir solo este por WhatsApp"}
         </a>
     );
 }
@@ -50,7 +51,40 @@ function leerHash() {
     return { seccion: seccion || null, categoria: categoria || null };
 }
 
-function TarjetaProductoCatalogo({ producto, onAbrir }) {
+// Botón para sumar el producto al pedido; muestra cuántas unidades ya lleva.
+function BotonAgregar({ producto, enPedido, onAgregar, grande = false }) {
+    const [recien, setRecien] = useState(false);
+
+    useEffect(() => {
+        if (!recien) return undefined;
+        const espera = setTimeout(() => setRecien(false), 1200);
+        return () => clearTimeout(espera);
+    }, [recien]);
+
+    if (!producto.disponible) {
+        return (
+            <button type="button" className={`cat-agregar ${grande ? "cat-agregar-grande" : ""}`} disabled>
+                Agotado
+            </button>
+        );
+    }
+
+    return (
+        <button
+            type="button"
+            className={`cat-agregar ${grande ? "cat-agregar-grande" : ""} ${enPedido ? "en-pedido" : ""}`}
+            onClick={() => {
+                onAgregar(producto);
+                setRecien(true);
+            }}
+            aria-label={`Agregar ${producto.nombre} al pedido`}
+        >
+            {recien ? "✓ Agregado" : enPedido ? `🛒 Agregar otro (${enPedido})` : grande ? "🛒 Agregar al pedido" : "🛒 Agregar"}
+        </button>
+    );
+}
+
+function TarjetaProductoCatalogo({ producto, onAbrir, enPedido, onAgregar }) {
     const foto = urlFoto(producto);
 
     return (
@@ -72,7 +106,7 @@ function TarjetaProductoCatalogo({ producto, onAbrir }) {
                     <span className="cat-producto-docena">Docena {moneda(producto.precioMinimoDocena)}</span>
                 </span>
             </button>
-            <BotonPedir producto={producto} />
+            <BotonAgregar producto={producto} enPedido={enPedido} onAgregar={onAgregar} />
         </li>
     );
 }
@@ -93,11 +127,17 @@ function Banner({ seccion, total, onVer }) {
     );
 }
 
-function Grilla({ productos, onAbrir }) {
+function Grilla({ productos, onAbrir, enPedido, onAgregar }) {
     return (
         <ul className="cat-grilla">
             {productos.map((producto) => (
-                <TarjetaProductoCatalogo key={producto.id} producto={producto} onAbrir={onAbrir} />
+                <TarjetaProductoCatalogo
+                    key={producto.id}
+                    producto={producto}
+                    onAbrir={onAbrir}
+                    enPedido={enPedido(producto.id)}
+                    onAgregar={onAgregar}
+                />
             ))}
         </ul>
     );
@@ -112,6 +152,8 @@ export default function Catalogo() {
     const [buscando, setBuscando] = useState(false);
     const [soloDisponibles, setSoloDisponibles] = useState(false);
     const [detalle, setDetalle] = useState(null);
+    const [viendoPedido, setViendoPedido] = useState(false);
+    const carrito = useCarrito();
     const listado = useRef(null);
     const campoBusqueda = useRef(null);
 
@@ -157,6 +199,11 @@ export default function Catalogo() {
 
         return lista;
     }, [datos]);
+
+    // Pedido: solo cuenta lo que sigue en el catálogo.
+    const pedido = detalleCarrito(carrito.lineas, datos?.productos ?? []);
+    const enPedido = (id) => pedido.items.filter((i) => i.id === id).reduce((suma, i) => suma + i.cantidad, 0);
+    const agregar = (producto) => carrito.agregar(producto);
 
     // Sección elegida: la del enlace o la primera; "todo" muestra todas.
     const seccionClave = ruta.seccion === TODO || secciones.some((s) => s.slug === ruta.seccion)
@@ -266,7 +313,18 @@ export default function Catalogo() {
                         Mil Deseos
                     </a>
 
-                    <span className="cat-icono-boton cat-espaciador" aria-hidden="true"></span>
+                    <button
+                        type="button"
+                        className="cat-icono-boton cat-boton-pedido"
+                        onClick={() => setViendoPedido(true)}
+                        aria-label={`Ver mi pedido (${pedido.piezas} ${pedido.piezas === 1 ? "producto" : "productos"})`}
+                    >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M5 8h14l-1.2 11.2a2 2 0 0 1-2 1.8H8.2a2 2 0 0 1-2-1.8z" />
+                            <path d="M9 8V6.5a3 3 0 0 1 6 0V8" />
+                        </svg>
+                        {pedido.piezas > 0 && <span className="cat-contador">{pedido.piezas}</span>}
+                    </button>
                 </div>
 
                 {buscando && (
@@ -415,7 +473,7 @@ export default function Catalogo() {
                                             )}
                                         </h2>
                                     )}
-                                    <Grilla productos={bloque.productos} onAbrir={setDetalle} />
+                                    <Grilla productos={bloque.productos} onAbrir={setDetalle} enPedido={enPedido} onAgregar={agregar} />
                                 </section>
                             ))
                         )}
@@ -428,12 +486,30 @@ export default function Catalogo() {
                 <p>Precios en soles (S/). Consulta disponibilidad antes de tu compra.</p>
             </footer>
 
-            {detalle && <DetalleProducto producto={detalle} onCerrar={() => setDetalle(null)} />}
+            {pedido.piezas > 0 && !viendoPedido && (
+                <button type="button" className="cat-barra-pedido" onClick={() => setViendoPedido(true)}>
+                    <span>🛒 Ver mi pedido ({pedido.piezas})</span>
+                    <strong>{moneda(pedido.total)}</strong>
+                </button>
+            )}
+
+            {detalle && (
+                <DetalleProducto
+                    producto={detalle}
+                    enPedido={enPedido(detalle.id)}
+                    onAgregar={agregar}
+                    onCerrar={() => setDetalle(null)}
+                />
+            )}
+
+            {viendoPedido && (
+                <CarritoCatalogo carrito={carrito} productos={datos?.productos ?? []} onCerrar={() => setViendoPedido(false)} />
+            )}
         </div>
     );
 }
 
-function DetalleProducto({ producto, onCerrar }) {
+function DetalleProducto({ producto, enPedido, onAgregar, onCerrar }) {
     const dialogo = useRef(null);
     const foto = urlFoto(producto);
 
@@ -472,7 +548,8 @@ function DetalleProducto({ producto, onCerrar }) {
                     <p className={producto.disponible ? "cat-disponible" : "cat-no-disponible"}>
                         {producto.disponible ? "● Disponible" : "● Agotado por ahora"}
                     </p>
-                    <BotonPedir producto={producto} grande />
+                    <BotonAgregar producto={producto} enPedido={enPedido} onAgregar={onAgregar} grande />
+                    <BotonPedir producto={producto} />
                 </div>
             </div>
         </dialog>
