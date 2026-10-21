@@ -17,7 +17,7 @@ const {
     totalesVentas,
     armarBoleta
 } = require("./consultasVentas");
-const { COSTO_MAXIMO_OBSEQUIO, OBSEQUIABLE, VALOR_OBSEQUIO, normalizarCodigo, resolverAjuste, repartirAjuste } = require("./ajustes");
+const { COSTO_MAXIMO_OBSEQUIO, OBSEQUIABLE, normalizarCodigo, resolverAjuste, repartirAjuste } = require("./ajustes");
 
 const NOMBRE_MODALIDAD = { unidad: "unidad", media: "media docena", docena: "docena" };
 
@@ -88,9 +88,12 @@ function anotarFallo(req, clave) {
     req.session[clave] = bloqueo;
 }
 
-/* Revisa los obsequios de un empleado: [{ producto (con obsequiable y valor_obsequio), unidades }].
+/* Revisa los obsequios de un empleado: [{ producto, unidades }] (producto con obsequiable,
+   stock_2025, precio_docena y precio_compra). Las unidades del 2025 salen primero y valen su precio
+   por unidad en la docena; las nuevas, su costo (que debe ser menor a S/ 5).
    Devuelve el mensaje de error o null. Los mensajes no muestran montos (el empleado no ve costos). */
 function errorObsequios(regalos) {
+    const quedan2025 = new Map();
     let valor = 0;
 
     for (const { producto, unidades } of regalos) {
@@ -98,15 +101,27 @@ function errorObsequios(regalos) {
             return `${producto.nombre} no se puede obsequiar.`;
         }
 
-        // Sin valor conocido (sin costo registrado): cuenta como que excede.
-        valor += producto.valor_obsequio === null ? Infinity : Number(producto.valor_obsequio) * unidades;
+        const disponibles = quedan2025.get(producto.id) ?? Number(producto.stock_2025);
+        const de2025 = Math.min(disponibles, unidades);
+        const nuevas = unidades - de2025;
+        const costo = producto.precio_compra === null ? null : Number(producto.precio_compra);
+        quedan2025.set(producto.id, disponibles - de2025);
+
+        if (nuevas > 0 && (costo === null || costo >= COSTO_MAXIMO_OBSEQUIO)) {
+            return `${producto.nombre} no se puede obsequiar en esa cantidad.`;
+        }
+
+        valor += de2025 * (Number(producto.precio_docena) / 12) + nuevas * (costo ?? 0);
     }
 
-    // Máximo de S/ 5 por venta (ver VALOR_OBSEQUIO).
+    // Máximo de S/ 5 por venta.
     return Math.round(valor * 100) > COSTO_MAXIMO_OBSEQUIO * 100
         ? "El obsequio pasa del máximo permitido. Regala menos unidades u otro producto, o pídeselo al jefe."
         : null;
 }
+
+// Revisiones de obsequio permitidas a un empleado cada 10 minutos.
+const MAXIMO_CONSULTAS_OBSEQUIO = 30;
 
 /* Antes de agregar un obsequio a la venta: { obsequios: [{ productoId, cantidad }] } con todos los
    regalos de la venta (los que ya están y el nuevo). Responde { ok: true } o el error. El jefe no tiene límite. */
@@ -124,9 +139,21 @@ router.post("/validar-obsequio", requiereSesion, async (req, res) => {
         return res.json({ ok: true });
     }
 
+    // Límite de consultas: probando cantidades se podría deducir el costo, que el empleado no ve.
+    const ahora = Date.now();
+    const consultas = req.session.consultasObsequio?.desde > ahora - BLOQUEO_MS
+        ? req.session.consultasObsequio
+        : { cantidad: 0, desde: ahora };
+
+    if (consultas.cantidad >= MAXIMO_CONSULTAS_OBSEQUIO) {
+        return res.status(429).json({ error: "Demasiadas revisiones de obsequios. Espera unos minutos." });
+    }
+
+    req.session.consultasObsequio = { ...consultas, cantidad: consultas.cantidad + 1 };
+
     try {
         const resultado = await pool.query(
-            `SELECT id, nombre, ${OBSEQUIABLE} AS obsequiable, ${VALOR_OBSEQUIO} AS valor_obsequio
+            `SELECT id, nombre, stock_2025, precio_docena, precio_compra, ${OBSEQUIABLE} AS obsequiable
              FROM productos
              WHERE id = ANY($1::int[])`,
             [[...new Set(obsequios.map((o) => o.productoId))]]
@@ -234,9 +261,8 @@ router.post("/", requiereSesion, async (req, res) => {
         // Se bloquean los productos en orden de id para evitar bloqueos cruzados.
         const ids = [...new Set(items.map((item) => item.productoId))].sort((a, b) => a - b);
         const resultado = await client.query(
-            `SELECT id, nombre, precio_minimo, precio_minimo_docena, precio_compra, stock, stock_2025,
-                    ${OBSEQUIABLE} AS obsequiable,
-                    ${VALOR_OBSEQUIO} AS valor_obsequio
+            `SELECT id, nombre, precio_minimo, precio_minimo_docena, precio_docena, precio_compra, stock, stock_2025,
+                    ${OBSEQUIABLE} AS obsequiable
              FROM productos
              WHERE id = ANY($1::int[])
              ORDER BY id
@@ -271,6 +297,23 @@ router.post("/", requiereSesion, async (req, res) => {
 
             if (Math.round(item.precio * 100) < Math.round(minimo * 100)) {
                 bajoMinimo.push(`${producto.nombre} (mínimo S/ ${minimo.toFixed(2)} por ${NOMBRE_MODALIDAD[modalidad]})`);
+            }
+        }
+
+        // Un descuento tampoco puede dejar la venta (sin obsequios) por debajo de la suma de los
+        // mínimos: el empleado necesita la contraseña del jefe, igual que con un precio bajo el mínimo.
+        if (ajusteVenta && !esJefe) {
+            let minimoVenta = 0;
+            let subtotalVenta = 0;
+
+            for (const item of items) {
+                if (item.obsequio === true) continue;
+                minimoVenta += minimoDe(productos.get(item.productoId), item.modalidad ?? "unidad") * item.cantidad;
+                subtotalVenta += Number(item.precio.toFixed(2)) * item.cantidad;
+            }
+
+            if (Math.round((subtotalVenta - ajusteVenta.monto) * 100) < Math.round(minimoVenta * 100)) {
+                bajoMinimo.push(`descuento ${ajusteVenta.codigo} (la venta queda por debajo del mínimo de S/ ${minimoVenta.toFixed(2)})`);
             }
         }
 

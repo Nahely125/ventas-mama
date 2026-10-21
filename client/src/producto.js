@@ -10,15 +10,21 @@ const CAMPOS_NUMERICOS = [
 // Convierte los valores del formulario y valida un producto.
 // Devuelve { datos } si es válido o { error } si no lo es.
 export function validarProducto(valores) {
+    // Al editar sin tocar el precio por unidad en la docena, se conservan la docena y su mínimo
+    // exactos (S/ 50 ÷ 12 = 4.17 y 4.17 × 12 daría 50.04).
+    const sinCambioDocena = valores.precioDocenaInicial !== undefined
+        && valores.precioUnidadDocena === valores.precioUnidadDocenaInicial;
+    const docenaCalculada = Number((Number(valores.precioUnidadDocena) * 12).toFixed(2));
+
     const datos = {
         codigo: valores.codigo.trim(),
         nombre: valores.nombre.trim(),
         precio: Number(valores.precio),
         // Precio de la docena = precio por unidad en la docena × 12.
-        precioDocena: Number((Number(valores.precioUnidadDocena) * 12).toFixed(2)),
+        precioDocena: sinCambioDocena ? Number(valores.precioDocenaInicial) : docenaCalculada,
         precioMinimo: Number(valores.precioMinimo),
         // Mínimo por docena = precio por unidad en la docena × 12 (un empleado no cobra menos).
-        precioMinimoDocena: Number((Number(valores.precioUnidadDocena) * 12).toFixed(2)),
+        precioMinimoDocena: sinCambioDocena ? Number(valores.precioMinimoDocenaInicial) : docenaCalculada,
         precioCompra: Number(valores.precioCompra),
         unidadesPorCaja: Number(valores.unidadesPorCaja),
         stock: Number(valores.stock),

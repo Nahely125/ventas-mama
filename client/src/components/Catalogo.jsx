@@ -3,14 +3,14 @@ import { moneda, pedir } from "../api.js";
 import { urlFoto } from "../fotos.js";
 import { iconoTema } from "../secciones.js";
 import { WHATSAPP_NEGOCIO } from "../datosPago.js";
-import CarritoCatalogo, { detalleCarrito, useCarrito } from "./CarritoCatalogo.jsx";
+import CarritoCatalogo, { detalleCarrito, precioCatalogo, useCarrito } from "./CarritoCatalogo.jsx";
 
 // Enlace para pedir un producto por WhatsApp con el mensaje ya escrito.
 function enlacePedido(producto) {
     const mensaje = [
         "Hola Mil Deseos 👋 Quiero pedir:",
         `• ${producto.nombre}${producto.codigo ? ` (código ${producto.codigo})` : ""}`,
-        `Precio: ${moneda(producto.precioMinimo)} c/u · Docena ${moneda(producto.precioMinimoDocena)}`,
+        `Precio: ${moneda(producto.precioMinimo)} c/u · Media docena ${moneda(precioCatalogo(producto, "media"))} · Docena ${moneda(producto.precioMinimoDocena)}`,
         "¿Cuántas unidades tienen disponibles?",
         `Lo vi en el catálogo: ${window.location.origin}/catalogo`
     ].join("\n");
@@ -539,6 +539,10 @@ function DetalleProducto({ producto, enPedido, onAgregar, onCerrar }) {
                         <div>
                             <dt>Por unidad</dt>
                             <dd>{moneda(producto.precioMinimo)}</dd>
+                        </div>
+                        <div>
+                            <dt>Por media docena</dt>
+                            <dd>{moneda(precioCatalogo(producto, "media"))}</dd>
                         </div>
                         <div>
                             <dt>Por docena</dt>

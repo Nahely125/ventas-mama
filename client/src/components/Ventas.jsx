@@ -40,7 +40,7 @@ function centimos(valor) {
 let siguienteClave = 1;
 
 // Ventana para que el jefe escriba su contraseña y autorice precios bajo el mínimo.
-function ModalAutorizacion({ productos, error, enviando, onConfirmar, onCerrar }) {
+function ModalAutorizacion({ productos, minimoDescuento, error, enviando, onConfirmar, onCerrar }) {
     const dialogo = useRef(null);
     const [password, setPassword] = useState("");
 
@@ -64,15 +64,22 @@ function ModalAutorizacion({ productos, error, enviando, onConfirmar, onCerrar }
                     </button>
                 </div>
 
-                <p>Estos productos tienen un precio por debajo del mínimo:</p>
-                <ul className="lista-bajo-minimo">
-                    {productos.map((item) => (
-                        <li key={item.clave}>
-                            <strong>{item.producto.nombre}</strong>: {moneda(item.precio)} (mínimo{" "}
-                            {moneda(minimoDe(item.producto, item.modalidad))} por {nombreModalidad(item.modalidad)})
-                        </li>
-                    ))}
-                </ul>
+                {productos.length > 0 && (
+                    <>
+                        <p>Estos productos tienen un precio por debajo del mínimo:</p>
+                        <ul className="lista-bajo-minimo">
+                            {productos.map((item) => (
+                                <li key={item.clave}>
+                                    <strong>{item.producto.nombre}</strong>: {moneda(item.precio)} (mínimo{" "}
+                                    {moneda(minimoDe(item.producto, item.modalidad))} por {nombreModalidad(item.modalidad)})
+                                </li>
+                            ))}
+                        </ul>
+                    </>
+                )}
+                {minimoDescuento !== null && (
+                    <p>Con el descuento, la venta queda por debajo del mínimo (<strong>{moneda(minimoDescuento)}</strong>).</p>
+                )}
 
                 <div className="campo">
                     <label htmlFor="password-jefe">Contraseña del jefe</label>
@@ -152,7 +159,9 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
     const precioValido = precio !== "" && Number.isFinite(precioNumero) && precioNumero > 0 ? precioNumero : 0;
     const lista = precioDeLista(productoActual, modalidad);
     const minimoPaquete = productoActual ? minimoDe(productoActual, modalidad) : null;
-    const minimo = minimoPaquete === null ? null : minimoPaquete / porUnidades;
+    // Mínimo por unidad redondeado hacia arriba: escribiéndolo, el paquete nunca queda bajo el mínimo
+    // (por ejemplo, docena de S/ 49 → S/ 4.09 c/u, porque 4.08 × 12 = 48.96).
+    const minimo = minimoPaquete === null ? null : Math.ceil(Math.round((minimoPaquete * 100) / porUnidades * 1000) / 1000) / 100;
     // Precio del paquete: precio por unidad × unidades (al precio de lista, exactamente el registrado).
     const precioDelPaquete = !productoActual
         ? 0
@@ -181,6 +190,11 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
     const estaBajoMinimo = (item) =>
         item.modalidad !== "obsequio" && centimos(item.precio) < centimos(minimoDe(item.producto, item.modalidad));
     const itemsBajoMinimo = esJefe ? [] : carrito.filter(estaBajoMinimo);
+    // Un descuento del empleado tampoco puede dejar la venta (sin obsequios) bajo la suma de los mínimos.
+    const minimoVenta = carrito
+        .filter((item) => item.modalidad !== "obsequio")
+        .reduce((suma, item) => suma + minimoDe(item.producto, item.modalidad) * item.cantidad, 0);
+    const descuentoBajoMinimo = !esJefe && Boolean(ajuste) && montoAjuste > 0 && centimos(total) < centimos(minimoVenta);
 
     function seleccionarProducto(nuevo) {
         setProducto(nuevo);
@@ -432,7 +446,7 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
         setMensaje(null);
 
         // Un trabajador necesita la contraseña del jefe para precios bajo el mínimo.
-        if (itemsBajoMinimo.length > 0 && !esJefe) {
+        if ((itemsBajoMinimo.length > 0 || descuentoBajoMinimo) && !esJefe) {
             setAutorizacion({ error: "" });
             return;
         }
@@ -765,6 +779,11 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                                             <span>Descuento</span>
                                             <span>− {moneda(montoAjuste)}</span>
                                         </div>
+                                        {descuentoBajoMinimo && (
+                                            <p className="ayuda-campo texto-aviso">
+                                                🔒 Con este descuento la venta queda bajo el mínimo: necesitará la contraseña del jefe.
+                                            </p>
+                                        )}
                                     </div>
                                 )}
                                 {(errorAjuste || ajusteExcede) && (
@@ -848,6 +867,7 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
             {autorizacion && (
                 <ModalAutorizacion
                     productos={itemsBajoMinimo}
+                    minimoDescuento={descuentoBajoMinimo ? minimoVenta : null}
                     error={autorizacion.error}
                     enviando={enviando}
                     onConfirmar={registrar}

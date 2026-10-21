@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { moneda } from "../api.js";
 import { urlFoto } from "../fotos.js";
 import { WHATSAPP_NEGOCIO } from "../datosPago.js";
+import { nombreModalidad } from "../venta.js";
 
 const CLAVE_GUARDADO = "mil-deseos-pedido";
 const MAXIMO = 999;
@@ -67,8 +68,14 @@ export function useCarrito() {
     };
 }
 
-const precioLinea = (producto, modalidad) =>
-    Number(modalidad === "docena" ? producto.precioMinimoDocena : producto.precioMinimo);
+// Precio del catálogo por unidad, media docena (mitad de la docena) o docena.
+export function precioCatalogo(producto, modalidad) {
+    if (modalidad === "docena") return Number(producto.precioMinimoDocena);
+    if (modalidad === "media") return Number((Number(producto.precioMinimoDocena) / 2).toFixed(2));
+    return Number(producto.precioMinimo);
+}
+
+const precioLinea = precioCatalogo;
 
 // Une cada línea con los datos actuales del producto (deja fuera los que ya no están en el catálogo).
 export function detalleCarrito(lineas, productos) {
@@ -90,9 +97,7 @@ function enlacePedido(items, total) {
     const mensaje = [
         "Hola Mil Deseos 👋 Quiero hacer este pedido:",
         ...items.map((item) => {
-            const cuanto = item.modalidad === "docena"
-                ? `${item.cantidad} ${item.cantidad === 1 ? "docena" : "docenas"}`
-                : `${item.cantidad} ${item.cantidad === 1 ? "unidad" : "unidades"}`;
+            const cuanto = `${item.cantidad} ${nombreModalidad(item.modalidad, item.cantidad)}`;
             const codigo = item.producto.codigo ? ` (código ${item.producto.codigo})` : "";
             return `• ${cuanto} de ${item.producto.nombre}${codigo} — ${moneda(item.importe)}`;
         }),
@@ -104,7 +109,7 @@ function enlacePedido(items, total) {
     return `https://wa.me/${WHATSAPP_NEGOCIO}?text=${encodeURIComponent(mensaje)}`;
 }
 
-// Ventana con el pedido: cantidades, unidad o docena, total y envío por WhatsApp.
+// Ventana con el pedido: cantidades, unidad, media docena o docena, total y envío por WhatsApp.
 export default function CarritoCatalogo({ carrito, productos, onCerrar }) {
     const dialogo = useRef(null);
     const { items, total } = detalleCarrito(carrito.lineas, productos);
@@ -153,7 +158,7 @@ export default function CarritoCatalogo({ carrito, productos, onCerrar }) {
                                             <strong>{item.producto.nombre}</strong>
                                             <span className="cat-carrito-precio">
                                                 {moneda(precioLinea(item.producto, item.modalidad))}{" "}
-                                                {item.modalidad === "docena" ? "la docena" : "c/u"}
+                                                {item.modalidad === "unidad" ? "c/u" : `la ${nombreModalidad(item.modalidad)}`}
                                                 {!item.producto.disponible && <em> · Agotado por ahora</em>}
                                             </span>
                                             <div className="cat-carrito-controles">
@@ -178,9 +183,10 @@ export default function CarritoCatalogo({ carrito, productos, onCerrar }) {
                                                 <select
                                                     value={item.modalidad}
                                                     onChange={(e) => carrito.modalidad(item.id, item.modalidad, e.target.value)}
-                                                    aria-label="Por unidad o por docena"
+                                                    aria-label="Por unidad, media docena o docena"
                                                 >
                                                     <option value="unidad">{item.cantidad === 1 ? "unidad" : "unidades"}</option>
+                                                    <option value="media">{nombreModalidad("media", item.cantidad)}</option>
                                                     <option value="docena">{item.cantidad === 1 ? "docena" : "docenas"}</option>
                                                 </select>
                                             </div>

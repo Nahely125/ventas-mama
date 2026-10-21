@@ -10,15 +10,14 @@ const router = express.Router();
 // (al costo) no más de esto por venta.
 const COSTO_MAXIMO_OBSEQUIO = 5;
 
-// Cuánto vale regalar una unidad (SQL sobre la tabla productos):
-// - mercadería del 2025 (ya pagada): su precio por unidad en la docena;
-// - mercadería nueva: su costo.
-const VALOR_OBSEQUIO = `(CASE WHEN productos.stock_2025 > 0
+// Cuánto vale regalar una unidad:
+// - del inventario 2025 (ya pagado): su precio por unidad en la docena;
+// - nueva: su costo (sin costo registrado no se puede regalar).
+// Un producto aparece para regalar si la unidad que saldría primero (las del 2025 se usan antes)
+// vale menos de S/ 5. Al vender se revisa unidad por unidad (ver errorObsequios en ventas.js).
+const OBSEQUIABLE = `COALESCE((CASE WHEN productos.stock_2025 > 0
     THEN productos.precio_docena / 12
-    ELSE productos.precio_compra END)`;
-
-// Se puede regalar si ese valor es menor a S/ 5 (sin costo registrado, no).
-const OBSEQUIABLE = `COALESCE(${VALOR_OBSEQUIO} < ${COSTO_MAXIMO_OBSEQUIO}, FALSE)`;
+    ELSE productos.precio_compra END) < ${COSTO_MAXIMO_OBSEQUIO}, FALSE)`;
 
 // Nombre con el que queda el descuento que hace el jefe directamente, sin código.
 const AJUSTE_DEL_JEFE = "DESCUENTO DEL JEFE";
@@ -220,7 +219,6 @@ module.exports = {
     AJUSTE_DEL_JEFE,
     COSTO_MAXIMO_OBSEQUIO,
     OBSEQUIABLE,
-    VALOR_OBSEQUIO,
     normalizarCodigo,
     resolverAjuste,
     repartirAjuste
