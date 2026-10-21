@@ -83,6 +83,19 @@ const MIGRACIONES = `
         creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
 
+    -- Categorías dentro de cada sección (por ejemplo, "Árboles y pinos" en la Feria Navideña).
+    CREATE TABLE IF NOT EXISTS categorias (
+        id SERIAL PRIMARY KEY,
+        seccion_id INTEGER NOT NULL REFERENCES secciones(id) ON DELETE CASCADE,
+        nombre VARCHAR(60) NOT NULL,
+        icono VARCHAR(16),
+        orden INTEGER NOT NULL DEFAULT 0,
+        UNIQUE (seccion_id, nombre)
+    );
+
+    ALTER TABLE productos
+        ADD COLUMN IF NOT EXISTS categoria_id INTEGER REFERENCES categorias(id) ON DELETE SET NULL;
+
     -- Registro de los cambios de datos que solo deben hacerse una vez.
     CREATE TABLE IF NOT EXISTS migraciones_unicas (
         nombre VARCHAR(100) PRIMARY KEY,
@@ -90,44 +103,85 @@ const MIGRACIONES = `
     );
 `;
 
-// Nombres que empiezan con "Árbol"/"Arbol" (así "Estrella para árbol" no cuenta como árbol).
-const PATRON_ARBOL = "^\\s*[aáAÁ]rbol";
+const { CATEGORIAS_NAVIDAD, CATEGORIAS_ESCOLAR, PRIORIDAD_NAVIDAD } = require("./categoriasIniciales");
+
+// Crea las categorías de una sección (si no existen) y devuelve { nombre: id }.
+async function crearCategorias(client, seccionId, categorias) {
+    const ids = {};
+
+    for (const [indice, categoria] of categorias.entries()) {
+        const fila = await client.query(
+            `INSERT INTO categorias (seccion_id, nombre, icono, orden)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (seccion_id, nombre) DO UPDATE SET nombre = EXCLUDED.nombre
+             RETURNING id`,
+            [seccionId, categoria.nombre, categoria.icono, indice + 1]
+        );
+        ids[categoria.nombre] = fila.rows[0].id;
+    }
+
+    return ids;
+}
+
+// Asigna categoría según el nombre a los productos que aún no tienen una.
+async function asignarPorNombre(client, condicionProductos, parametros, reglas, ids) {
+    for (const regla of reglas) {
+        await client.query(
+            `UPDATE productos
+             SET categoria_id = $${parametros.length + 1}
+             WHERE categoria_id IS NULL AND nombre ~* $${parametros.length + 2} AND (${condicionProductos})`,
+            [...parametros, ids[regla.nombre], regla.patron]
+        );
+    }
+}
 
 /* Cambios de datos que se aplican UNA sola vez (quedan anotados en migraciones_unicas).
    Así, si luego se borra o cambia algo a mano, no vuelve a aparecer. */
 const MIGRACIONES_UNICAS = [
     {
-        nombre: "2026-10-seccion-arboles",
+        nombre: "2026-10-categorias-ferias",
         async aplicar(client) {
-            const existente = await client.query(
-                `SELECT id FROM secciones WHERE nombre ~* $1 LIMIT 1`,
-                ["[aá]rbol"]
-            );
+            const navidad = (await client.query(
+                `SELECT id FROM secciones WHERE tema = 'navidad' AND nombre !~* '[aá]rbol' ORDER BY orden LIMIT 1`
+            )).rows[0];
+            const escolar = (await client.query(
+                `SELECT id FROM secciones WHERE tema = 'escolar' ORDER BY orden LIMIT 1`
+            )).rows[0];
 
-            let seccionId = existente.rows[0]?.id;
+            if (navidad) {
+                const ids = await crearCategorias(client, navidad.id, CATEGORIAS_NAVIDAD);
 
-            if (!seccionId) {
-                // Se ubica justo después de la Feria Navideña.
-                const navidad = await client.query(
-                    `SELECT orden FROM secciones WHERE tema = 'navidad' ORDER BY orden LIMIT 1`
+                // Si existe una sección suelta de árboles (versión anterior), sus productos pasan
+                // a la Feria Navideña, categoría "Árboles y pinos", y la sección se elimina.
+                const arboles = await client.query(`SELECT id FROM secciones WHERE nombre ~* '[aá]rbol'`);
+
+                for (const seccion of arboles.rows) {
+                    await client.query(
+                        `UPDATE productos SET seccion_id = $1, categoria_id = $2 WHERE seccion_id = $3`,
+                        [navidad.id, ids["Árboles y pinos"], seccion.id]
+                    );
+                    await client.query(`DELETE FROM secciones WHERE id = $1`, [seccion.id]);
+                }
+
+                // Productos navideños o sin sección: se acomodan por su nombre.
+                const reglas = PRIORIDAD_NAVIDAD.map((nombre) => CATEGORIAS_NAVIDAD.find((c) => c.nombre === nombre));
+                await asignarPorNombre(
+                    client,
+                    "seccion_id IS NULL OR seccion_id = $1",
+                    [navidad.id],
+                    reglas,
+                    ids
                 );
-                const base = navidad.rows[0]?.orden ?? 0;
-
-                await client.query(`UPDATE secciones SET orden = orden + 1 WHERE orden > $1`, [base]);
-
-                const creada = await client.query(
-                    `INSERT INTO secciones (nombre, descripcion, tema, visible, orden)
-                     VALUES ('Árboles de Navidad', 'Árboles navideños de todos los tamaños.', 'navidad', TRUE, $1)
-                     RETURNING id`,
-                    [base + 1]
+                await client.query(
+                    `UPDATE productos SET seccion_id = $1 WHERE seccion_id IS NULL AND categoria_id IS NOT NULL`,
+                    [navidad.id]
                 );
-                seccionId = creada.rows[0].id;
             }
 
-            await client.query(
-                `UPDATE productos SET seccion_id = $1 WHERE nombre ~* $2`,
-                [seccionId, PATRON_ARBOL]
-            );
+            if (escolar) {
+                const ids = await crearCategorias(client, escolar.id, CATEGORIAS_ESCOLAR);
+                await asignarPorNombre(client, "seccion_id = $1", [escolar.id], CATEGORIAS_ESCOLAR, ids);
+            }
         }
     }
 ];

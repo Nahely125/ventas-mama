@@ -19,7 +19,8 @@ export function validarProducto(valores) {
         precioCompra: Number(valores.precioCompra),
         unidadesPorCaja: Number(valores.unidadesPorCaja),
         stock: Number(valores.stock),
-        seccionId: valores.seccionId ? Number(valores.seccionId) : null
+        seccionId: valores.seccionId ? Number(valores.seccionId) : null,
+        categoriaId: valores.categoriaId ? Number(valores.categoriaId) : null
     };
 
     if (!datos.codigo) {

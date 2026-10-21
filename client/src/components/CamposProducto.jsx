@@ -3,8 +3,14 @@ import { porDocena, textoCostoUnitario } from "../producto.js";
 import CampoFoto from "./CampoFoto.jsx";
 import Escaner from "./Escaner.jsx";
 import { iconoTema, useSecciones } from "../secciones.js";
+import { sugerirCategoria } from "../categoriasAuto.js";
 
-const ESARBOL = /^\s*[aá]rbol/i;
+// Valor del selector de ubicación: "c<id>" (categoría), "s<id>" (sección sin categoría) o "".
+function valorUbicacion(valores) {
+    if (valores.categoriaId) return `c${valores.categoriaId}`;
+    if (valores.seccionId) return `s${valores.seccionId}`;
+    return "";
+}
 
 /* Campos compartidos por el formulario de registro y el modal de edición.
    valores.docenaAuto: mientras sea true, el precio por docena sigue al precio mínimo × 12.
@@ -13,7 +19,6 @@ const ESARBOL = /^\s*[aá]rbol/i;
 export default function CamposProducto({ valores, onCambio, prefijo, etiquetaCompra }) {
     const [escaneando, setEscaneando] = useState(false);
     const secciones = useSecciones();
-    const seccionArboles = secciones.find((s) => /[aá]rbol/i.test(s.nombre));
 
     const codigoLeido = useCallback((codigo) => {
         setEscaneando(false);
@@ -26,23 +31,21 @@ export default function CamposProducto({ valores, onCambio, prefijo, etiquetaCom
         onCambio((anteriores) => {
             const nuevos = { ...anteriores, [name]: value };
 
-            // Si el nombre empieza con "Árbol", se elige sola la sección de árboles
-            // (mientras no se haya elegido una sección a mano).
-            if (name === "seccionId") {
-                nuevos.seccionManual = true;
-            }
+            // Mientras no se elija la ubicación a mano, se sugiere la categoría según el nombre
+            // (por ejemplo, "Pino nevado" → Árboles y pinos; "Reno de luces" → Renos de luces).
+            if (name === "nombre" && !anteriores.ubicacionManual) {
+                const sugerida = sugerirCategoria(value, secciones);
 
-            if (name === "nombre" && !anteriores.seccionManual && seccionArboles) {
-                const idArboles = String(seccionArboles.id);
-
-                if (ESARBOL.test(value)) {
-                    if (anteriores.seccionId !== idArboles) {
-                        nuevos.seccionAnterior = anteriores.seccionId;
-                        nuevos.seccionId = idArboles;
+                if (sugerida) {
+                    if (anteriores.ubicacionPrevia === undefined) {
+                        nuevos.ubicacionPrevia = { seccionId: anteriores.seccionId, categoriaId: anteriores.categoriaId };
                     }
-                } else if (anteriores.seccionId === idArboles && anteriores.seccionAnterior !== undefined) {
-                    nuevos.seccionId = anteriores.seccionAnterior;
-                    nuevos.seccionAnterior = undefined;
+                    nuevos.categoriaId = String(sugerida.id);
+                    nuevos.seccionId = String(sugerida.seccionId);
+                } else if (anteriores.ubicacionPrevia !== undefined) {
+                    nuevos.seccionId = anteriores.ubicacionPrevia.seccionId;
+                    nuevos.categoriaId = anteriores.ubicacionPrevia.categoriaId;
+                    nuevos.ubicacionPrevia = undefined;
                 }
             }
 
@@ -63,6 +66,21 @@ export default function CamposProducto({ valores, onCambio, prefijo, etiquetaCom
             ...anteriores,
             precioDocena: porDocena(anteriores.precioMinimo),
             docenaAuto: true
+        }));
+    }
+
+    function cambiarUbicacion(evento) {
+        const valor = evento.target.value;
+        const tipo = valor.charAt(0);
+        const numero = valor.slice(1);
+        const seccionDeCategoria = secciones.find((s) => s.categorias.some((cat) => String(cat.id) === numero));
+
+        onCambio((anteriores) => ({
+            ...anteriores,
+            ubicacionManual: true,
+            ubicacionPrevia: undefined,
+            categoriaId: tipo === "c" ? numero : "",
+            seccionId: tipo === "c" ? String(seccionDeCategoria?.id ?? "") : tipo === "s" ? numero : ""
         }));
     }
 
@@ -115,20 +133,32 @@ export default function CamposProducto({ valores, onCambio, prefijo, etiquetaCom
                 </div>
 
                 <div className="campo">
-                    <label htmlFor={id("seccionId")}>Sección del catálogo</label>
+                    <label htmlFor={id("ubicacion")}>Ubicación en el catálogo</label>
                     <select
-                        id={id("seccionId")}
-                        name="seccionId"
-                        value={valores.seccionId ?? ""}
-                        onChange={cambiar}
+                        id={id("ubicacion")}
+                        value={valorUbicacion(valores)}
+                        onChange={cambiarUbicacion}
                     >
                         <option value="">Sin sección</option>
                         {secciones.map((seccion) => (
-                            <option key={seccion.id} value={seccion.id}>
-                                {iconoTema(seccion.tema)} {seccion.nombre}{seccion.visible ? "" : " (oculta)"}
-                            </option>
+                            <optgroup
+                                key={seccion.id}
+                                label={`${iconoTema(seccion.tema)} ${seccion.nombre}${seccion.visible ? "" : " (oculta)"}`}
+                            >
+                                {seccion.categorias.map((categoria) => (
+                                    <option key={categoria.id} value={`c${categoria.id}`}>
+                                        {categoria.icono} {categoria.nombre}
+                                    </option>
+                                ))}
+                                <option value={`s${seccion.id}`}>
+                                    {seccion.categorias.length ? `Otros de ${seccion.nombre}` : seccion.nombre}
+                                </option>
+                            </optgroup>
                         ))}
                     </select>
+                    {!valores.ubicacionManual && valores.categoriaId && (
+                        <span className="ayuda-campo">✨ Sugerida por el nombre. Puedes cambiarla.</span>
+                    )}
                 </div>
             </div>
 

@@ -14,7 +14,18 @@ const COLUMNAS = `
     secciones.tema,
     secciones.visible,
     secciones.orden,
-    (SELECT COUNT(*)::INT FROM productos WHERE productos.seccion_id = secciones.id) AS "totalProductos"
+    (SELECT COUNT(*)::INT FROM productos WHERE productos.seccion_id = secciones.id) AS "totalProductos",
+    COALESCE((
+        SELECT JSON_AGG(JSON_BUILD_OBJECT(
+            'id', categorias.id,
+            'nombre', categorias.nombre,
+            'icono', categorias.icono,
+            'orden', categorias.orden,
+            'totalProductos', (SELECT COUNT(*) FROM productos WHERE productos.categoria_id = categorias.id)
+        ) ORDER BY categorias.orden, categorias.nombre)
+        FROM categorias
+        WHERE categorias.seccion_id = secciones.id
+    ), '[]') AS categorias
 `;
 
 function validarSeccion({ nombre, descripcion = "", tema, visible, orden }) {
@@ -112,6 +123,100 @@ router.put("/:id", requiereJefe, async (req, res) => {
         if (errorNombreRepetido(err, res)) return;
         console.error("Error al actualizar la sección:", err.message);
         res.status(500).json({ error: "No se pudo actualizar la sección." });
+    }
+});
+
+/* Categorías de una sección */
+
+function validarCategoria({ nombre, icono = "", orden = 0 }) {
+    if (typeof nombre !== "string" || !nombre.trim() || nombre.trim().length > 60) {
+        return { error: "El nombre de la categoría es obligatorio (máximo 60 caracteres)." };
+    }
+
+    if (typeof icono !== "string" || [...icono].length > 4) {
+        return { error: "El ícono debe ser un emoji." };
+    }
+
+    if (!Number.isInteger(orden) || orden < 0 || orden > 999) {
+        return { error: "El orden debe ser un número entre 0 y 999." };
+    }
+
+    return { datos: { nombre: nombre.trim(), icono: icono.trim() || null, orden } };
+}
+
+function errorCategoriaRepetida(error, res) {
+    if (error.code === "23505") {
+        res.status(409).json({ error: "Esa sección ya tiene una categoría con ese nombre." });
+        return true;
+    }
+    return false;
+}
+
+router.post("/:id/categorias", requiereJefe, async (req, res) => {
+    const seccionId = leerId(req);
+    const { datos, error } = validarCategoria(req.body);
+
+    if (!seccionId) return res.status(400).json({ error: "Sección inválida." });
+    if (error) return res.status(400).json({ error });
+
+    try {
+        const resultado = await pool.query(
+            `INSERT INTO categorias (seccion_id, nombre, icono, orden)
+             VALUES ($1, $2, $3, $4)
+             RETURNING id`,
+            [seccionId, datos.nombre, datos.icono, datos.orden]
+        );
+        res.status(201).json({ mensaje: "Categoría creada.", id: resultado.rows[0].id });
+    } catch (err) {
+        if (errorCategoriaRepetida(err, res)) return;
+        if (err.code === "23503") return res.status(404).json({ error: "Sección no encontrada." });
+        console.error("Error al crear la categoría:", err.message);
+        res.status(500).json({ error: "No se pudo crear la categoría." });
+    }
+});
+
+router.put("/categorias/:id", requiereJefe, async (req, res) => {
+    const id = leerId(req);
+    const { datos, error } = validarCategoria(req.body);
+
+    if (!id) return res.status(400).json({ error: "Categoría inválida." });
+    if (error) return res.status(400).json({ error });
+
+    try {
+        const resultado = await pool.query(
+            `UPDATE categorias SET nombre = $1, icono = $2, orden = $3 WHERE id = $4 RETURNING id`,
+            [datos.nombre, datos.icono, datos.orden, id]
+        );
+
+        if (resultado.rows.length === 0) {
+            return res.status(404).json({ error: "Categoría no encontrada." });
+        }
+
+        res.json({ mensaje: "Categoría actualizada." });
+    } catch (err) {
+        if (errorCategoriaRepetida(err, res)) return;
+        console.error("Error al actualizar la categoría:", err.message);
+        res.status(500).json({ error: "No se pudo actualizar la categoría." });
+    }
+});
+
+// Al eliminar una categoría, sus productos siguen en la sección pero sin categoría.
+router.delete("/categorias/:id", requiereJefe, async (req, res) => {
+    const id = leerId(req);
+
+    if (!id) return res.status(400).json({ error: "Categoría inválida." });
+
+    try {
+        const resultado = await pool.query(`DELETE FROM categorias WHERE id = $1 RETURNING id`, [id]);
+
+        if (resultado.rows.length === 0) {
+            return res.status(404).json({ error: "Categoría no encontrada." });
+        }
+
+        res.json({ mensaje: "Categoría eliminada." });
+    } catch (error) {
+        console.error("Error al eliminar la categoría:", error.message);
+        res.status(500).json({ error: "No se pudo eliminar la categoría." });
     }
 });
 

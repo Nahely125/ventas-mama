@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { pedir } from "../api.js";
 import { TEMAS, iconoTema } from "../secciones.js";
+import CategoriasSeccion from "./CategoriasSeccion.jsx";
 
 const VACIA = { nombre: "", descripcion: "", tema: "general", visible: true, orden: "0" };
 
@@ -119,8 +120,7 @@ export default function SeccionesCatalogo({ onError }) {
                     </a>
                 </div>
                 <p className="descripcion-seccion">
-                    Cada sección aparece como una pestaña del catálogo. Oculta la que no esté en temporada
-                    (por ejemplo, la Feria Escolar hasta que empiece) y asigna la sección a cada producto al registrarlo o editarlo.
+                    Cada sección (feria) es una pestaña del catálogo y se divide en categorías para que los clientes encuentren rápido lo que buscan. Oculta la feria que no esté en temporada (por ejemplo, la Escolar hasta que empiece) y elige la ubicación de cada producto al registrarlo o editarlo.
                 </p>
 
                 {secciones === null ? (
@@ -156,6 +156,7 @@ export default function SeccionesCatalogo({ onError }) {
                                         🗑️
                                     </button>
                                 </div>
+                                <CategoriasSeccion seccion={seccion} onCambio={cargar} onError={onError} />
                             </li>
                         ))}
                     </ul>

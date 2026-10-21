@@ -11,7 +11,14 @@ const router = express.Router();
 router.get("/catalogo", async (req, res) => {
     try {
         const secciones = await pool.query(
-            `SELECT id, nombre, descripcion, tema
+            `SELECT
+                id, nombre, descripcion, tema,
+                COALESCE((
+                    SELECT JSON_AGG(JSON_BUILD_OBJECT('id', c.id, 'nombre', c.nombre, 'icono', c.icono)
+                                    ORDER BY c.orden, c.nombre)
+                    FROM categorias c
+                    WHERE c.seccion_id = secciones.id
+                ), '[]') AS categorias
              FROM secciones
              WHERE visible
              ORDER BY orden, nombre`
@@ -25,6 +32,7 @@ router.get("/catalogo", async (req, res) => {
                 productos.precio_minimo AS "precioMinimo",
                 productos.precio_docena AS "precioDocena",
                 productos.seccion_id AS "seccionId",
+                productos.categoria_id AS "categoriaId",
                 (productos.stock > 0) AS disponible,
                 (productos.foto IS NOT NULL) AS "tieneFoto",
                 COALESCE(EXTRACT(EPOCH FROM productos.foto_actualizada)::BIGINT, 0)::INT AS "fotoVersion"

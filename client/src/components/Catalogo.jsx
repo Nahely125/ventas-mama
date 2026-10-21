@@ -4,9 +4,10 @@ import { urlFoto } from "../fotos.js";
 import { iconoTema } from "../secciones.js";
 
 const TODO = "todo";
-const SIN_SECCION = { id: 0, nombre: "Más productos", descripcion: null, tema: "general" };
+const OTROS = "otros";
+const SIN_SECCION = { id: 0, nombre: "Más productos", descripcion: null, tema: "general", categorias: [] };
 
-// "Feria Navideña" → "feria-navidena" (para el enlace #seccion).
+// "Feria Navideña" → "feria-navidena" (para el enlace #seccion/categoria).
 function slug(texto) {
     return texto
         .normalize("NFD")
@@ -14,6 +15,11 @@ function slug(texto) {
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-|-$/g, "");
+}
+
+function leerHash() {
+    const [seccion = null, categoria = null] = decodeURIComponent(window.location.hash.slice(1)).split("/");
+    return { seccion: seccion || null, categoria: categoria || null };
 }
 
 function TarjetaProductoCatalogo({ producto, onAbrir }) {
@@ -58,16 +64,26 @@ function Banner({ seccion, total, onVer }) {
     );
 }
 
-// Página pública del catálogo, organizada por secciones (ferias). No necesita iniciar sesión.
+function Grilla({ productos, onAbrir }) {
+    return (
+        <ul className="cat-grilla">
+            {productos.map((producto) => (
+                <TarjetaProductoCatalogo key={producto.id} producto={producto} onAbrir={onAbrir} />
+            ))}
+        </ul>
+    );
+}
+
+// Página pública del catálogo: secciones (ferias) → categorías → productos. No necesita iniciar sesión.
 export default function Catalogo() {
     const [datos, setDatos] = useState(null);
     const [error, setError] = useState("");
-    const [activa, setActiva] = useState(() => window.location.hash.slice(1) || null);
+    const [ruta, setRuta] = useState(leerHash);
     const [busqueda, setBusqueda] = useState("");
     const [buscando, setBuscando] = useState(false);
     const [soloDisponibles, setSoloDisponibles] = useState(false);
     const [detalle, setDetalle] = useState(null);
-    const grilla = useRef(null);
+    const listado = useRef(null);
     const campoBusqueda = useRef(null);
 
     useEffect(() => {
@@ -78,37 +94,58 @@ export default function Catalogo() {
             .catch((err) => setError(err.message));
     }, []);
 
-    // Secciones con productos; los productos sin sección van al final.
+    // Secciones con sus categorías y productos. Los productos sin sección van a "Más productos";
+    // los que no tienen categoría, a "Otros" dentro de su sección.
     const secciones = useMemo(() => {
         if (!datos) return [];
 
-        const lista = datos.secciones.map((seccion) => ({
-            ...seccion,
-            slug: slug(seccion.nombre),
-            productos: datos.productos.filter((p) => p.seccionId === seccion.id)
-        }));
+        const lista = datos.secciones.map((seccion) => {
+            const productos = datos.productos.filter((p) => p.seccionId === seccion.id);
+            const categorias = seccion.categorias
+                .map((categoria) => ({
+                    ...categoria,
+                    slug: slug(categoria.nombre),
+                    productos: productos.filter((p) => p.categoriaId === categoria.id)
+                }))
+                .filter((categoria) => categoria.productos.length > 0);
+
+            const sinCategoria = productos.filter((p) => !categorias.some((c) => c.id === p.categoriaId));
+
+            if (sinCategoria.length > 0 && categorias.length > 0) {
+                categorias.push({ id: -seccion.id, nombre: "Otros", icono: "🛍️", slug: OTROS, productos: sinCategoria });
+            }
+
+            return { ...seccion, slug: slug(seccion.nombre), productos, categorias };
+        });
 
         const sueltos = datos.productos.filter(
             (p) => p.seccionId === null || !datos.secciones.some((s) => s.id === p.seccionId)
         );
 
         if (sueltos.length > 0) {
-            lista.push({ ...SIN_SECCION, slug: "mas-productos", productos: sueltos });
+            lista.push({ ...SIN_SECCION, slug: "mas-productos", productos: sueltos, categorias: [] });
         }
 
-        return lista.filter((seccion) => seccion.productos.length > 0 || seccion.id !== 0);
+        return lista;
     }, [datos]);
 
-    // Sección elegida: la del enlace (#...) o la primera; "todo" muestra todas.
-    const claveActiva = activa === TODO || secciones.some((s) => s.slug === activa)
-        ? activa
+    // Sección elegida: la del enlace o la primera; "todo" muestra todas.
+    const seccionClave = ruta.seccion === TODO || secciones.some((s) => s.slug === ruta.seccion)
+        ? ruta.seccion
         : secciones[0]?.slug ?? TODO;
+    const seccionActiva = secciones.find((s) => s.slug === seccionClave) ?? null;
+    const categoriaActiva = seccionActiva?.categorias.find((c) => c.slug === ruta.categoria) ?? null;
 
-    function elegir(clave) {
-        setActiva(clave);
+    function ir(seccion, categoria = null, desplazar = true) {
+        setRuta({ seccion, categoria });
         setBusqueda("");
-        history.replaceState(null, "", `#${clave}`);
-        window.scrollTo({ top: 0, behavior: "smooth" });
+        history.replaceState(null, "", `#${seccion}${categoria ? `/${categoria}` : ""}`);
+
+        if (desplazar && categoria) {
+            setTimeout(() => listado.current?.scrollIntoView({ behavior: "smooth" }), 30);
+        } else {
+            window.scrollTo({ top: 0, behavior: "smooth" });
+        }
     }
 
     function abrirBusqueda() {
@@ -117,25 +154,61 @@ export default function Catalogo() {
     }
 
     const texto = busqueda.trim().toLowerCase();
-    const coincide = (producto) =>
-        (!soloDisponibles || producto.disponible) &&
-        (!texto ||
-            producto.nombre.toLowerCase().includes(texto) ||
-            (producto.codigo ?? "").toLowerCase().includes(texto));
+    const filtrar = (productos) => productos.filter((p) => !soloDisponibles || p.disponible);
 
-    const visibles = texto || claveActiva === TODO
-        ? secciones
-        : secciones.filter((s) => s.slug === claveActiva);
+    // Búsqueda: nombre, código o categoría, en todas las secciones.
+    const resultados = texto
+        ? secciones.flatMap((seccion) =>
+            seccion.productos.filter((p) => {
+                const categoria = seccion.categorias.find((c) => c.id === p.categoriaId);
+                return (
+                    p.nombre.toLowerCase().includes(texto) ||
+                    (p.codigo ?? "").toLowerCase().includes(texto) ||
+                    (categoria?.nombre ?? "").toLowerCase().includes(texto)
+                );
+            }))
+        : [];
 
-    const bloques = visibles
-        .map((seccion) => ({ ...seccion, filtrados: seccion.productos.filter(coincide) }))
-        .filter((seccion) => seccion.filtrados.length > 0);
+    // Bloques a mostrar (título + productos).
+    let bloques;
 
-    const seccionBanner = !texto && claveActiva !== TODO
-        ? secciones.find((s) => s.slug === claveActiva)
-        : null;
+    if (texto) {
+        bloques = [{ clave: "busqueda", titulo: null, productos: filtrar(resultados) }];
+    } else if (seccionClave === TODO) {
+        bloques = secciones.flatMap((seccion) =>
+            seccion.categorias.length
+                ? seccion.categorias.map((c) => ({
+                    clave: `${seccion.slug}-${c.slug}`,
+                    titulo: `${c.icono ?? ""} ${c.nombre}`,
+                    subtitulo: seccion.nombre,
+                    productos: filtrar(c.productos)
+                }))
+                : [{ clave: seccion.slug, titulo: seccion.nombre, productos: filtrar(seccion.productos) }]
+        );
+    } else if (categoriaActiva) {
+        bloques = [{ clave: categoriaActiva.slug, titulo: null, productos: filtrar(categoriaActiva.productos) }];
+    } else if (seccionActiva?.categorias.length) {
+        bloques = seccionActiva.categorias.map((c) => ({
+            clave: c.slug,
+            titulo: `${c.icono ?? ""} ${c.nombre}`,
+            categoria: c,
+            productos: filtrar(c.productos)
+        }));
+    } else {
+        bloques = [{ clave: "seccion", titulo: null, productos: filtrar(seccionActiva?.productos ?? []) }];
+    }
 
+    bloques = bloques.filter((b) => b.productos.length > 0);
+
+    const mostrarBanner = !texto && seccionActiva && !categoriaActiva;
     const anuncio = secciones.find((s) => s.id !== 0);
+    const tituloListado = texto
+        ? `Resultados para “${busqueda.trim()}”`
+        : seccionClave === TODO
+            ? "Todo el catálogo"
+            : categoriaActiva
+                ? `${categoriaActiva.icono ?? ""} ${categoriaActiva.nombre}`
+                : seccionActiva?.nombre;
 
     return (
         <div className="cat-pagina">
@@ -160,7 +233,7 @@ export default function Catalogo() {
                         </svg>
                     </button>
 
-                    <a className="cat-logo" href="/catalogo" onClick={(e) => { e.preventDefault(); elegir(secciones[0]?.slug ?? TODO); }}>
+                    <a className="cat-logo" href="/catalogo" onClick={(e) => { e.preventDefault(); ir(secciones[0]?.slug ?? TODO); }}>
                         Mil Deseos
                     </a>
 
@@ -172,8 +245,8 @@ export default function Catalogo() {
                         <input
                             ref={campoBusqueda}
                             type="search"
-                            placeholder="¿Qué estás buscando?"
-                            aria-label="Buscar por nombre o código"
+                            placeholder="Busca: árbol, luces, reno, cascanueces..."
+                            aria-label="Buscar por nombre, código o categoría"
                             value={busqueda}
                             onChange={(e) => setBusqueda(e.target.value)}
                         />
@@ -187,9 +260,9 @@ export default function Catalogo() {
                                 <li key={seccion.slug}>
                                     <button
                                         type="button"
-                                        className={claveActiva === seccion.slug && !texto ? "activa" : ""}
-                                        aria-current={claveActiva === seccion.slug && !texto ? "page" : undefined}
-                                        onClick={() => elegir(seccion.slug)}
+                                        className={seccionClave === seccion.slug && !texto ? "activa" : ""}
+                                        aria-current={seccionClave === seccion.slug && !texto ? "page" : undefined}
+                                        onClick={() => ir(seccion.slug)}
                                     >
                                         {seccion.nombre}
                                     </button>
@@ -199,13 +272,41 @@ export default function Catalogo() {
                                 <li>
                                     <button
                                         type="button"
-                                        className={claveActiva === TODO && !texto ? "activa" : ""}
-                                        onClick={() => elegir(TODO)}
+                                        className={seccionClave === TODO && !texto ? "activa" : ""}
+                                        onClick={() => ir(TODO)}
                                     >
                                         Ver todo
                                     </button>
                                 </li>
                             )}
+                        </ul>
+                    </nav>
+                )}
+
+                {/* Barra de categorías de la sección: siempre a la vista para saltar rápido. */}
+                {!texto && seccionActiva?.categorias.length > 0 && (
+                    <nav className="cat-subnav" aria-label={`Categorías de ${seccionActiva.nombre}`}>
+                        <ul>
+                            <li>
+                                <button
+                                    type="button"
+                                    className={!categoriaActiva ? "activa" : ""}
+                                    onClick={() => ir(seccionActiva.slug, null)}
+                                >
+                                    Todas
+                                </button>
+                            </li>
+                            {seccionActiva.categorias.map((categoria) => (
+                                <li key={categoria.slug}>
+                                    <button
+                                        type="button"
+                                        className={categoriaActiva?.slug === categoria.slug ? "activa" : ""}
+                                        onClick={() => ir(seccionActiva.slug, categoria.slug)}
+                                    >
+                                        <span aria-hidden="true">{categoria.icono}</span> {categoria.nombre}
+                                    </button>
+                                </li>
+                            ))}
                         </ul>
                     </nav>
                 )}
@@ -220,22 +321,36 @@ export default function Catalogo() {
                     </p>
                 ) : (
                     <>
-                        {seccionBanner && (
+                        {mostrarBanner && (
                             <Banner
-                                seccion={seccionBanner}
-                                total={seccionBanner.productos.length}
-                                onVer={() => grilla.current?.scrollIntoView({ behavior: "smooth" })}
+                                seccion={seccionActiva}
+                                total={seccionActiva.productos.length}
+                                onVer={() => listado.current?.scrollIntoView({ behavior: "smooth" })}
                             />
                         )}
 
-                        <div className="cat-filtros" ref={grilla}>
-                            <p>
-                                {texto
-                                    ? `Resultados para “${busqueda.trim()}”`
-                                    : claveActiva === TODO
-                                        ? "Todo el catálogo"
-                                        : seccionBanner?.nombre}
-                            </p>
+                        {/* Tarjetas "Compra por categoría" */}
+                        {mostrarBanner && seccionActiva.categorias.length > 1 && (
+                            <section className="cat-categorias" aria-label="Compra por categoría">
+                                <h2 className="cat-titulo-centrado">Compra por categoría</h2>
+                                <ul>
+                                    {seccionActiva.categorias.map((categoria) => (
+                                        <li key={categoria.slug}>
+                                            <button type="button" onClick={() => ir(seccionActiva.slug, categoria.slug)}>
+                                                <span className="cat-categoria-icono" aria-hidden="true">{categoria.icono}</span>
+                                                <span className="cat-categoria-nombre">{categoria.nombre}</span>
+                                                <span className="cat-categoria-total">
+                                                    {categoria.productos.length} {categoria.productos.length === 1 ? "producto" : "productos"}
+                                                </span>
+                                            </button>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </section>
+                        )}
+
+                        <div className="cat-filtros" ref={listado}>
+                            <p>{tituloListado}</p>
                             <label className="cat-chip">
                                 <input
                                     type="checkbox"
@@ -250,26 +365,28 @@ export default function Catalogo() {
                             <p className="cat-vacio">
                                 {texto
                                     ? "No encontramos productos con esa búsqueda."
-                                    : "Pronto tendremos productos en esta sección. ✦"}
+                                    : "Pronto tendremos productos aquí. ✦"}
                             </p>
                         ) : (
-                            bloques.map((seccion) => (
-                                <section key={seccion.slug} className="cat-bloque" aria-label={seccion.nombre}>
-                                    {(bloques.length > 1 || claveActiva === TODO || texto) && (
+                            bloques.map((bloque) => (
+                                <section key={bloque.clave} className="cat-bloque" aria-label={bloque.titulo ?? tituloListado}>
+                                    {bloque.titulo && (
                                         <h2 className="cat-bloque-titulo">
-                                            {seccion.nombre}
-                                            <span>{seccion.filtrados.length}</span>
+                                            {bloque.titulo}
+                                            {bloque.subtitulo && <em>{bloque.subtitulo}</em>}
+                                            <span>{bloque.productos.length}</span>
+                                            {bloque.categoria && (
+                                                <button
+                                                    type="button"
+                                                    className="cat-ver-mas"
+                                                    onClick={() => ir(seccionActiva.slug, bloque.categoria.slug)}
+                                                >
+                                                    Ver solo esta →
+                                                </button>
+                                            )}
                                         </h2>
                                     )}
-                                    <ul className="cat-grilla">
-                                        {seccion.filtrados.map((producto) => (
-                                            <TarjetaProductoCatalogo
-                                                key={producto.id}
-                                                producto={producto}
-                                                onAbrir={setDetalle}
-                                            />
-                                        ))}
-                                    </ul>
+                                    <Grilla productos={bloque.productos} onAbrir={setDetalle} />
                                 </section>
                             ))
                         )}

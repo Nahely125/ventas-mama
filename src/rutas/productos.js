@@ -17,6 +17,7 @@ const COLUMNAS_COMUNES = `
     precio_docena AS "precioDocena",
     stock,
     seccion_id AS "seccionId",
+    categoria_id AS "categoriaId",
     (foto IS NOT NULL) AS "tieneFoto",
     COALESCE(EXTRACT(EPOCH FROM foto_actualizada)::BIGINT, 0)::INT AS "fotoVersion"
 `;
@@ -50,7 +51,8 @@ function validarProducto(cuerpo) {
         precioCompra,
         unidadesPorCaja,
         stock,
-        seccionId = null
+        seccionId = null,
+        categoriaId = null
     } = cuerpo;
 
     if (typeof codigo !== "string" || !codigo.trim() || codigo.trim().length > 50) {
@@ -80,6 +82,10 @@ function validarProducto(cuerpo) {
         };
     }
 
+    if (categoriaId !== null && (!Number.isInteger(categoriaId) || categoriaId <= 0)) {
+        return { error: "La categoría elegida no es válida." };
+    }
+
     if (seccionId !== null && (!Number.isInteger(seccionId) || seccionId <= 0)) {
         return { error: "La sección elegida no es válida." };
     }
@@ -105,14 +111,15 @@ function validarProducto(cuerpo) {
             costoUnitario: Number((precioCompra / unidadesPorCaja).toFixed(2)),
             unidadesPorCaja,
             stock,
-            seccionId
+            seccionId,
+            categoriaId
         }
     };
 }
 
 function errorDuplicado(error, res) {
-    if (error.code === "23503" && /seccion/.test(error.constraint ?? error.detail ?? "")) {
-        res.status(400).json({ error: "La sección elegida ya no existe." });
+    if (error.code === "23503" && /seccion|categoria/.test(error.constraint ?? error.detail ?? "")) {
+        res.status(400).json({ error: "La sección o categoría elegida ya no existe." });
         return true;
     }
 
@@ -171,8 +178,9 @@ router.post("/", requiereJefe, async (req, res) => {
         const resultado = await pool.query(
             `INSERT INTO productos
                 (codigo, nombre, precio, precio_docena, precio_minimo,
-                 precio_compra, unidades_por_caja, stock, seccion_id)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                 precio_compra, unidades_por_caja, stock, seccion_id, categoria_id)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8,
+                     COALESCE((SELECT seccion_id FROM categorias WHERE id = $10), $9), $10)
              RETURNING ${COLUMNAS_JEFE}`,
             [
                 datos.codigo,
@@ -183,7 +191,8 @@ router.post("/", requiereJefe, async (req, res) => {
                 datos.costoUnitario,
                 datos.unidadesPorCaja,
                 datos.stock,
-                datos.seccionId
+                datos.seccionId,
+                datos.categoriaId
             ]
         );
 
@@ -223,7 +232,8 @@ router.put("/:id", requiereJefe, async (req, res) => {
                  precio_compra = $6,
                  unidades_por_caja = $7,
                  stock = $8,
-                 seccion_id = $9
+                 seccion_id = COALESCE((SELECT seccion_id FROM categorias WHERE id = $11), $9),
+                 categoria_id = $11
              WHERE id = $10
              RETURNING ${COLUMNAS_JEFE}`,
             [
@@ -236,7 +246,8 @@ router.put("/:id", requiereJefe, async (req, res) => {
                 datos.unidadesPorCaja,
                 datos.stock,
                 datos.seccionId,
-                id
+                id,
+                datos.categoriaId
             ]
         );
 

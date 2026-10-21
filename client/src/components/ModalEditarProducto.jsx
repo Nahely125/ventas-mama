@@ -21,8 +21,9 @@ export default function ModalEditarProducto({ producto, onCerrar, onGuardado, on
         unidadesPorCaja: String(unidades),
         stock: String(producto.stock),
         seccionId: producto.seccionId ? String(producto.seccionId) : "",
-        // Al editar no se cambia la sección sola: ya fue elegida.
-        seccionManual: true,
+        categoriaId: producto.categoriaId ? String(producto.categoriaId) : "",
+        // Al editar no se cambia la ubicación sola: ya fue elegida.
+        ubicacionManual: true,
         foto: undefined,
         fotoActual: urlFoto(producto)
     });

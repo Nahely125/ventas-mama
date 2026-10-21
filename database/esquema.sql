@@ -46,6 +46,20 @@ CREATE TABLE IF NOT EXISTS secciones (
 );
 
 -- ---------------------------------------------------------------------
+-- categorias: subdivisiones de cada sección para ubicar rápido los productos
+--   (ej. Feria Navideña → Árboles y pinos, Puntas de árbol, Luces lineales...).
+--   Al borrar una sección se borran sus categorías; los productos quedan sin categoría.
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS categorias (
+    id          SERIAL PRIMARY KEY,
+    seccion_id  INTEGER     NOT NULL REFERENCES secciones(id) ON DELETE CASCADE,
+    nombre      VARCHAR(60) NOT NULL,
+    icono       VARCHAR(16),                    -- emoji
+    orden       INTEGER     NOT NULL DEFAULT 0,
+    UNIQUE (seccion_id, nombre)
+);
+
+-- ---------------------------------------------------------------------
 -- productos: inventario.
 --   precio_compra guarda el COSTO POR UNIDAD (el formulario recibe el costo
 --   de la caja y el servidor lo divide entre unidades_por_caja).
@@ -61,6 +75,7 @@ CREATE TABLE IF NOT EXISTS productos (
     unidades_por_caja  INTEGER       NOT NULL DEFAULT 1 CHECK (unidades_por_caja >= 1),
     stock              INTEGER       NOT NULL CHECK (stock >= 0),           -- siempre en unidades
     seccion_id         INTEGER REFERENCES secciones(id) ON DELETE SET NULL,
+    categoria_id       INTEGER REFERENCES categorias(id) ON DELETE SET NULL,    -- la sección se toma de la categoría
     foto               BYTEA,                                               -- foto reducida (JPEG)
     foto_tipo          VARCHAR(30),
     foto_actualizada   TIMESTAMP,
@@ -125,6 +140,15 @@ CREATE TABLE IF NOT EXISTS inversiones (
     fecha        DATE          NOT NULL,
     usuario_id   INTEGER       REFERENCES usuarios(id),
     creado_en    TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ---------------------------------------------------------------------
+-- migraciones_unicas: cambios de datos que el servidor aplica una sola vez
+-- (por ejemplo, crear las categorías iniciales de cada feria).
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS migraciones_unicas (
+    nombre       VARCHAR(100) PRIMARY KEY,
+    aplicada_en  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 COMMIT;
