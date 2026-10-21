@@ -1,5 +1,5 @@
 -- =====================================================================
--- Ventas Mamá · Estructura de la base de datos (PostgreSQL 13 o superior)
+-- Mil Deseos · Estructura de la base de datos (PostgreSQL 13 o superior)
 --
 -- Crear la base desde cero:
 --   1) createdb -U postgres ventas_mama
@@ -31,6 +31,21 @@ CREATE TABLE IF NOT EXISTS usuarios (
 );
 
 -- ---------------------------------------------------------------------
+-- secciones: pestañas del catálogo público (Feria Navideña, Feria Escolar...).
+--   visible = FALSE oculta la sección y sus productos del catálogo.
+--   tema define los colores del banner: navidad, escolar o general.
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS secciones (
+    id           SERIAL PRIMARY KEY,
+    nombre       VARCHAR(80)  NOT NULL UNIQUE,
+    descripcion  VARCHAR(200),
+    tema         VARCHAR(20)  NOT NULL DEFAULT 'general',
+    visible      BOOLEAN      NOT NULL DEFAULT TRUE,
+    orden        INTEGER      NOT NULL DEFAULT 0,
+    creado_en    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ---------------------------------------------------------------------
 -- productos: inventario.
 --   precio_compra guarda el COSTO POR UNIDAD (el formulario recibe el costo
 --   de la caja y el servidor lo divide entre unidades_por_caja).
@@ -45,6 +60,7 @@ CREATE TABLE IF NOT EXISTS productos (
     precio_compra      NUMERIC(10,2) CHECK (precio_compra >= 0),            -- costo por unidad
     unidades_por_caja  INTEGER       NOT NULL DEFAULT 1 CHECK (unidades_por_caja >= 1),
     stock              INTEGER       NOT NULL CHECK (stock >= 0),           -- siempre en unidades
+    seccion_id         INTEGER REFERENCES secciones(id) ON DELETE SET NULL,
     foto               BYTEA,                                               -- foto reducida (JPEG)
     foto_tipo          VARCHAR(30),
     foto_actualizada   TIMESTAMP,

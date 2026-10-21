@@ -123,7 +123,7 @@ export async function generarImagenComprobante(venta) {
     ctx.fillStyle = "#ffffff";
     ctx.textAlign = "center";
     ctx.font = `700 38px ${SERIF}`;
-    ctx.fillText("Ventas Mamá", ANCHO / 2, 85);
+    ctx.fillText("Mil Deseos", ANCHO / 2, 85);
     ctx.font = `500 17px ${SANS}`;
     ctx.fillText(`Boleta de venta N° ${numeroComprobante(venta)}`, ANCHO / 2, 120);
     ctx.textAlign = "left";

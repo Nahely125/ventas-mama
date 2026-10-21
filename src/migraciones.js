@@ -29,6 +29,28 @@ const MIGRACIONES = `
         ADD COLUMN IF NOT EXISTS token UUID NOT NULL DEFAULT gen_random_uuid();
     CREATE UNIQUE INDEX IF NOT EXISTS ventas_token_unico ON ventas (token);
 
+    -- Secciones del catálogo (ferias). tema define los colores del banner.
+    CREATE TABLE IF NOT EXISTS secciones (
+        id SERIAL PRIMARY KEY,
+        nombre VARCHAR(80) NOT NULL UNIQUE,
+        descripcion VARCHAR(200),
+        tema VARCHAR(20) NOT NULL DEFAULT 'general',
+        visible BOOLEAN NOT NULL DEFAULT TRUE,
+        orden INTEGER NOT NULL DEFAULT 0,
+        creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- Secciones iniciales: solo la primera vez (si la tabla está vacía).
+    INSERT INTO secciones (nombre, descripcion, tema, visible, orden)
+    SELECT * FROM (VALUES
+        ('Feria Navideña', 'Adornos, regalos y todo para decorar tu Navidad.', 'navidad', TRUE, 1),
+        ('Feria Escolar', 'Útiles y todo lo necesario para el regreso a clases.', 'escolar', FALSE, 2)
+    ) AS iniciales (nombre, descripcion, tema, visible, orden)
+    WHERE NOT EXISTS (SELECT 1 FROM secciones);
+
+    ALTER TABLE productos
+        ADD COLUMN IF NOT EXISTS seccion_id INTEGER REFERENCES secciones(id) ON DELETE SET NULL;
+
     -- Acelera los filtros del historial por día y mes.
     CREATE INDEX IF NOT EXISTS ventas_fecha_idx ON ventas (fecha);
 

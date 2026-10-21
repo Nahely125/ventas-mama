@@ -20,6 +20,7 @@ export default function ModalEditarProducto({ producto, onCerrar, onGuardado, on
         precioCompra: (Number(producto.precioCompra) * unidades).toFixed(2),
         unidadesPorCaja: String(unidades),
         stock: String(producto.stock),
+        seccionId: producto.seccionId ? String(producto.seccionId) : "",
         foto: undefined,
         fotoActual: urlFoto(producto)
     });

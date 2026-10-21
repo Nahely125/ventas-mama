@@ -56,8 +56,8 @@ export function textoComprobante(venta) {
     const porDocena = venta.modalidad === "docena";
 
     return [
-        "*Ventas Mamá*",
-        `Comprobante de venta N° ${numeroComprobante(venta)}`,
+        "*Mil Deseos*",
+        `Boleta de venta N° ${numeroComprobante(venta)}`,
         `Fecha: ${formatearFecha(venta.fecha)}`,
         `Atendido por: ${venta.vendedor}`,
         "",

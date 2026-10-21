@@ -14,6 +14,7 @@ const VALORES_INICIALES = {
     precioCompra: "",
     unidadesPorCaja: "1",
     stock: "",
+    seccionId: "",
     foto: undefined
 };
 
@@ -47,7 +48,8 @@ export default function FormularioProducto({ onCreado, onError }) {
                 });
             }
 
-            setValores(VALORES_INICIALES);
+            // Se mantiene la sección para registrar varios productos de la misma feria seguidos.
+            setValores({ ...VALORES_INICIALES, seccionId: valores.seccionId });
             await onCreado();
         } catch (err) {
             onError(err, () => setMensaje({ tipo: "error", texto: err.message }));

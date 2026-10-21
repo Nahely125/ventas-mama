@@ -32,7 +32,7 @@ export default function Encabezado({ usuario, menuAbierto, onAbrirMenu, onSalir 
                 </button>
 
                 <div className="marca">
-                    <h1>Ventas Mamá</h1>
+                    <h1>Mil Deseos</h1>
                     <p>
                         Control de ventas e inventario ·{" "}
                         <a className="enlace-catalogo" href="/catalogo" target="_blank" rel="noopener">

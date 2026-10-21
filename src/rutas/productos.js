@@ -16,6 +16,7 @@ const COLUMNAS_COMUNES = `
     precio_minimo AS "precioMinimo",
     precio_docena AS "precioDocena",
     stock,
+    seccion_id AS "seccionId",
     (foto IS NOT NULL) AS "tieneFoto",
     COALESCE(EXTRACT(EPOCH FROM foto_actualizada)::BIGINT, 0)::INT AS "fotoVersion"
 `;
@@ -48,7 +49,8 @@ function validarProducto(cuerpo) {
         precioMinimo,
         precioCompra,
         unidadesPorCaja,
-        stock
+        stock,
+        seccionId = null
     } = cuerpo;
 
     if (typeof codigo !== "string" || !codigo.trim() || codigo.trim().length > 50) {
@@ -78,6 +80,10 @@ function validarProducto(cuerpo) {
         };
     }
 
+    if (seccionId !== null && (!Number.isInteger(seccionId) || seccionId <= 0)) {
+        return { error: "La sección elegida no es válida." };
+    }
+
     if (centimos(precio) < centimos(precioMinimo)) {
         return { error: "El precio de venta no puede ser menor que el precio mínimo." };
     }
@@ -98,12 +104,18 @@ function validarProducto(cuerpo) {
             // Se recibe el costo de la caja y se guarda el costo por unidad.
             costoUnitario: Number((precioCompra / unidadesPorCaja).toFixed(2)),
             unidadesPorCaja,
-            stock
+            stock,
+            seccionId
         }
     };
 }
 
 function errorDuplicado(error, res) {
+    if (error.code === "23503" && /seccion/.test(error.constraint ?? error.detail ?? "")) {
+        res.status(400).json({ error: "La sección elegida ya no existe." });
+        return true;
+    }
+
     if (error.code === "23505") {
         res.status(409).json({ error: "Ya existe un producto con ese código." });
         return true;
@@ -208,8 +220,8 @@ router.post("/", requiereJefe, async (req, res) => {
         const resultado = await pool.query(
             `INSERT INTO productos
                 (codigo, nombre, precio, precio_docena, precio_minimo,
-                 precio_compra, unidades_por_caja, stock)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                 precio_compra, unidades_por_caja, stock, seccion_id)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
              RETURNING ${COLUMNAS_JEFE}`,
             [
                 datos.codigo,
@@ -219,7 +231,8 @@ router.post("/", requiereJefe, async (req, res) => {
                 datos.precioMinimo,
                 datos.costoUnitario,
                 datos.unidadesPorCaja,
-                datos.stock
+                datos.stock,
+                datos.seccionId
             ]
         );
 
@@ -258,8 +271,9 @@ router.put("/:id", requiereJefe, async (req, res) => {
                  precio_minimo = $5,
                  precio_compra = $6,
                  unidades_por_caja = $7,
-                 stock = $8
-             WHERE id = $9
+                 stock = $8,
+                 seccion_id = $9
+             WHERE id = $10
              RETURNING ${COLUMNAS_JEFE}`,
             [
                 datos.codigo,
@@ -270,6 +284,7 @@ router.put("/:id", requiereJefe, async (req, res) => {
                 datos.costoUnitario,
                 datos.unidadesPorCaja,
                 datos.stock,
+                datos.seccionId,
                 id
             ]
         );

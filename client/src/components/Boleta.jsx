@@ -11,7 +11,7 @@ export default function Boleta({ token }) {
     const [error, setError] = useState("");
 
     useEffect(() => {
-        document.title = "Boleta | Ventas Mamá";
+        document.title = "Boleta | Mil Deseos";
         let direccion = "";
         let cancelado = false;
 
@@ -44,7 +44,7 @@ export default function Boleta({ token }) {
         <div className="pagina-publica">
             <header className="encabezado-catalogo">
                 <div className="encabezado-catalogo-interno">
-                    <h1>Ventas Mamá</h1>
+                    <h1>Mil Deseos</h1>
                     <p>{venta ? `Boleta de venta N° ${numeroComprobante(venta)}` : "Boleta de venta"}</p>
                 </div>
             </header>

@@ -34,7 +34,7 @@ export default function Login({ onIngresar }) {
             <main className="login-card">
                 <div className="login-icono" aria-hidden="true">📦</div>
 
-                <h1>Ventas Mamá</h1>
+                <h1>Mil Deseos</h1>
                 <p className="login-subtitulo">
                     Ingresa tus credenciales para continuar
                 </p>

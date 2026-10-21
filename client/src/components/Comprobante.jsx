@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { generarImagenComprobante } from "../imagenComprobante.js";
-import { enlaceBoleta, normalizarWhatsapp, numeroComprobante, textoComprobante } from "../venta.js";
+import { enlaceBoleta, normalizarWhatsapp, numeroComprobante } from "../venta.js";
 
 function descargar(archivo) {
     const url = URL.createObjectURL(archivo);
@@ -54,7 +54,12 @@ export default function Comprobante({ venta, onCerrar }) {
 
     // Abre el chat de ese número con la boleta: el mensaje lleva el enlace a la boleta
     // en imagen y al catálogo, así el cliente la ve aunque WhatsApp no adjunte archivos por enlace.
-    function enviarAlNumero(evento) {
+    /* Envía la boleta EN IMAGEN al número escrito.
+       WhatsApp no permite adjuntar archivos desde un enlace, así que:
+       1) se copia la imagen al portapapeles y se abre el chat de ese número → solo hay que pegarla;
+       2) si el teléfono no deja copiar imágenes, se abre el menú Compartir con la imagen;
+       3) en computadoras sin esas opciones, se descarga y se abre el chat para adjuntarla. */
+    async function enviarAlNumero(evento) {
         evento.preventDefault();
 
         const numero = normalizarWhatsapp(telefono);
@@ -67,12 +72,44 @@ export default function Comprobante({ venta, onCerrar }) {
             return;
         }
 
-        setAviso(null);
-        window.open(
-            `https://wa.me/${numero}?text=${encodeURIComponent(textoComprobante(venta))}`,
-            "_blank",
-            "noopener"
-        );
+        if (!archivo) {
+            setAviso({ tipo: "error", texto: "La imagen todavía se está preparando. Inténtalo en un momento." });
+            return;
+        }
+
+        const saludo = `Hola 👋 Te envío tu boleta N° ${numeroComprobante(venta)} de Mil Deseos 🎁`;
+        const chat = `https://wa.me/${numero}?text=${encodeURIComponent(saludo)}`;
+
+        try {
+            await navigator.clipboard.write([new ClipboardItem({ [archivo.type]: archivo })]);
+            window.open(chat, "_blank", "noopener");
+            setAviso({
+                tipo: "exito",
+                texto: "✅ Imagen copiada. En el chat que se abrió, mantén presionado el cuadro de mensaje y toca «Pegar» (en computadora: Ctrl + V)."
+            });
+            return;
+        } catch {
+            // El navegador no permite copiar imágenes: se prueba con Compartir.
+        }
+
+        if (puedeCompartirArchivos) {
+            try {
+                await navigator.share({ files: [archivo], text: saludo });
+                setAviso({ tipo: "exito", texto: `Elige WhatsApp y busca el número ${telefono.trim()}.` });
+            } catch (error) {
+                if (error.name !== "AbortError") {
+                    setAviso({ tipo: "error", texto: "No se pudo compartir la imagen. Prueba con «Descargar imagen»." });
+                }
+            }
+            return;
+        }
+
+        descargar(archivo);
+        window.open(chat, "_blank", "noopener");
+        setAviso({
+            tipo: "exito",
+            texto: "La imagen se descargó. Adjúntala en el chat que se abrió (clip 📎 → Fotos)."
+        });
     }
 
     async function compartirImagen() {
@@ -139,10 +176,10 @@ export default function Comprobante({ venta, onCerrar }) {
                     </div>
 
                     <button type="submit" className="boton-whatsapp boton-whatsapp-grande">
-                        💬 Enviar boleta a este número
+                        📷 Enviar boleta en imagen
                     </button>
                     <span className="ayuda-campo">
-                        Se abre el chat de ese número con la boleta y el enlace para verla en imagen y al catálogo.
+                        Se copia la imagen y se abre el chat de ese número: solo tienes que pegarla y enviar.
                     </span>
                 </form>
 
@@ -180,13 +217,6 @@ export default function Comprobante({ venta, onCerrar }) {
                             🔗 Copiar enlace
                         </button>
                     )}
-                    <button
-                        type="button"
-                        className="boton-secundario boton-pequeno"
-                        onClick={() => copiar(textoComprobante(venta), "Boleta copiada como texto.")}
-                    >
-                        📋 Copiar texto
-                    </button>
                 </div>
 
                 <button type="button" className="boton-principal" onClick={onCerrar}>

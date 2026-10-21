@@ -18,7 +18,8 @@ export function validarProducto(valores) {
         precioMinimo: Number(valores.precioMinimo),
         precioCompra: Number(valores.precioCompra),
         unidadesPorCaja: Number(valores.unidadesPorCaja),
-        stock: Number(valores.stock)
+        stock: Number(valores.stock),
+        seccionId: valores.seccionId ? Number(valores.seccionId) : null
     };
 
     if (!datos.codigo) {

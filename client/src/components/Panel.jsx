@@ -9,6 +9,7 @@ import Ventas from "./Ventas.jsx";
 import Gastos from "./Gastos.jsx";
 import Inversion from "./Inversion.jsx";
 import Empleados from "./Empleados.jsx";
+import SeccionesCatalogo from "./SeccionesCatalogo.jsx";
 
 const VISTAS = [
     {
@@ -40,6 +41,13 @@ const VISTAS = [
         icono: "💸",
         nombre: "Gastos",
         descripcion: "Anota lo que gastas para conocer tu ganancia real.",
+        soloJefe: true
+    },
+    {
+        clave: "catalogo",
+        icono: "🛍️",
+        nombre: "Catálogo",
+        descripcion: "Organiza el catálogo por secciones (ferias) y elige cuáles se muestran.",
         soloJefe: true
     },
     {
@@ -223,6 +231,10 @@ export default function Panel({ usuario, onSalir, onActualizarUsuario }) {
 
                     {vistaActual.clave === "inversion" && (
                         <Inversion resumen={resumen} onCambio={cargarResumen} onError={manejarError} />
+                    )}
+
+                    {vistaActual.clave === "catalogo" && (
+                        <SeccionesCatalogo onError={manejarError} />
                     )}
 
                     {vistaActual.clave === "empleados" && (

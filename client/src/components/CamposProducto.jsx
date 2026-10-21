@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import { porDocena } from "../producto.js";
 import CampoFoto from "./CampoFoto.jsx";
 import Escaner from "./Escaner.jsx";
+import { iconoTema, useSecciones } from "../secciones.js";
 
 /* Campos compartidos por el formulario de registro y el modal de edición.
    valores.docenaAuto: mientras sea true, el precio por docena sigue al precio mínimo × 12.
@@ -9,6 +10,7 @@ import Escaner from "./Escaner.jsx";
    valores.fotoActual: URL de la foto ya guardada (solo al editar). */
 export default function CamposProducto({ valores, onCambio, prefijo, etiquetaCompra }) {
     const [escaneando, setEscaneando] = useState(false);
+    const secciones = useSecciones();
 
     const codigoLeido = useCallback((codigo) => {
         setEscaneando(false);
@@ -87,6 +89,23 @@ export default function CamposProducto({ valores, onCambio, prefijo, etiquetaCom
                         onChange={cambiar}
                         required
                     />
+                </div>
+
+                <div className="campo">
+                    <label htmlFor={id("seccionId")}>Sección del catálogo</label>
+                    <select
+                        id={id("seccionId")}
+                        name="seccionId"
+                        value={valores.seccionId ?? ""}
+                        onChange={cambiar}
+                    >
+                        <option value="">Sin sección</option>
+                        {secciones.map((seccion) => (
+                            <option key={seccion.id} value={seccion.id}>
+                                {iconoTema(seccion.tema)} {seccion.nombre}{seccion.visible ? "" : " (oculta)"}
+                            </option>
+                        ))}
+                    </select>
                 </div>
             </div>
 
