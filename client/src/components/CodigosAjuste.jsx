@@ -9,7 +9,7 @@ const VALORES_INICIALES = {
     activo: true
 };
 
-// El jefe registra los códigos de ajuste (descuentos) que les da a los empleados.
+// El jefe registra los códigos de descuento que les da a los empleados.
 export default function CodigosAjuste({ onError }) {
     const [codigos, setCodigos] = useState(null);
     const [errorLista, setErrorLista] = useState("");
@@ -121,7 +121,7 @@ export default function CodigosAjuste({ onError }) {
     return (
         <div className="contenido-vista vista-gastos">
             <section className="tarjeta formulario-gasto">
-                <h2>{editando ? "Editar código de ajuste" : "Nuevo código de ajuste"}</h2>
+                <h2>{editando ? "Editar código de descuento" : "Nuevo código de descuento"}</h2>
                 <p className="descripcion-seccion">
                     Dale el código al empleado para que pueda descontar del total de una venta.
                     Puedes desactivarlo o cambiarlo cuando quieras.
@@ -231,7 +231,7 @@ export default function CodigosAjuste({ onError }) {
                 ) : codigos === null ? (
                     <p>Cargando códigos...</p>
                 ) : codigos.length === 0 ? (
-                    <p>Todavía no hay códigos de ajuste.</p>
+                    <p>Todavía no hay códigos de descuento.</p>
                 ) : (
                     <ul className="lista-gastos">
                         {codigos.map((codigo) => (

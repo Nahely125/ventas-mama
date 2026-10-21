@@ -76,7 +76,7 @@ const VISTAS = [
     {
         clave: "ajustes",
         icono: "🏷️",
-        nombre: "Códigos de ajuste",
+        nombre: "Códigos de descuento",
         descripcion: "Crea los códigos que les das a los empleados para descontar del total de una venta.",
         soloJefe: true
     },

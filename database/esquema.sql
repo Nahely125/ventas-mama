@@ -138,7 +138,7 @@ CREATE TABLE IF NOT EXISTS ventas (
     unidades_2025    INTEGER       NOT NULL DEFAULT 0,
     cliente_id       INTEGER       REFERENCES clientes(id),             -- cliente (obligatorio si metodo_pago = 'fiado')
     descuento        NUMERIC(10,2) NOT NULL DEFAULT 0,                  -- parte del ajuste de la venta (total ya lo descuenta)
-    codigo_ajuste    VARCHAR(20),                                       -- AJUSTE10, AJUSTE20 o AJUSTE PROPIO
+    codigo_ajuste    VARCHAR(20),                                       -- código de descuento usado (o DESCUENTO DEL JEFE)
     obsequio         BOOLEAN       NOT NULL DEFAULT FALSE,              -- mercadería regalada (precio 0)
     anulada_en       TIMESTAMP,                                         -- si se anuló: no cuenta en totales ni ganancias
     anulada_por      INTEGER       REFERENCES usuarios(id),

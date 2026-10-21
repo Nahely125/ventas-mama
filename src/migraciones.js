@@ -212,14 +212,41 @@ async function asignarPorNombre(client, condicionProductos, parametros, reglas, 
    Así, si luego se borra o cambia algo a mano, no vuelve a aparecer. */
 const MIGRACIONES_UNICAS = [
     {
+        // «Ajuste» pasa a llamarse «descuento»: se renombran los códigos iniciales si siguen igual,
+        // y también en las ventas que ya los usaron.
+        nombre: "2026-10-ajuste-se-llama-descuento",
+        async aplicar(client) {
+            const nombres = [
+                ["AJUSTE10", "DESCUENTO10", "Descuento de S/ 10"],
+                ["AJUSTE20", "DESCUENTO20", "Descuento de S/ 20"],
+                ["AJUSTE PROPIO", "DESCUENTO LIBRE", "El empleado escribe el monto"],
+                ["AJUSTE DEL JEFE", "DESCUENTO DEL JEFE", null]
+            ];
+
+            for (const [antes, ahora, descripcion] of nombres) {
+                const libre = await client.query(`SELECT 1 FROM codigos_ajuste WHERE codigo = $1`, [ahora]);
+
+                if (libre.rows.length > 0) continue;
+
+                await client.query(
+                    `UPDATE codigos_ajuste
+                     SET codigo = $2, descripcion = COALESCE($3, descripcion)
+                     WHERE codigo = $1`,
+                    [antes, ahora, descripcion]
+                );
+                await client.query(`UPDATE ventas SET codigo_ajuste = $2 WHERE codigo_ajuste = $1`, [antes, ahora]);
+            }
+        }
+    },
+    {
         // Los códigos que antes estaban fijos pasan a la tabla: el jefe puede editarlos o borrarlos.
         nombre: "2026-10-codigos-ajuste-iniciales",
         async aplicar(client) {
             await client.query(
                 `INSERT INTO codigos_ajuste (codigo, descripcion, monto) VALUES
-                    ('AJUSTE10', 'Descuento de S/ 10', 10),
-                    ('AJUSTE20', 'Descuento de S/ 20', 20),
-                    ('AJUSTE PROPIO', 'El empleado escribe el monto', NULL)
+                    ('DESCUENTO10', 'Descuento de S/ 10', 10),
+                    ('DESCUENTO20', 'Descuento de S/ 20', 20),
+                    ('DESCUENTO LIBRE', 'El empleado escribe el monto', NULL)
                  ON CONFLICT (codigo) DO NOTHING`
             );
         }

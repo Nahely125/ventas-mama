@@ -209,12 +209,12 @@ export async function generarImagenComprobante(boleta) {
     ctx.stroke();
     y += 52;
 
-    // Subtotal y ajuste (descuento permitido por el jefe)
+    // Subtotal y descuento (permitido por el jefe)
     if (conAjuste) {
         ctx.font = `500 17px ${SANS}`;
         ctx.fillStyle = COLORES.suave;
         ctx.fillText("Subtotal", IZQUIERDA, y - 12);
-        ctx.fillText("Ajuste", IZQUIERDA, y + 20);
+        ctx.fillText("Descuento", IZQUIERDA, y + 20);
         ctx.textAlign = "right";
         ctx.fillText(moneda(boleta.subtotal), DERECHA, y - 12);
         ctx.fillText(`− ${moneda(boleta.ajuste.monto)}`, DERECHA, y + 20);

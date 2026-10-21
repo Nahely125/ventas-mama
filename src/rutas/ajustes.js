@@ -9,8 +9,8 @@ const router = express.Router();
 // Solo se puede obsequiar mercadería que cueste menos de esto por unidad (límite para empleados).
 const COSTO_MAXIMO_OBSEQUIO = 5;
 
-// Nombre con el que queda el ajuste que hace el jefe directamente, sin código.
-const AJUSTE_DEL_JEFE = "AJUSTE DEL JEFE";
+// Nombre con el que queda el descuento que hace el jefe directamente, sin código.
+const AJUSTE_DEL_JEFE = "DESCUENTO DEL JEFE";
 
 const COLUMNAS = `
     id,
@@ -21,7 +21,7 @@ const COLUMNAS = `
     (SELECT COUNT(DISTINCT grupo) FROM ventas WHERE ventas.codigo_ajuste = codigos_ajuste.codigo)::INT AS usos
 `;
 
-// " ajuste10 " → "AJUSTE10" (mayúsculas y un solo espacio entre palabras).
+// " descuento10 " → "DESCUENTO10" (mayúsculas y un solo espacio entre palabras).
 function normalizarCodigo(codigo) {
     return typeof codigo === "string" ? codigo.trim().toUpperCase().replace(/\s+/g, " ") : "";
 }
@@ -31,7 +31,7 @@ function normalizarCodigo(codigo) {
 async function resolverAjuste(db, ajuste, esJefe) {
     if (ajuste?.libre === true) {
         if (!esJefe) {
-            return { error: "Solo el jefe puede hacer un ajuste sin código.", prohibido: true };
+            return { error: "Solo el jefe puede hacer un descuento sin código.", prohibido: true };
         }
 
         return conMonto(AJUSTE_DEL_JEFE, null, ajuste.monto);
@@ -43,7 +43,7 @@ async function resolverAjuste(db, ajuste, esJefe) {
         : { rows: [] };
 
     if (resultado.rows.length === 0) {
-        return { error: "El código de ajuste no es válido.", codigoInvalido: true };
+        return { error: "El código de descuento no es válido.", codigoInvalido: true };
     }
 
     const fila = resultado.rows[0];
@@ -54,7 +54,7 @@ function conMonto(codigo, fijo, escrito) {
     const monto = fijo ?? Number(escrito);
 
     if (!Number.isFinite(monto) || monto <= 0) {
-        return { error: "Escribe el monto del ajuste (mayor que cero)." };
+        return { error: "Escribe el monto del descuento (mayor que cero)." };
     }
 
     return { codigo, monto: Number(monto.toFixed(2)) };
@@ -89,7 +89,7 @@ function validarCodigo(cuerpo) {
     }
 
     if (codigo === AJUSTE_DEL_JEFE) {
-        return { error: "Ese nombre está reservado para los ajustes del jefe." };
+        return { error: "Ese nombre está reservado para los descuentos del jefe." };
     }
 
     if (descripcion.length > 100) {
@@ -116,7 +116,7 @@ router.get("/", requiereJefe, async (req, res) => {
         res.json(resultado.rows);
     } catch (error) {
         console.error("Error al listar los códigos de ajuste:", error.message);
-        res.status(500).json({ error: "No se pudieron cargar los códigos de ajuste." });
+        res.status(500).json({ error: "No se pudieron cargar los códigos de descuento." });
     }
 });
 
@@ -135,14 +135,14 @@ router.post("/", requiereJefe, async (req, res) => {
             [datos.codigo, datos.descripcion, datos.monto, datos.activo]
         );
         const fila = await pool.query(`SELECT ${COLUMNAS} FROM codigos_ajuste WHERE id = $1`, [resultado.rows[0].id]);
-        res.status(201).json({ mensaje: "Código de ajuste registrado.", codigo: fila.rows[0] });
+        res.status(201).json({ mensaje: "Código de descuento registrado.", codigo: fila.rows[0] });
     } catch (error) {
         if (error.code === "23505") {
-            return res.status(409).json({ error: "Ya existe un código de ajuste con ese nombre." });
+            return res.status(409).json({ error: "Ya existe un código de descuento con ese nombre." });
         }
 
         console.error("Error al registrar el código de ajuste:", error.message);
-        res.status(500).json({ error: "No se pudo registrar el código de ajuste." });
+        res.status(500).json({ error: "No se pudo registrar el código de descuento." });
     }
 });
 
@@ -151,7 +151,7 @@ router.put("/:id", requiereJefe, async (req, res) => {
     const { datos, error } = validarCodigo(req.body);
 
     if (!id) {
-        return res.status(404).json({ error: "Código de ajuste no encontrado." });
+        return res.status(404).json({ error: "Código de descuento no encontrado." });
     }
 
     if (error) {
@@ -167,18 +167,18 @@ router.put("/:id", requiereJefe, async (req, res) => {
         );
 
         if (resultado.rows.length === 0) {
-            return res.status(404).json({ error: "Código de ajuste no encontrado." });
+            return res.status(404).json({ error: "Código de descuento no encontrado." });
         }
 
         const fila = await pool.query(`SELECT ${COLUMNAS} FROM codigos_ajuste WHERE id = $1`, [id]);
-        res.json({ mensaje: "Código de ajuste actualizado.", codigo: fila.rows[0] });
+        res.json({ mensaje: "Código de descuento actualizado.", codigo: fila.rows[0] });
     } catch (error) {
         if (error.code === "23505") {
-            return res.status(409).json({ error: "Ya existe un código de ajuste con ese nombre." });
+            return res.status(409).json({ error: "Ya existe un código de descuento con ese nombre." });
         }
 
         console.error("Error al actualizar el código de ajuste:", error.message);
-        res.status(500).json({ error: "No se pudo actualizar el código de ajuste." });
+        res.status(500).json({ error: "No se pudo actualizar el código de descuento." });
     }
 });
 
@@ -187,20 +187,20 @@ router.delete("/:id", requiereJefe, async (req, res) => {
     const id = leerId(req);
 
     if (!id) {
-        return res.status(404).json({ error: "Código de ajuste no encontrado." });
+        return res.status(404).json({ error: "Código de descuento no encontrado." });
     }
 
     try {
         const resultado = await pool.query(`DELETE FROM codigos_ajuste WHERE id = $1 RETURNING id`, [id]);
 
         if (resultado.rows.length === 0) {
-            return res.status(404).json({ error: "Código de ajuste no encontrado." });
+            return res.status(404).json({ error: "Código de descuento no encontrado." });
         }
 
-        res.json({ mensaje: "Código de ajuste eliminado." });
+        res.json({ mensaje: "Código de descuento eliminado." });
     } catch (error) {
         console.error("Error al eliminar el código de ajuste:", error.message);
-        res.status(500).json({ error: "No se pudo eliminar el código de ajuste." });
+        res.status(500).json({ error: "No se pudo eliminar el código de descuento." });
     }
 });
 

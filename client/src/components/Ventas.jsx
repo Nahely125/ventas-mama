@@ -263,7 +263,7 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
 
     // Ajuste directo del jefe: escribe el monto que quiera, sin código.
     function ajusteDelJefe() {
-        setAjuste({ codigo: "Ajuste del jefe", monto: null, libre: true });
+        setAjuste({ codigo: "Descuento del jefe", monto: null, libre: true });
         setMontoPropio("");
         setErrorAjuste("");
     }
@@ -342,8 +342,8 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
 
         if (ajuste && (montoAjuste <= 0 || ajusteExcede)) {
             setErrorAjuste(ajusteExcede
-                ? "El ajuste no puede ser mayor que el total."
-                : "Escribe el monto del ajuste.");
+                ? "El descuento no puede ser mayor que el total."
+                : "Escribe el monto del descuento.");
             return;
         }
 
@@ -531,7 +531,7 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                             <div className="ajuste-venta">
                                 {!ajuste ? (
                                     <div className="campo">
-                                        <label htmlFor="codigo-ajuste">🏷️ Código de ajuste (opcional)</label>
+                                        <label htmlFor="codigo-ajuste">🏷️ Código de descuento (opcional)</label>
                                         <div className="campo-con-boton">
                                             <input
                                                 type="text"
@@ -563,7 +563,7 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                                                 <>
                                                     Usa un código o{" "}
                                                     <button type="button" className="boton-enlace" onClick={ajusteDelJefe}>
-                                                        haz un ajuste sin código
+                                                        haz un descuento sin código
                                                     </button>
                                                     .
                                                 </>
@@ -582,7 +582,7 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                                         </div>
                                         {ajuste.monto === null && (
                                             <div className="campo">
-                                                <label htmlFor="monto-ajuste">Monto del ajuste (S/)</label>
+                                                <label htmlFor="monto-ajuste">Monto del descuento (S/)</label>
                                                 <input
                                                     type="number"
                                                     id="monto-ajuste"
@@ -601,14 +601,14 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                                             <span>{moneda(subtotal)}</span>
                                         </div>
                                         <div className="linea-total linea-ajuste">
-                                            <span>Ajuste</span>
+                                            <span>Descuento</span>
                                             <span>− {moneda(montoAjuste)}</span>
                                         </div>
                                     </div>
                                 )}
                                 {(errorAjuste || ajusteExcede) && (
                                     <p className="mensaje mensaje-error" role="alert">
-                                        {ajusteExcede ? "El ajuste no puede ser mayor que el total." : errorAjuste}
+                                        {ajusteExcede ? "El descuento no puede ser mayor que el total." : errorAjuste}
                                     </p>
                                 )}
                             </div>

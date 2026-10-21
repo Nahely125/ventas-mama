@@ -93,7 +93,7 @@ router.post("/validar-ajuste", requiereSesion, async (req, res) => {
 
         if (resultado.rows.length === 0) {
             anotarFallo(req, "bloqueoAjuste");
-            return res.status(400).json({ error: "El código de ajuste no es válido." });
+            return res.status(400).json({ error: "El código de descuento no es válido." });
         }
 
         req.session.bloqueoAjuste = { fallos: 0, hasta: 0 };
@@ -134,7 +134,7 @@ router.post("/", requiereSesion, async (req, res) => {
             ajusteVenta = await resolverAjuste(pool, ajuste, esJefe);
         } catch (error) {
             console.error("Error al validar el ajuste:", error.message);
-            return res.status(500).json({ error: "No se pudo validar el ajuste." });
+            return res.status(500).json({ error: "No se pudo validar el descuento." });
         }
 
         if (ajusteVenta.error) {
@@ -145,7 +145,7 @@ router.post("/", requiereSesion, async (req, res) => {
         const subtotal = items.reduce((suma, item) => suma + Number(item.precio.toFixed(2)) * item.cantidad, 0);
 
         if (Math.round(ajusteVenta.monto * 100) > Math.round(subtotal * 100)) {
-            return res.status(400).json({ error: "El ajuste no puede ser mayor que el total de la venta." });
+            return res.status(400).json({ error: "El descuento no puede ser mayor que el total de la venta." });
         }
     }
 
