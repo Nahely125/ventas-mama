@@ -1024,6 +1024,21 @@ select {
     color: #9d174d;
 }
 
+.dato-costo {
+    display: block;
+    margin-top: 6px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    background: #ecfdf5;
+    color: #047857;
+    font-size: 0.8rem;
+}
+
+.dato-costo.perdida {
+    background: #fef2f2;
+    color: var(--rojo);
+}
+
 .etiqueta-obsequio {
     margin-left: 6px;
     background: #fce7f3;

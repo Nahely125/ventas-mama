@@ -6,8 +6,15 @@ const VALORES_INICIALES = {
     nombre: "",
     usuario: "",
     password: "",
-    confirmar: ""
+    confirmar: "",
+    rol: "trabajador"
 };
+
+// "jefe" = administrador (mismo poder que el jefe).
+const TIPOS_CUENTA = [
+    { valor: "trabajador", texto: "Trabajador", ayuda: "Registra ventas y consulta el inventario." },
+    { valor: "jefe", texto: "Administrador", ayuda: "Tiene el mismo poder que el jefe: costos, ganancias, empleados y todo lo demás." }
+];
 
 export default function Empleados({ usuarioActual, onCuentaPropiaCambiada, onError }) {
     const [empleados, setEmpleados] = useState(null);
@@ -50,7 +57,8 @@ export default function Empleados({ usuarioActual, onCuentaPropiaCambiada, onErr
                 cuerpo: {
                     nombre: empleado.nombre,
                     usuario: empleado.usuario,
-                    activo: !empleado.activo
+                    activo: !empleado.activo,
+                    rol: empleado.rol
                 }
             });
             setAvisoLista({
@@ -124,7 +132,7 @@ export default function Empleados({ usuarioActual, onCuentaPropiaCambiada, onErr
         try {
             const resultado = await pedir("/api/usuarios", {
                 method: "POST",
-                cuerpo: { nombre, usuario, password: valores.password }
+                cuerpo: { nombre, usuario, password: valores.password, rol: valores.rol }
             });
 
             setMensaje({
@@ -144,12 +152,33 @@ export default function Empleados({ usuarioActual, onCuentaPropiaCambiada, onErr
     return (
         <div className="contenido-vista">
             <section className="tarjeta formulario-empleado">
-                <h2>Agregar empleado</h2>
+                <h2>Agregar empleado o administrador</h2>
                 <p className="descripcion-seccion">
-                    Crea una cuenta para que un trabajador pueda registrar ventas y consultar el inventario.
+                    Crea una cuenta para un trabajador o para un administrador con el mismo poder que el jefe.
                 </p>
 
                 <form onSubmit={enviar} className="formulario">
+                    <div className="campo">
+                        <span className="etiqueta-campo" id="etiqueta-tipo-cuenta">Tipo de cuenta</span>
+                        <div className="selector-modalidad" role="radiogroup" aria-labelledby="etiqueta-tipo-cuenta">
+                            {TIPOS_CUENTA.map((tipo) => (
+                                <button
+                                    key={tipo.valor}
+                                    type="button"
+                                    role="radio"
+                                    aria-checked={valores.rol === tipo.valor}
+                                    className={valores.rol === tipo.valor ? "activo" : ""}
+                                    onClick={() => setValores((anteriores) => ({ ...anteriores, rol: tipo.valor }))}
+                                >
+                                    {tipo.texto}
+                                </button>
+                            ))}
+                        </div>
+                        <span className="ayuda-campo">
+                            {TIPOS_CUENTA.find((tipo) => tipo.valor === valores.rol).ayuda}
+                        </span>
+                    </div>
+
                     <div className="fila-campos fila-empleado">
                         <div className="campo">
                             <label htmlFor="empleado-nombre">Nombre completo</label>
@@ -224,7 +253,7 @@ export default function Empleados({ usuarioActual, onCuentaPropiaCambiada, onErr
                     <p className="ayuda-campo">Mínimo 12 caracteres.</p>
 
                     <button type="submit" className="boton-principal" disabled={enviando}>
-                        {enviando ? "Registrando..." : "Agregar empleado"}
+                        {enviando ? "Registrando..." : valores.rol === "jefe" ? "Agregar administrador" : "Agregar empleado"}
                     </button>
 
                     {mensaje && (
@@ -268,7 +297,7 @@ export default function Empleados({ usuarioActual, onCuentaPropiaCambiada, onErr
                                         </div>
                                         <div className="etiquetas-empleado">
                                             <span className={`etiqueta etiqueta-${empleado.rol}`}>
-                                                {esTrabajador ? "Trabajador" : "Jefe"}
+                                                {esTrabajador ? "Trabajador" : "Administrador"}
                                             </span>
                                             {!empleado.activo && (
                                                 <span className="etiqueta etiqueta-inactivo">Inactivo</span>
@@ -282,37 +311,35 @@ export default function Empleados({ usuarioActual, onCuentaPropiaCambiada, onErr
                                             : `${empleado.totalVentas} ventas registradas`}
                                     </p>
 
-                                    {(esTrabajador || esPropia) && (
-                                        <div className="acciones-empleado">
+                                    <div className="acciones-empleado">
+                                        <button
+                                            type="button"
+                                            className="boton-editar"
+                                            onClick={() => setEditando(empleado)}
+                                        >
+                                            Editar
+                                        </button>
+
+                                        {!esPropia && (
                                             <button
                                                 type="button"
-                                                className="boton-editar"
-                                                onClick={() => setEditando(empleado)}
+                                                className="boton-secundario boton-pequeno"
+                                                onClick={() => alternarActivo(empleado)}
                                             >
-                                                Editar
+                                                {empleado.activo ? "Desactivar" : "Activar"}
                                             </button>
+                                        )}
 
-                                            {esTrabajador && (
-                                                <button
-                                                    type="button"
-                                                    className="boton-secundario boton-pequeno"
-                                                    onClick={() => alternarActivo(empleado)}
-                                                >
-                                                    {empleado.activo ? "Desactivar" : "Activar"}
-                                                </button>
-                                            )}
-
-                                            {esTrabajador && empleado.totalVentas === 0 && (
-                                                <button
-                                                    type="button"
-                                                    className="boton-eliminar"
-                                                    onClick={() => eliminar(empleado)}
-                                                >
-                                                    Eliminar
-                                                </button>
-                                            )}
-                                        </div>
-                                    )}
+                                        {!esPropia && empleado.totalVentas === 0 && (
+                                            <button
+                                                type="button"
+                                                className="boton-eliminar"
+                                                onClick={() => eliminar(empleado)}
+                                            >
+                                                Eliminar
+                                            </button>
+                                        )}
+                                    </div>
                                 </li>
                             );
                         })}

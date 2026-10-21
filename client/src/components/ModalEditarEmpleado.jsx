@@ -8,7 +8,8 @@ export default function ModalEditarEmpleado({ empleado, esPropia, onCerrar, onGu
         usuario: empleado.usuario,
         password: "",
         confirmar: "",
-        activo: empleado.activo
+        activo: empleado.activo,
+        rol: empleado.rol
     });
     const [verPassword, setVerPassword] = useState(false);
     const [error, setError] = useState("");
@@ -60,7 +61,8 @@ export default function ModalEditarEmpleado({ empleado, esPropia, onCerrar, onGu
                     nombre,
                     usuario,
                     password: valores.password || undefined,
-                    activo: valores.activo
+                    activo: valores.activo,
+                    rol: valores.rol
                 }
             });
             await onGuardado();
@@ -81,7 +83,7 @@ export default function ModalEditarEmpleado({ empleado, esPropia, onCerrar, onGu
             <form onSubmit={guardar} className="formulario modal-contenido">
                 <div className="modal-encabezado">
                     <h2 id="titulo-editar-empleado">
-                        {esPropia ? "Mi cuenta" : "Editar empleado"}
+                        {esPropia ? "Mi cuenta" : empleado.rol === "jefe" ? "Editar administrador" : "Editar empleado"}
                     </h2>
                     <button type="button" className="boton-cerrar-modal" onClick={onCerrar} aria-label="Cerrar">
                         ✕
@@ -157,6 +159,25 @@ export default function ModalEditarEmpleado({ empleado, esPropia, onCerrar, onGu
                         Mostrar contraseña
                     </label>
                 </fieldset>
+
+                {!esPropia && (
+                    <label className="interruptor">
+                        <input
+                            type="checkbox"
+                            checked={valores.rol === "jefe"}
+                            onChange={(e) => setValores((anteriores) => ({ ...anteriores, rol: e.target.checked ? "jefe" : "trabajador" }))}
+                        />
+                        <span className="interruptor-pista" aria-hidden="true"></span>
+                        <span>
+                            <strong>{valores.rol === "jefe" ? "Administrador" : "Trabajador"}</strong>
+                            <small>
+                                {valores.rol === "jefe"
+                                    ? "Tiene el mismo poder que el jefe."
+                                    : "Registra ventas y consulta el inventario. No ve costos ni ganancias."}
+                            </small>
+                        </span>
+                    </label>
+                )}
 
                 {!esPropia && (
                     <label className="interruptor">

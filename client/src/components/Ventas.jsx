@@ -158,6 +158,9 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
         : precio === lista
             ? precioPaquete(productoActual, modalidad)
             : Number((precioValido * porUnidades).toFixed(2));
+    // Solo el jefe recibe el costo: ve cuánto le costó y cuánto gana con el precio escrito.
+    const costoUnidad = esJefe && productoActual?.precioCompra != null ? Number(productoActual.precioCompra) : null;
+    const gananciaPaquete = costoUnidad !== null && precioValido > 0 ? precioDelPaquete - costoUnidad * porUnidades : null;
     // El precio mínimo solo limita a los empleados; el jefe vende al precio que quiera.
     const bajoMinimo = !esJefe && minimoPaquete !== null && precioValido > 0
         && centimos(precioDelPaquete) < centimos(minimoPaquete);
@@ -516,6 +519,15 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                                                 <><br />🔒 Bajo el mínimo: necesitará la contraseña del jefe.</>
                                             )}
                                         </span>
+                                        {costoUnidad !== null && (
+                                            <span className={`dato-costo ${gananciaPaquete !== null && gananciaPaquete < 0 ? "perdida" : ""}`}>
+                                                💰 Costo: <strong>{moneda(costoUnidad)}</strong> c/u
+                                                {esDePaquete && <> · {moneda(costoUnidad * porUnidades)} la {nombreModalidad(modalidad)}</>}
+                                                {gananciaPaquete !== null && (
+                                                    <> · Ganas <strong>{moneda(gananciaPaquete)}</strong> por {nombreModalidad(modalidad)}</>
+                                                )}
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
 
@@ -561,6 +573,13 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                                 ))}
                             </select>
                         </div>
+
+                        {esJefe && regaloActual?.precioCompra != null && (
+                            <span className="dato-costo">
+                                💰 Costo: <strong>{moneda(regaloActual.precioCompra)}</strong> c/u
+                                {Number(cantidadRegalo) > 1 && <> · {moneda(Number(regaloActual.precioCompra) * Number(cantidadRegalo))} en total</>}
+                            </span>
+                        )}
 
                         {regaloActual && (
                             <div className="fila-obsequio">

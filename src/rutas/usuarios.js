@@ -5,6 +5,9 @@ const { requiereJefe, leerId } = require("../autenticacion");
 
 const router = express.Router();
 
+// "jefe" = administrador: tiene los mismos permisos que el jefe.
+const ROLES = ["trabajador", "jefe"];
+
 const COLUMNAS = `
     id,
     usuario,
@@ -66,9 +69,14 @@ router.get("/", requiereJefe, async (req, res) => {
 
 router.post("/", requiereJefe, async (req, res) => {
     const error = validarCuenta(req.body, true);
+    const rol = req.body.rol ?? "trabajador";
 
     if (error) {
         return res.status(400).json({ error });
+    }
+
+    if (!ROLES.includes(rol)) {
+        return res.status(400).json({ error: "Elige si la cuenta es de trabajador o de administrador." });
     }
 
     try {
@@ -76,13 +84,13 @@ router.post("/", requiereJefe, async (req, res) => {
 
         const resultado = await pool.query(
             `INSERT INTO usuarios (usuario, nombre, password_hash, rol)
-             VALUES ($1, $2, $3, 'trabajador')
+             VALUES ($1, $2, $3, $4)
              RETURNING ${COLUMNAS}`,
-            [req.body.usuario.trim(), req.body.nombre.trim(), hash]
+            [req.body.usuario.trim(), req.body.nombre.trim(), hash, rol]
         );
 
         res.status(201).json({
-            mensaje: "Empleado registrado correctamente.",
+            mensaje: rol === "jefe" ? "Administrador registrado correctamente." : "Empleado registrado correctamente.",
             usuario: resultado.rows[0]
         });
     } catch (err) {
@@ -92,10 +100,10 @@ router.post("/", requiereJefe, async (req, res) => {
     }
 });
 
-/* Editar una cuenta.
-   - Los trabajadores se pueden editar por completo (nombre, usuario, contraseña, activo).
-   - El jefe puede editar su propia cuenta, pero no desactivarse.
-   - No se pueden editar otras cuentas de jefe. */
+/* Editar una cuenta (nombre, usuario, contraseña, activo y tipo de cuenta).
+   - Jefe y administradores tienen el mismo poder: pueden editar cualquier cuenta.
+   - Nadie puede desactivarse ni quitarse el rol de administrador a sí mismo,
+     así siempre queda al menos un administrador activo. */
 router.put("/:id", requiereJefe, async (req, res) => {
     const id = leerId(req);
 
@@ -109,10 +117,14 @@ router.put("/:id", requiereJefe, async (req, res) => {
         return res.status(400).json({ error });
     }
 
-    const { activo } = req.body;
+    const { activo, rol } = req.body;
 
     if (typeof activo !== "boolean") {
         return res.status(400).json({ error: "Indica si la cuenta está activa." });
+    }
+
+    if (rol !== undefined && !ROLES.includes(rol)) {
+        return res.status(400).json({ error: "Elige si la cuenta es de trabajador o de administrador." });
     }
 
     try {
@@ -125,12 +137,12 @@ router.put("/:id", requiereJefe, async (req, res) => {
 
         const esPropia = id === req.session.usuario.id;
 
-        if (cuenta.rol === "jefe" && !esPropia) {
-            return res.status(403).json({ error: "No puedes modificar la cuenta de otro jefe." });
-        }
-
         if (esPropia && !activo) {
             return res.status(400).json({ error: "No puedes desactivar tu propia cuenta." });
+        }
+
+        if (esPropia && rol !== undefined && rol !== cuenta.rol) {
+            return res.status(400).json({ error: "No puedes quitarte el rol de administrador." });
         }
 
         const hash = req.body.password ? await bcrypt.hash(req.body.password, 12) : null;
@@ -140,10 +152,11 @@ router.put("/:id", requiereJefe, async (req, res) => {
              SET nombre = $1,
                  usuario = $2,
                  activo = $3,
-                 password_hash = COALESCE($4, password_hash)
+                 password_hash = COALESCE($4, password_hash),
+                 rol = COALESCE($6, rol)
              WHERE id = $5
              RETURNING ${COLUMNAS}`,
-            [req.body.nombre.trim(), req.body.usuario.trim(), activo, hash, id]
+            [req.body.nombre.trim(), req.body.usuario.trim(), activo, hash, id, rol ?? null]
         );
 
         const usuario = resultado.rows[0];
@@ -164,7 +177,8 @@ router.put("/:id", requiereJefe, async (req, res) => {
     }
 });
 
-// Eliminar un trabajador. Si ya registró ventas, solo se puede desactivar.
+// Eliminar una cuenta (trabajador o administrador), menos la propia.
+// Si ya registró ventas o gastos, solo se puede desactivar.
 router.delete("/:id", requiereJefe, async (req, res) => {
     const id = leerId(req);
 
@@ -172,16 +186,20 @@ router.delete("/:id", requiereJefe, async (req, res) => {
         return res.status(400).json({ error: "ID de usuario inválido." });
     }
 
+    if (id === req.session.usuario.id) {
+        return res.status(400).json({ error: "No puedes eliminar tu propia cuenta." });
+    }
+
     try {
         const resultado = await pool.query(
             `DELETE FROM usuarios
-             WHERE id = $1 AND rol = 'trabajador'
+             WHERE id = $1
              RETURNING id, nombre`,
             [id]
         );
 
         if (resultado.rows.length === 0) {
-            return res.status(404).json({ error: "Solo se pueden eliminar cuentas de trabajador." });
+            return res.status(404).json({ error: "Cuenta no encontrada." });
         }
 
         res.json({ mensaje: "Empleado eliminado correctamente.", usuario: resultado.rows[0] });
