@@ -16,7 +16,7 @@ const {
     totalesVentas,
     armarBoleta
 } = require("./consultasVentas");
-const { COSTO_MAXIMO_OBSEQUIO, resolverAjuste, repartirAjuste } = require("./ajustes");
+const { COSTO_MAXIMO_OBSEQUIO, normalizarCodigo, resolverAjuste, repartirAjuste } = require("./ajustes");
 
 function validarItems(items) {
     if (!Array.isArray(items) || items.length === 0 || items.length > MAXIMO_PRODUCTOS) {
@@ -79,29 +79,38 @@ function anotarFallo(req, clave) {
 }
 
 /* Comprueba un código de ajuste antes de cobrar: { codigo } → { codigo, monto }
-   (monto null = ajuste propio: el empleado escribe el monto). */
-router.post("/validar-ajuste", requiereSesion, (req, res) => {
+   (monto null = monto libre: se escribe al vender). */
+router.post("/validar-ajuste", requiereSesion, async (req, res) => {
     if (bloqueado(req, "bloqueoAjuste")) {
         return res.status(429).json({ error: "Demasiados códigos incorrectos. Espera 10 minutos." });
     }
 
-    const resultado = resolverAjuste({ codigo: req.body?.codigo, monto: 1 });
+    try {
+        const codigo = normalizarCodigo(req.body?.codigo);
+        const resultado = codigo
+            ? await pool.query(`SELECT codigo, monto FROM codigos_ajuste WHERE codigo = $1 AND activo`, [codigo])
+            : { rows: [] };
 
-    if (resultado.error) {
-        anotarFallo(req, "bloqueoAjuste");
-        return res.status(400).json({ error: resultado.error });
+        if (resultado.rows.length === 0) {
+            anotarFallo(req, "bloqueoAjuste");
+            return res.status(400).json({ error: "El código de ajuste no es válido." });
+        }
+
+        req.session.bloqueoAjuste = { fallos: 0, hasta: 0 };
+        const fila = resultado.rows[0];
+        res.json({ codigo: fila.codigo, monto: fila.monto === null ? null : Number(fila.monto) });
+    } catch (error) {
+        console.error("Error al validar el código de ajuste:", error.message);
+        res.status(500).json({ error: "No se pudo validar el código." });
     }
-
-    req.session.bloqueoAjuste = { fallos: 0, hasta: 0 };
-    const propio = resultado.codigo === "AJUSTE PROPIO";
-    res.json({ codigo: resultado.codigo, monto: propio ? null : resultado.monto });
 });
 
 /* Registrar una venta con uno o varios productos.
    items: [{ productoId, cantidad, modalidad, precio, obsequio }]
      cantidad: número de unidades o de docenas, según la modalidad.
      precio: precio por unidad o por docena; puede ajustarse. Obsequio: precio 0, por unidad.
-   ajuste: { codigo, monto } descuento sobre el total permitido por el jefe con un código.
+   ajuste: { codigo, monto } descuento sobre el total con un código que registró el jefe,
+           o { libre: true, monto } ajuste directo del jefe (sin código).
    Si algún precio está por debajo del mínimo, un trabajador necesita passwordJefe. */
 router.post("/", requiereSesion, async (req, res) => {
     const { items, metodoPago = "efectivo", passwordJefe, clienteId = null, ajuste = null } = req.body;
@@ -118,13 +127,18 @@ router.post("/", requiereSesion, async (req, res) => {
 
     if (ajuste !== null) {
         if (bloqueado(req, "bloqueoAjuste")) {
-            return res.status(429).json({ error: "Demasiados códigos incorrectos. Espera 10 minutos." });
+            return res.status(400).json({ error: "Demasiados códigos incorrectos. Espera 10 minutos." });
         }
 
-        ajusteVenta = resolverAjuste(ajuste);
+        try {
+            ajusteVenta = await resolverAjuste(pool, ajuste, esJefe);
+        } catch (error) {
+            console.error("Error al validar el ajuste:", error.message);
+            return res.status(500).json({ error: "No se pudo validar el ajuste." });
+        }
 
         if (ajusteVenta.error) {
-            anotarFallo(req, "bloqueoAjuste");
+            if (ajusteVenta.codigoInvalido) anotarFallo(req, "bloqueoAjuste");
             return res.status(400).json({ error: ajusteVenta.error });
         }
 

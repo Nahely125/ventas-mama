@@ -141,6 +141,16 @@ const MIGRACIONES = `
         usuario_id INTEGER REFERENCES usuarios(id)
     );
 
+    -- Códigos de ajuste que registra el jefe (monto NULL = monto libre al vender).
+    CREATE TABLE IF NOT EXISTS codigos_ajuste (
+        id SERIAL PRIMARY KEY,
+        codigo VARCHAR(20) NOT NULL UNIQUE,
+        descripcion VARCHAR(100),
+        monto NUMERIC(10, 2) CHECK (monto IS NULL OR monto > 0),
+        activo BOOLEAN NOT NULL DEFAULT TRUE,
+        creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
     -- Compras y reposiciones de mercadería.
     CREATE TABLE IF NOT EXISTS compras (
         id SERIAL PRIMARY KEY,
@@ -201,6 +211,19 @@ async function asignarPorNombre(client, condicionProductos, parametros, reglas, 
 /* Cambios de datos que se aplican UNA sola vez (quedan anotados en migraciones_unicas).
    Así, si luego se borra o cambia algo a mano, no vuelve a aparecer. */
 const MIGRACIONES_UNICAS = [
+    {
+        // Los códigos que antes estaban fijos pasan a la tabla: el jefe puede editarlos o borrarlos.
+        nombre: "2026-10-codigos-ajuste-iniciales",
+        async aplicar(client) {
+            await client.query(
+                `INSERT INTO codigos_ajuste (codigo, descripcion, monto) VALUES
+                    ('AJUSTE10', 'Descuento de S/ 10', 10),
+                    ('AJUSTE20', 'Descuento de S/ 20', 20),
+                    ('AJUSTE PROPIO', 'El empleado escribe el monto', NULL)
+                 ON CONFLICT (codigo) DO NOTHING`
+            );
+        }
+    },
     {
         nombre: "2026-10-categorias-ferias",
         async aplicar(client) {

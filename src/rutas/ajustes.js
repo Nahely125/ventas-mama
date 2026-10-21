@@ -1,31 +1,57 @@
-// Ajustes (descuentos sobre el total de una venta) que el jefe permite dándole el código al empleado.
-// monto null = ajuste propio: se escribe el monto.
-const CODIGOS_AJUSTE = {
-    AJUSTE10: 10,
-    AJUSTE20: 20,
-    "AJUSTE PROPIO": null
-};
+const express = require("express");
+const pool = require("../db");
+const { requiereJefe, leerId } = require("../autenticacion");
+
+// Códigos de ajuste (descuentos sobre el total de una venta): los registra el jefe y se los da al
+// empleado. monto null = monto libre: el empleado lo escribe al vender.
+const router = express.Router();
 
 // Solo se puede obsequiar mercadería que cueste menos de esto por unidad (límite para empleados).
 const COSTO_MAXIMO_OBSEQUIO = 5;
 
-// "ajuste propio", "AjustePropio", " ajuste10 " → forma oficial del código.
+// Nombre con el que queda el ajuste que hace el jefe directamente, sin código.
+const AJUSTE_DEL_JEFE = "AJUSTE DEL JEFE";
+
+const COLUMNAS = `
+    id,
+    codigo,
+    descripcion,
+    monto,
+    activo,
+    (SELECT COUNT(DISTINCT grupo) FROM ventas WHERE ventas.codigo_ajuste = codigos_ajuste.codigo)::INT AS usos
+`;
+
+// " ajuste10 " → "AJUSTE10" (mayúsculas y un solo espacio entre palabras).
 function normalizarCodigo(codigo) {
-    if (typeof codigo !== "string") return "";
-    const limpio = codigo.trim().toUpperCase().replace(/\s+/g, " ");
-    return limpio === "AJUSTEPROPIO" ? "AJUSTE PROPIO" : limpio;
+    return typeof codigo === "string" ? codigo.trim().toUpperCase().replace(/\s+/g, " ") : "";
 }
 
-// Devuelve { codigo, monto } con el monto fijo del código (o el escrito si es propio), o { error }.
-function resolverAjuste(ajuste) {
-    const codigo = normalizarCodigo(ajuste?.codigo);
+/* Convierte lo pedido al vender en { codigo, monto } o { error }.
+   ajuste: { codigo, monto } con un código registrado, o { libre: true, monto } (solo el jefe). */
+async function resolverAjuste(db, ajuste, esJefe) {
+    if (ajuste?.libre === true) {
+        if (!esJefe) {
+            return { error: "Solo el jefe puede hacer un ajuste sin código.", prohibido: true };
+        }
 
-    if (!Object.hasOwn(CODIGOS_AJUSTE, codigo)) {
-        return { error: "El código de ajuste no es válido." };
+        return conMonto(AJUSTE_DEL_JEFE, null, ajuste.monto);
     }
 
-    const fijo = CODIGOS_AJUSTE[codigo];
-    const monto = fijo ?? Number(ajuste.monto);
+    const codigo = normalizarCodigo(ajuste?.codigo);
+    const resultado = codigo
+        ? await db.query(`SELECT codigo, monto FROM codigos_ajuste WHERE codigo = $1 AND activo`, [codigo])
+        : { rows: [] };
+
+    if (resultado.rows.length === 0) {
+        return { error: "El código de ajuste no es válido.", codigoInvalido: true };
+    }
+
+    const fila = resultado.rows[0];
+    return conMonto(fila.codigo, fila.monto === null ? null : Number(fila.monto), ajuste.monto);
+}
+
+function conMonto(codigo, fijo, escrito) {
+    const monto = fijo ?? Number(escrito);
 
     if (!Number.isFinite(monto) || monto <= 0) {
         return { error: "Escribe el monto del ajuste (mayor que cero)." };
@@ -51,4 +77,138 @@ function repartirAjuste(importes, monto) {
     return partes.map((p) => p / 100);
 }
 
-module.exports = { CODIGOS_AJUSTE, COSTO_MAXIMO_OBSEQUIO, normalizarCodigo, resolverAjuste, repartirAjuste };
+function validarCodigo(cuerpo) {
+    const codigo = normalizarCodigo(cuerpo?.codigo);
+    const descripcion = typeof cuerpo?.descripcion === "string" ? cuerpo.descripcion.trim() : "";
+    const monto = cuerpo?.monto === null || cuerpo?.monto === undefined || cuerpo?.monto === ""
+        ? null
+        : Number(cuerpo.monto);
+
+    if (!/^[A-Z0-9Ñ][A-Z0-9Ñ -]{2,19}$/.test(codigo)) {
+        return { error: "El código debe tener de 3 a 20 letras o números (puede llevar espacios o guiones)." };
+    }
+
+    if (codigo === AJUSTE_DEL_JEFE) {
+        return { error: "Ese nombre está reservado para los ajustes del jefe." };
+    }
+
+    if (descripcion.length > 100) {
+        return { error: "La descripción puede tener hasta 100 caracteres." };
+    }
+
+    if (monto !== null && (!Number.isFinite(monto) || monto <= 0 || monto > 99999)) {
+        return { error: "El monto debe ser mayor que cero (o déjalo libre)." };
+    }
+
+    return {
+        datos: {
+            codigo,
+            descripcion: descripcion || null,
+            monto: monto === null ? null : Number(monto.toFixed(2)),
+            activo: cuerpo?.activo !== false
+        }
+    };
+}
+
+router.get("/", requiereJefe, async (req, res) => {
+    try {
+        const resultado = await pool.query(`SELECT ${COLUMNAS} FROM codigos_ajuste ORDER BY activo DESC, codigo`);
+        res.json(resultado.rows);
+    } catch (error) {
+        console.error("Error al listar los códigos de ajuste:", error.message);
+        res.status(500).json({ error: "No se pudieron cargar los códigos de ajuste." });
+    }
+});
+
+router.post("/", requiereJefe, async (req, res) => {
+    const { datos, error } = validarCodigo(req.body);
+
+    if (error) {
+        return res.status(400).json({ error });
+    }
+
+    try {
+        const resultado = await pool.query(
+            `INSERT INTO codigos_ajuste (codigo, descripcion, monto, activo)
+             VALUES ($1, $2, $3, $4)
+             RETURNING id`,
+            [datos.codigo, datos.descripcion, datos.monto, datos.activo]
+        );
+        const fila = await pool.query(`SELECT ${COLUMNAS} FROM codigos_ajuste WHERE id = $1`, [resultado.rows[0].id]);
+        res.status(201).json({ mensaje: "Código de ajuste registrado.", codigo: fila.rows[0] });
+    } catch (error) {
+        if (error.code === "23505") {
+            return res.status(409).json({ error: "Ya existe un código de ajuste con ese nombre." });
+        }
+
+        console.error("Error al registrar el código de ajuste:", error.message);
+        res.status(500).json({ error: "No se pudo registrar el código de ajuste." });
+    }
+});
+
+router.put("/:id", requiereJefe, async (req, res) => {
+    const id = leerId(req);
+    const { datos, error } = validarCodigo(req.body);
+
+    if (!id) {
+        return res.status(404).json({ error: "Código de ajuste no encontrado." });
+    }
+
+    if (error) {
+        return res.status(400).json({ error });
+    }
+
+    try {
+        const resultado = await pool.query(
+            `UPDATE codigos_ajuste SET codigo = $1, descripcion = $2, monto = $3, activo = $4
+             WHERE id = $5
+             RETURNING id`,
+            [datos.codigo, datos.descripcion, datos.monto, datos.activo, id]
+        );
+
+        if (resultado.rows.length === 0) {
+            return res.status(404).json({ error: "Código de ajuste no encontrado." });
+        }
+
+        const fila = await pool.query(`SELECT ${COLUMNAS} FROM codigos_ajuste WHERE id = $1`, [id]);
+        res.json({ mensaje: "Código de ajuste actualizado.", codigo: fila.rows[0] });
+    } catch (error) {
+        if (error.code === "23505") {
+            return res.status(409).json({ error: "Ya existe un código de ajuste con ese nombre." });
+        }
+
+        console.error("Error al actualizar el código de ajuste:", error.message);
+        res.status(500).json({ error: "No se pudo actualizar el código de ajuste." });
+    }
+});
+
+// Las ventas guardan el texto del código, así que borrarlo no cambia el historial.
+router.delete("/:id", requiereJefe, async (req, res) => {
+    const id = leerId(req);
+
+    if (!id) {
+        return res.status(404).json({ error: "Código de ajuste no encontrado." });
+    }
+
+    try {
+        const resultado = await pool.query(`DELETE FROM codigos_ajuste WHERE id = $1 RETURNING id`, [id]);
+
+        if (resultado.rows.length === 0) {
+            return res.status(404).json({ error: "Código de ajuste no encontrado." });
+        }
+
+        res.json({ mensaje: "Código de ajuste eliminado." });
+    } catch (error) {
+        console.error("Error al eliminar el código de ajuste:", error.message);
+        res.status(500).json({ error: "No se pudo eliminar el código de ajuste." });
+    }
+});
+
+module.exports = {
+    router,
+    AJUSTE_DEL_JEFE,
+    COSTO_MAXIMO_OBSEQUIO,
+    normalizarCodigo,
+    resolverAjuste,
+    repartirAjuste
+};

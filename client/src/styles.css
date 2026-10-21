@@ -3712,6 +3712,27 @@ textarea {
     gap: 8px;
 }
 
+.acciones-codigo {
+    display: flex;
+    gap: 4px;
+}
+
+.codigo-ajuste {
+    flex-wrap: wrap;
+}
+
+.codigo-ajuste .gasto-datos {
+    flex: 1 1 160px;
+}
+
+.codigo-ajuste.inactivo {
+    opacity: 0.6;
+}
+
+.codigo-ajuste .etiqueta-inactivo {
+    margin-left: 6px;
+}
+
 .gasto {
     display: flex;
     align-items: center;

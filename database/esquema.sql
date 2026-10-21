@@ -109,6 +109,19 @@ CREATE UNIQUE INDEX IF NOT EXISTS clientes_telefono_unico ON clientes (telefono)
 --   para que la ganancia histórica no cambie si luego se edita el producto.
 --   ganancia = total - costo_unitario × cantidad
 -- ---------------------------------------------------------------------
+-- Códigos de ajuste: descuentos sobre el total de una venta que el jefe
+-- registra y le da al empleado. monto NULL = el monto se escribe al vender.
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS codigos_ajuste (
+    id          SERIAL PRIMARY KEY,
+    codigo      VARCHAR(20)   NOT NULL UNIQUE,                       -- en mayúsculas
+    descripcion VARCHAR(100),
+    monto       NUMERIC(10,2) CHECK (monto IS NULL OR monto > 0),
+    activo      BOOLEAN       NOT NULL DEFAULT TRUE,
+    creado_en   TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS ventas (
     id               SERIAL PRIMARY KEY,
     producto_id      INTEGER       NOT NULL REFERENCES productos(id),   -- impide borrar productos con ventas

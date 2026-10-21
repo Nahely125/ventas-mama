@@ -10,6 +10,7 @@ import Gastos from "./Gastos.jsx";
 import Clientes from "./Clientes.jsx";
 import Compras from "./Compras.jsx";
 import Inversion from "./Inversion.jsx";
+import CodigosAjuste from "./CodigosAjuste.jsx";
 import Empleados from "./Empleados.jsx";
 import SeccionesCatalogo from "./SeccionesCatalogo.jsx";
 
@@ -70,6 +71,13 @@ const VISTAS = [
         icono: "💼",
         nombre: "Inversión",
         descripcion: "Registra lo que invertiste y mira cuánto te falta para recuperarlo.",
+        soloJefe: true
+    },
+    {
+        clave: "ajustes",
+        icono: "🏷️",
+        nombre: "Códigos de ajuste",
+        descripcion: "Crea los códigos que les das a los empleados para descontar del total de una venta.",
         soloJefe: true
     },
     {
@@ -238,6 +246,10 @@ export default function Panel({ usuario, onSalir, onActualizarUsuario }) {
 
                     {vistaActual.clave === "inversion" && (
                         <Inversion resumen={resumen} onCambio={cargarResumen} onError={manejarError} />
+                    )}
+
+                    {vistaActual.clave === "ajustes" && (
+                        <CodigosAjuste onError={manejarError} />
                     )}
 
                     {vistaActual.clave === "catalogo" && (

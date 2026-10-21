@@ -184,6 +184,7 @@ app.use("/api/secciones", require("./rutas/secciones"));
 app.use("/api/clientes", require("./rutas/clientes").router);
 app.use("/api/compras", require("./rutas/compras"));
 app.use("/api/inversiones", require("./rutas/inversiones"));
+app.use("/api/ajustes", require("./rutas/ajustes").router);
 
 /* Frontend en React: archivos compilados con "npm run build" en client/dist.
    La propia app decide si mostrar el login o el panel según /api/sesion. */

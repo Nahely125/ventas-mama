@@ -110,9 +110,9 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
     const [comprobante, setComprobante] = useState(null);
     const [dictando, setDictando] = useState(false);
 
-    // Ajuste (descuento) con el código que da el jefe: AJUSTE10, AJUSTE20 o AJUSTE PROPIO.
+    // Ajuste (descuento) con un código que registró el jefe; el jefe también puede ajustar sin código.
     const [codigoAjuste, setCodigoAjuste] = useState("");
-    const [ajuste, setAjuste] = useState(null); // { codigo, monto } (monto null = propio)
+    const [ajuste, setAjuste] = useState(null); // { codigo, monto, libre } (monto null = se escribe)
     const [montoPropio, setMontoPropio] = useState("");
     const [errorAjuste, setErrorAjuste] = useState("");
     const [validandoAjuste, setValidandoAjuste] = useState(false);
@@ -261,6 +261,13 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
         }
     }
 
+    // Ajuste directo del jefe: escribe el monto que quiera, sin código.
+    function ajusteDelJefe() {
+        setAjuste({ codigo: "Ajuste del jefe", monto: null, libre: true });
+        setMontoPropio("");
+        setErrorAjuste("");
+    }
+
     function quitarAjuste() {
         setAjuste(null);
         setCodigoAjuste("");
@@ -287,7 +294,9 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                         ...(item.modalidad === "obsequio" ? { obsequio: true } : {})
                     })),
                     metodoPago,
-                    ajuste: ajuste ? { codigo: ajuste.codigo, monto: montoAjuste } : null,
+                    ajuste: ajuste
+                        ? (ajuste.libre ? { libre: true, monto: montoAjuste } : { codigo: ajuste.codigo, monto: montoAjuste })
+                        : null,
                     clienteId: cliente?.id ?? null,
                     ...(passwordJefe ? { passwordJefe } : {})
                 }
@@ -334,7 +343,7 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
         if (ajuste && (montoAjuste <= 0 || ajusteExcede)) {
             setErrorAjuste(ajusteExcede
                 ? "El ajuste no puede ser mayor que el total."
-                : "Escribe el monto del ajuste propio.");
+                : "Escribe el monto del ajuste.");
             return;
         }
 
@@ -527,7 +536,6 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                                             <input
                                                 type="text"
                                                 id="codigo-ajuste"
-                                                placeholder="Ej. AJUSTE10"
                                                 autoCapitalize="characters"
                                                 autoComplete="off"
                                                 spellCheck={false}
@@ -550,7 +558,19 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                                                 {validandoAjuste ? "..." : "Aplicar"}
                                             </button>
                                         </div>
-                                        <span className="ayuda-campo">El jefe te da el código para descontar del total.</span>
+                                        <span className="ayuda-campo">
+                                            {esJefe ? (
+                                                <>
+                                                    Usa un código o{" "}
+                                                    <button type="button" className="boton-enlace" onClick={ajusteDelJefe}>
+                                                        haz un ajuste sin código
+                                                    </button>
+                                                    .
+                                                </>
+                                            ) : (
+                                                "El jefe te da el código para descontar del total."
+                                            )}
+                                        </span>
                                     </div>
                                 ) : (
                                     <div className="ajuste-aplicado">
