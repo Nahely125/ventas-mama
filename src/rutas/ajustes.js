@@ -6,7 +6,8 @@ const { requiereJefe, leerId } = require("../autenticacion");
 // empleado. monto null = monto libre: el empleado lo escribe al vender.
 const router = express.Router();
 
-// Lo máximo (al costo) que un empleado puede regalar en una venta.
+// Límite para el empleado: solo regala productos de menos de esto por unidad, y en total
+// (al costo) no más de esto por venta.
 const COSTO_MAXIMO_OBSEQUIO = 5;
 
 // Nombre con el que queda el descuento que hace el jefe directamente, sin código.

@@ -204,6 +204,16 @@ router.post("/", requiereSesion, async (req, res) => {
             unidadesPorProducto.set(producto.id, (unidadesPorProducto.get(producto.id) ?? 0) + unidades);
 
             if (item.obsequio === true) {
+                // El empleado solo regala productos de menos de S/ 5 por unidad (sin costo: no se sabe, no).
+                const costo = producto.precio_compra === null ? null : Number(producto.precio_compra);
+
+                if (!esJefe && (costo === null || costo >= COSTO_MAXIMO_OBSEQUIO)) {
+                    await client.query("ROLLBACK");
+                    return res.status(400).json({
+                        error: `${producto.nombre} no se puede obsequiar: solo productos de menos de S/ ${COSTO_MAXIMO_OBSEQUIO.toFixed(2)}.`
+                    });
+                }
+
                 // Sin costo registrado no se sabe cuánto vale: para el empleado cuenta como que excede.
                 costoObsequios += producto.precio_compra === null
                     ? Infinity
