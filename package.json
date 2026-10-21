@@ -21,9 +21,6 @@
     "url": "https://github.com/Nahely125/ventas-mama/issues"
   },
   "homepage": "https://github.com/Nahely125/ventas-mama#readme",
-  "devDependencies": {
-    "typescript": "^7.0.2"
-  },
   "dependencies": {
     "bcrypt": "^6.0.0",
     "connect-pg-simple": "^10.0.0",

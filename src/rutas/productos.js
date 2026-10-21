@@ -159,55 +159,6 @@ router.get("/stock-bajo", requiereSesion, async (req, res) => {
     }
 });
 
-// Buscar productos por código o nombre.
-router.get("/buscar/:texto", requiereSesion, async (req, res) => {
-    try {
-        const texto = req.params.texto.trim();
-
-        if (!texto) {
-            return res.status(400).json({ error: "Debes indicar el código o el nombre del producto" });
-        }
-
-        const resultado = await pool.query(
-            `SELECT ${columnasSegunRol(req)}
-             FROM productos
-             WHERE nombre ILIKE $1 OR codigo ILIKE $1
-             ORDER BY nombre`,
-            [`%${texto}%`]
-        );
-
-        res.json(resultado.rows);
-    } catch (error) {
-        console.error("Error al buscar productos:", error.message);
-        res.status(500).json({ error: "Error al buscar productos" });
-    }
-});
-
-// Buscar un producto por su ID.
-router.get("/:id", requiereSesion, async (req, res) => {
-    const id = leerId(req);
-
-    if (!id) {
-        return res.status(400).json({ error: "ID de producto inválido" });
-    }
-
-    try {
-        const resultado = await pool.query(
-            `SELECT ${columnasSegunRol(req)} FROM productos WHERE id = $1`,
-            [id]
-        );
-
-        if (resultado.rows.length === 0) {
-            return res.status(404).json({ error: "Producto no encontrado" });
-        }
-
-        res.json(resultado.rows[0]);
-    } catch (error) {
-        console.error("Error al buscar el producto:", error.message);
-        res.status(500).json({ error: "Error al buscar el producto" });
-    }
-});
-
 // Registrar un producto nuevo.
 router.post("/", requiereJefe, async (req, res) => {
     const { datos, error } = validarProducto(req.body);
