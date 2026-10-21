@@ -131,9 +131,18 @@ router.delete("/:id", requiereJefe, async (req, res) => {
             return res.status(404).json({ error: "Cliente no encontrado." });
         }
 
-        if (Number(fila.rows[0].saldo) > 0) {
+        const saldo = Number(fila.rows[0].saldo);
+
+        if (saldo > 0) {
             await client.query("ROLLBACK");
             return res.status(409).json({ error: "No se puede eliminar: el cliente todavía tiene deuda." });
+        }
+
+        if (saldo < 0) {
+            await client.query("ROLLBACK");
+            return res.status(409).json({
+                error: `No se puede eliminar: el cliente tiene S/ ${(-saldo).toFixed(2)} a favor. Revisa sus abonos primero.`
+            });
         }
 
         await client.query(`UPDATE ventas SET cliente_id = NULL WHERE cliente_id = $1`, [id]);

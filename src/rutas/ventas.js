@@ -17,6 +17,7 @@ const {
     totalesVentas,
     armarBoleta
 } = require("./consultasVentas");
+const { SALDO } = require("./clientes");
 const { COSTO_MAXIMO_OBSEQUIO, OBSEQUIABLE, normalizarCodigo, resolverAjuste, repartirAjuste } = require("./ajustes");
 
 const NOMBRE_MODALIDAD = { unidad: "unidad", media: "media docena", docena: "docena" };
@@ -120,8 +121,23 @@ function errorObsequios(regalos) {
         : null;
 }
 
-// Revisiones de obsequio permitidas a un empleado cada 10 minutos.
+// Revisiones de obsequio permitidas a un empleado cada 10 minutos. Se cuentan por usuario (en memoria
+// del servidor), así volver a iniciar sesión no las reinicia. También cuentan las ventas con obsequio.
 const MAXIMO_CONSULTAS_OBSEQUIO = 30;
+const consultasObsequio = new Map();
+
+function puedeRevisarObsequio(usuarioId) {
+    const ahora = Date.now();
+    const actual = consultasObsequio.get(usuarioId);
+    const vigente = actual && actual.desde > ahora - BLOQUEO_MS ? actual : { cantidad: 0, desde: ahora };
+
+    if (vigente.cantidad >= MAXIMO_CONSULTAS_OBSEQUIO) {
+        return false;
+    }
+
+    consultasObsequio.set(usuarioId, { ...vigente, cantidad: vigente.cantidad + 1 });
+    return true;
+}
 
 /* Antes de agregar un obsequio a la venta: { obsequios: [{ productoId, cantidad }] } con todos los
    regalos de la venta (los que ya están y el nuevo). Responde { ok: true } o el error. El jefe no tiene límite. */
@@ -140,16 +156,9 @@ router.post("/validar-obsequio", requiereSesion, async (req, res) => {
     }
 
     // Límite de consultas: probando cantidades se podría deducir el costo, que el empleado no ve.
-    const ahora = Date.now();
-    const consultas = req.session.consultasObsequio?.desde > ahora - BLOQUEO_MS
-        ? req.session.consultasObsequio
-        : { cantidad: 0, desde: ahora };
-
-    if (consultas.cantidad >= MAXIMO_CONSULTAS_OBSEQUIO) {
+    if (!puedeRevisarObsequio(req.session.usuario.id)) {
         return res.status(429).json({ error: "Demasiadas revisiones de obsequios. Espera unos minutos." });
     }
-
-    req.session.consultasObsequio = { ...consultas, cantidad: consultas.cantidad + 1 };
 
     try {
         const resultado = await pool.query(
@@ -318,6 +327,12 @@ router.post("/", requiereSesion, async (req, res) => {
         }
 
         // Se vuelve a revisar al cobrar (por si cambió algo); el jefe regala lo que quiera.
+        // Esta revisión también cuenta para el límite (si no, se podría usar para deducir costos).
+        if (!esJefe && regalos.length > 0 && !puedeRevisarObsequio(usuario.id)) {
+            await client.query("ROLLBACK");
+            return res.status(429).json({ error: "Demasiadas revisiones de obsequios. Espera unos minutos." });
+        }
+
         const errorRegalos = esJefe ? null : errorObsequios(regalos);
 
         if (errorRegalos) {
@@ -380,8 +395,22 @@ router.post("/", requiereSesion, async (req, res) => {
         const importes = items.map((item) => Number((Number(item.precio.toFixed(2)) * item.cantidad).toFixed(2)));
         const descuentos = ajusteVenta ? repartirAjuste(importes, ajusteVenta.monto) : importes.map(() => 0);
 
-        // Unidades del 2025 que quedan por producto: se descuentan primero.
+        // Unidades del 2025 que quedan por producto: se descuentan primero, y antes en los obsequios
+        // (así el obsequio vale lo que se revisó y lo ya pagado se regala antes que lo nuevo).
         const quedan2025 = new Map([...productos.values()].map((p) => [p.id, p.stock_2025]));
+        const unidades2025Por = new Map();
+        const ordenReparto = [...items.keys()].sort(
+            (a, b) => Number(items[b].obsequio === true) - Number(items[a].obsequio === true)
+        );
+
+        for (const indice of ordenReparto) {
+            const item = items[indice];
+            const unidades = item.cantidad * UNIDADES_MODALIDAD[item.modalidad ?? "unidad"];
+            const disponibles = quedan2025.get(item.productoId);
+            const de2025 = Math.min(disponibles, unidades);
+            quedan2025.set(item.productoId, disponibles - de2025);
+            unidades2025Por.set(indice, de2025);
+        }
 
         for (const [indice, item] of items.entries()) {
             const producto = productos.get(item.productoId);
@@ -391,8 +420,7 @@ router.post("/", requiereSesion, async (req, res) => {
             const descuento = descuentos[indice];
             const total = Number((importes[indice] - descuento).toFixed(2));
             const precioUnitario = Number((precioVenta / UNIDADES_MODALIDAD[modalidad]).toFixed(2));
-            const unidades2025 = Math.min(quedan2025.get(producto.id), unidades);
-            quedan2025.set(producto.id, quedan2025.get(producto.id) - unidades2025);
+            const unidades2025 = unidades2025Por.get(indice);
 
             await client.query(
                 `INSERT INTO ventas
@@ -501,7 +529,7 @@ router.post("/:grupo/anular", requiereJefe, async (req, res) => {
         await client.query("BEGIN");
 
         const filas = await client.query(
-            `SELECT id, producto_id, cantidad, unidades_2025, anulada_en
+            `SELECT id, producto_id, cantidad, unidades_2025, anulada_en, total, metodo_pago, cliente_id
              FROM ventas WHERE grupo = $1
              ORDER BY producto_id
              FOR UPDATE`,
@@ -516,6 +544,25 @@ router.post("/:grupo/anular", requiereJefe, async (req, res) => {
         if (filas.rows.some((f) => f.anulada_en)) {
             await client.query("ROLLBACK");
             return res.status(409).json({ error: "Esta venta ya estaba anulada." });
+        }
+
+        // Fiado: si el cliente ya abonó, anularla podría dejarle saldo a favor (deuda negativa).
+        const primera = filas.rows[0];
+
+        if (primera.metodo_pago === "fiado" && primera.cliente_id) {
+            const deuda = await client.query(
+                `SELECT ROUND(${SALDO}, 2) AS saldo FROM clientes WHERE id = $1 FOR UPDATE`,
+                [primera.cliente_id]
+            );
+            const totalVenta = filas.rows.reduce((suma, f) => suma + Number(f.total), 0);
+            const saldo = Number(deuda.rows[0]?.saldo ?? 0);
+
+            if (Math.round((saldo - totalVenta) * 100) < 0) {
+                await client.query("ROLLBACK");
+                return res.status(409).json({
+                    error: `El cliente ya abonó parte de esta venta: su deuda es S/ ${saldo.toFixed(2)} y la venta es de S/ ${totalVenta.toFixed(2)}. Elimina primero los abonos que sobren (en Clientes) y luego anúlala.`
+                });
+            }
         }
 
         for (const fila of filas.rows) {

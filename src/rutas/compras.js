@@ -74,7 +74,8 @@ router.post("/", requiereJefe, async (req, res) => {
         }
 
         // Costo promedio de la mercadería de este año (lo del 2025 no entra en el cálculo).
-        const nuevas = Math.max(producto.stock - producto.stock_2025, 0);
+        // Si no tenía costo registrado, no se mezcla un S/ 0 inventado: vale el de esta compra.
+        const nuevas = producto.precio_compra === null ? 0 : Math.max(producto.stock - producto.stock_2025, 0);
         const costoActual = Number(producto.precio_compra ?? 0);
         const costoPromedio = (nuevas * costoActual + costoTotal) / (nuevas + cantidad);
 

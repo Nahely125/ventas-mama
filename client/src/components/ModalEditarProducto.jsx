@@ -15,6 +15,10 @@ export default function ModalEditarProducto({ producto, onCerrar, onGuardado, on
         precio: String(producto.precio),
         // Casilla marcada si el producto tiene mercadería del 2025.
         es2025: (producto.stock2025 ?? 0) > 0,
+        // Para no cambiar cuántas unidades son del 2025 si solo una parte del stock lo es.
+        es2025Inicial: (producto.stock2025 ?? 0) > 0,
+        stock2025Inicial: Number(producto.stock2025 ?? 0),
+        stockInicial: Number(producto.stock),
         precioMinimo: String(producto.precioMinimo ?? ""),
         // Precio por unidad en la docena = precio de la docena ÷ 12. Se guardan los valores
         // de antes para no cambiar la docena por redondeo si no se toca este precio.

@@ -267,6 +267,12 @@ export default function CamposProducto({ valores, onCambio, prefijo, etiquetaCom
                             Ya se pagó el año pasado: al venderla, todo lo cobrado va a la <strong>ganancia del
                             inventario 2025</strong> (ganancia neta) y no cuenta para recuperar la inversión de este año.
                         </small>
+                        {valores.es2025 && valores.es2025Inicial && valores.stock2025Inicial < valores.stockInicial && (
+                            <small className="dato-calculado">
+                                Solo <strong>{Math.min(valores.stock2025Inicial, Number(valores.stock) || 0)}</strong> unidades
+                                son del 2025; el resto es mercadería nueva.
+                            </small>
+                        )}
                     </span>
                 </label>
             </fieldset>

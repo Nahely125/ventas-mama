@@ -7,6 +7,21 @@ const CAMPOS_NUMERICOS = [
     "stock"
 ];
 
+/* Unidades del 2025 al guardar:
+   - casilla sin marcar: ninguna;
+   - producto nuevo, casilla recién marcada o producto que era todo del 2025: todo el stock;
+   - producto con solo una parte del 2025 (por ejemplo, después de una compra): esa parte se
+     conserva (sin pasar del stock). */
+function calcularStock2025(valores) {
+    const stock = Number(valores.stock);
+
+    if (!valores.es2025) return 0;
+    if (valores.stock2025Inicial === undefined || !valores.es2025Inicial) return stock;
+    if (valores.stock2025Inicial >= valores.stockInicial) return stock;
+
+    return Math.min(valores.stock2025Inicial, stock);
+}
+
 // Convierte los valores del formulario y valida un producto.
 // Devuelve { datos } si es válido o { error } si no lo es.
 export function validarProducto(valores) {
@@ -28,8 +43,7 @@ export function validarProducto(valores) {
         precioCompra: Number(valores.precioCompra),
         unidadesPorCaja: Number(valores.unidadesPorCaja),
         stock: Number(valores.stock),
-        // Si se marca como mercadería del 2025, todo su stock cuenta como del año pasado.
-        stock2025: valores.es2025 ? Number(valores.stock) : 0,
+        stock2025: calcularStock2025(valores),
         seccionId: valores.seccionId ? Number(valores.seccionId) : null,
         categoriaId: valores.categoriaId ? Number(valores.categoriaId) : null
     };

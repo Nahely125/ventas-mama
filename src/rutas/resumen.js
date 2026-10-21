@@ -39,7 +39,7 @@ router.get("/", requiereSesion, async (req, res) => {
                     (SELECT COALESCE(SUM(${GANANCIA_2025}), 0) FROM ventas WHERE anulada_en IS NULL) AS "ganancia2025",
                     (SELECT COALESCE(SUM(monto), 0) FROM gastos) AS "gastosTotales",
                     (SELECT COALESCE(SUM(monto), 0) FROM inversiones) AS "inversionTotal",
-                    (SELECT COALESCE(SUM(${SALDO}), 0) FROM clientes) AS "porCobrar"`
+                    (SELECT COALESCE(SUM(GREATEST(${SALDO}, 0)), 0) FROM clientes) AS "porCobrar"`
             );
 
             const fila = datos.rows[0];
