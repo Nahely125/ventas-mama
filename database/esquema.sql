@@ -69,9 +69,9 @@ CREATE TABLE IF NOT EXISTS productos (
     codigo             VARCHAR(50),
     nombre             VARCHAR(150)  NOT NULL,
     precio             NUMERIC(10,2) NOT NULL CHECK (precio >= 0),          -- precio de venta por unidad
-    precio_minimo      NUMERIC(10,2) NOT NULL CHECK (precio_minimo >= 0),   -- no se puede vender por debajo
+    precio_minimo      NUMERIC(10,2) NOT NULL CHECK (precio_minimo >= 0),   -- un empleado no puede vender por debajo (sin el jefe)
     precio_docena      NUMERIC(10,2) NOT NULL CHECK (precio_docena >= 0),   -- precio de venta por docena
-    precio_minimo_docena NUMERIC(10,2) NOT NULL CHECK (precio_minimo_docena >= 0), -- no se puede vender la docena por debajo
+    precio_minimo_docena NUMERIC(10,2) NOT NULL CHECK (precio_minimo_docena >= 0), -- ídem para la docena
     precio_compra      NUMERIC(10,2) CHECK (precio_compra >= 0),            -- costo por unidad
     unidades_por_caja  INTEGER       NOT NULL DEFAULT 1 CHECK (unidades_por_caja >= 1),
     stock              INTEGER       NOT NULL CHECK (stock >= 0),           -- siempre en unidades
@@ -80,8 +80,7 @@ CREATE TABLE IF NOT EXISTS productos (
     categoria_id       INTEGER REFERENCES categorias(id) ON DELETE SET NULL,    -- la sección se toma de la categoría
     foto               BYTEA,                                               -- foto reducida (JPEG)
     foto_tipo          VARCHAR(30),
-    foto_actualizada   TIMESTAMP,
-    CHECK (precio >= precio_minimo)
+    foto_actualizada   TIMESTAMP
 );
 
 -- El código no se puede repetir (sin distinguir mayúsculas/minúsculas).

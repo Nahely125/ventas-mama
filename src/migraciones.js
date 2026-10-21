@@ -151,6 +151,9 @@ const MIGRACIONES = `
         creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
 
+    -- El precio mínimo solo limita a los empleados al vender: el jefe puede fijar cualquier precio.
+    ALTER TABLE productos DROP CONSTRAINT IF EXISTS productos_check;
+
     -- Registro de los cambios de datos que solo deben hacerse una vez.
     CREATE TABLE IF NOT EXISTS migraciones_unicas (
         nombre VARCHAR(100) PRIMARY KEY,

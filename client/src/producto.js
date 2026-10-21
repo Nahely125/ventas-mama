@@ -58,10 +58,6 @@ export function validarProducto(valores) {
         };
     }
 
-    if (datos.precio < datos.precioMinimo) {
-        return { error: "El precio de venta no puede ser menor que el precio mínimo." };
-    }
-
     return { datos };
 }
 

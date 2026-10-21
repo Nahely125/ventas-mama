@@ -96,10 +96,6 @@ function validarProducto(cuerpo) {
         return { error: "La sección elegida no es válida." };
     }
 
-    if (centimos(precio) < centimos(precioMinimo)) {
-        return { error: "El precio de venta no puede ser menor que el precio mínimo." };
-    }
-
     if (!Number.isInteger(stock2025) || stock2025 < 0 || stock2025 > stock) {
         return { error: "Las unidades del 2025 deben estar entre 0 y el stock total." };
     }

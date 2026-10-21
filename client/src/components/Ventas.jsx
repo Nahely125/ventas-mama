@@ -117,7 +117,8 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
     const precioValido = precio !== "" && Number.isFinite(precioNumero) && precioNumero > 0 ? precioNumero : 0;
     const lista = precioDeLista(productoActual, modalidad);
     const minimo = productoActual ? minimoDe(productoActual, modalidad) : null;
-    const bajoMinimo = minimo !== null && precioValido > 0 && centimos(precioValido) < centimos(minimo);
+    // El precio mínimo solo limita a los empleados; el jefe vende al precio que quiera.
+    const bajoMinimo = !esJefe && minimo !== null && precioValido > 0 && centimos(precioValido) < centimos(minimo);
 
     // Unidades ya puestas en el carrito por producto (para avisar del stock).
     const unidadesEnCarrito = (id) =>
@@ -375,7 +376,7 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                                             )}
                                             {" "}· Mínimo: {moneda(minimo)}
                                             {bajoMinimo && (
-                                                <><br />🔒 Bajo el mínimo: {esJefe ? "lo autorizas tú al cobrar." : "necesitará la contraseña del jefe."}</>
+                                                <><br />🔒 Bajo el mínimo: necesitará la contraseña del jefe.</>
                                             )}
                                         </span>
                                     </div>
@@ -413,7 +414,7 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                                                         ? (item.cantidad === 1 ? "docena" : "docenas")
                                                         : (item.cantidad === 1 ? "unidad" : "unidades")}{" "}
                                                     × {moneda(item.precio)}
-                                                    {bajo && <span className="etiqueta etiqueta-ajustado">🔒 Bajo mínimo</span>}
+                                                    {bajo && !esJefe && <span className="etiqueta etiqueta-ajustado">🔒 Bajo mínimo</span>}
                                                 </span>
                                             </div>
                                             <strong className="item-carrito-total">{moneda(item.precio * item.cantidad)}</strong>

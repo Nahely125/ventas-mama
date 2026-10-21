@@ -23,3 +23,6 @@ export const CUENTAS_BANCARIAS = [
         cci: "00219110555299108057"
     }
 ];
+
+// WhatsApp del negocio (con código de país 51): recibe los pedidos del catálogo.
+export const WHATSAPP_NEGOCIO = "51904979273";

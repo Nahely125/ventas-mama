@@ -2,6 +2,34 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { moneda, pedir } from "../api.js";
 import { urlFoto } from "../fotos.js";
 import { iconoTema } from "../secciones.js";
+import { WHATSAPP_NEGOCIO } from "../datosPago.js";
+
+// Enlace para pedir un producto por WhatsApp con el mensaje ya escrito.
+function enlacePedido(producto) {
+    const mensaje = [
+        "Hola Mil Deseos 👋 Quiero pedir:",
+        `• ${producto.nombre}${producto.codigo ? ` (código ${producto.codigo})` : ""}`,
+        `Precio: ${moneda(producto.precioMinimo)} c/u · Docena ${moneda(producto.precioMinimoDocena)}`,
+        "¿Cuántas unidades tienen disponibles?",
+        `Lo vi en el catálogo: ${window.location.origin}/catalogo`
+    ].join("\n");
+
+    return `https://wa.me/${WHATSAPP_NEGOCIO}?text=${encodeURIComponent(mensaje)}`;
+}
+
+function BotonPedir({ producto, grande = false }) {
+    return (
+        <a
+            className={`cat-pedir ${grande ? "cat-pedir-grande" : ""}`}
+            href={enlacePedido(producto)}
+            target="_blank"
+            rel="noopener"
+            aria-label={`Pedir ${producto.nombre} por WhatsApp`}
+        >
+            <span aria-hidden="true">💬</span> {grande ? "Pedir por WhatsApp" : "Pedir"}
+        </a>
+    );
+}
 
 const TODO = "todo";
 const OTROS = "otros";
@@ -44,6 +72,7 @@ function TarjetaProductoCatalogo({ producto, onAbrir }) {
                     <span className="cat-producto-docena">Docena {moneda(producto.precioMinimoDocena)}</span>
                 </span>
             </button>
+            <BotonPedir producto={producto} />
         </li>
     );
 }
@@ -443,6 +472,7 @@ function DetalleProducto({ producto, onCerrar }) {
                     <p className={producto.disponible ? "cat-disponible" : "cat-no-disponible"}>
                         {producto.disponible ? "● Disponible" : "● Agotado por ahora"}
                     </p>
+                    <BotonPedir producto={producto} grande />
                 </div>
             </div>
         </dialog>

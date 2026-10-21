@@ -3233,6 +3233,46 @@ textarea {
     font-weight: 600;
 }
 
+.cat-producto {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.cat-pedir {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 38px;
+    border: 1px solid #25d366;
+    border-radius: 999px;
+    background: #ffffff;
+    color: #128c4a;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-decoration: none;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.cat-pedir:hover {
+    background: #25d366;
+    color: #ffffff;
+}
+
+.cat-pedir-grande {
+    min-height: 50px;
+    margin-top: 6px;
+    border: none;
+    background: #25d366;
+    color: #ffffff;
+    font-size: 1rem;
+}
+
+.cat-pedir-grande:hover {
+    background: #1ebe5b;
+}
+
 .cat-vacio {
     padding: 60px 16px;
     text-align: center;
