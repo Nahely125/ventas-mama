@@ -25,7 +25,7 @@ function buscar(productos, texto) {
         .slice(0, MAXIMO_RESULTADOS);
 }
 
-export default function BuscadorProducto({ productos, seleccionado, onSeleccionar }) {
+export default function BuscadorProducto({ productos, seleccionado, onSeleccionar, permitirAgotados = false }) {
     const [texto, setTexto] = useState("");
     const [abierto, setAbierto] = useState(false);
     const [activo, setActivo] = useState(0);
@@ -38,19 +38,19 @@ export default function BuscadorProducto({ productos, seleccionado, onSelecciona
             (producto) => (producto.codigo ?? "").toLowerCase() === codigo.toLowerCase()
         );
 
-        if (exacto && exacto.stock > 0) {
+        if (exacto && (exacto.stock > 0 || permitirAgotados)) {
             onSeleccionar(exacto);
             setTexto("");
         } else {
             setTexto(codigo);
             setAbierto(true);
         }
-    }, [productos, onSeleccionar]);
+    }, [productos, onSeleccionar, permitirAgotados]);
 
     const resultados = buscar(productos ?? [], texto);
 
     function elegir(producto) {
-        if (!producto || producto.stock === 0) {
+        if (!producto || (producto.stock === 0 && !permitirAgotados)) {
             return;
         }
 
@@ -142,7 +142,7 @@ export default function BuscadorProducto({ productos, seleccionado, onSelecciona
                                 key={producto.id}
                                 role="option"
                                 aria-selected={indice === activo}
-                                aria-disabled={producto.stock === 0}
+                                aria-disabled={producto.stock === 0 && !permitirAgotados}
                                 className={`resultado-producto ${indice === activo ? "activo" : ""}`}
                                 // onMouseDown evita que el input pierda el foco antes del clic.
                                 onMouseDown={(e) => {

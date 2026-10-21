@@ -1,7 +1,7 @@
 import { moneda } from "../api.js";
 import { urlFoto } from "../fotos.js";
 
-export default function TarjetaProducto({ producto, esJefe, retraso, onEditar, onEliminar }) {
+export default function TarjetaProducto({ producto, esJefe, retraso, onEditar, onEliminar, onIngresar }) {
     const precio = Number(producto.precio);
     const stockBajo = producto.stock <= 5;
 
@@ -41,6 +41,10 @@ export default function TarjetaProducto({ producto, esJefe, retraso, onEditar, o
                         <dd>{moneda(gananciaUnidad * unidadesPorCaja)}</dd>
                     </div>
                 </dl>
+
+                <button type="button" className="boton-ingresar" onClick={onIngresar}>
+                    🚚 Ingresar mercadería
+                </button>
 
                 <div className="acciones-producto">
                     <button type="button" className="boton-editar" onClick={onEditar}>

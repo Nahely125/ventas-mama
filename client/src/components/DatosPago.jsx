@@ -58,6 +58,18 @@ export default function DatosPago({ metodoPago, total }) {
         );
     }
 
+    if (metodoPago === "fiado") {
+        return (
+            <div className="contenedor-qr-yape aviso-fiado">
+                <h3>📝 Venta fiada</h3>
+                <p>
+                    El cliente se lleva los productos ahora y paga después. Los <strong>{moneda(total)}</strong> se
+                    suman a su deuda en «Clientes y fiados», donde podrás registrar sus pagos.
+                </p>
+            </div>
+        );
+    }
+
     if (metodoPago === "transferencia") {
         return (
             <div className="contenedor-qr-yape datos-transferencia">

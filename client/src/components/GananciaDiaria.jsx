@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { moneda, pedir } from "../api.js";
 import { formatearDia, hoy, mesesDisponibles, nombreMes } from "../fechas.js";
 
-// Ganancia neta por día de un mes: ganancia de las ventas (incluido el inventario 2025) menos los gastos.
+// Ganancia neta por día de un mes: ganancia de mercadería nueva + ganancia del inventario 2025 − gastos.
 export default function GananciaDiaria({ onError }) {
     const [mes, setMes] = useState(hoy().slice(0, 7));
     const [dias, setDias] = useState(null);
@@ -23,10 +23,12 @@ export default function GananciaDiaria({ onError }) {
         (suma, d) => ({
             vendido: suma.vendido + Number(d.vendido),
             ganancia: suma.ganancia + Number(d.ganancia),
+            nueva: suma.nueva + Number(d.gananciaNueva),
+            g2025: suma.g2025 + Number(d.ganancia2025),
             gastos: suma.gastos + Number(d.gastos),
             neta: suma.neta + Number(d.neta)
         }),
-        { vendido: 0, ganancia: 0, gastos: 0, neta: 0 }
+        { vendido: 0, ganancia: 0, nueva: 0, g2025: 0, gastos: 0, neta: 0 }
     );
 
     // Los últimos 12 meses para elegir.
@@ -58,7 +60,7 @@ export default function GananciaDiaria({ onError }) {
                     <span>Hoy</span>
                     <strong>{moneda(deHoy?.neta ?? 0)}</strong>
                     <small>
-                        Ganancia {moneda(deHoy?.ganancia ?? 0)} − gastos {moneda(deHoy?.gastos ?? 0)}
+                        Nueva {moneda(deHoy?.gananciaNueva ?? 0)} + 2025 {moneda(deHoy?.ganancia2025 ?? 0)} − gastos {moneda(deHoy?.gastos ?? 0)}
                     </small>
                 </div>
             )}
@@ -77,7 +79,8 @@ export default function GananciaDiaria({ onError }) {
                                 <th>Día</th>
                                 <th>Ventas</th>
                                 <th>Vendido</th>
-                                <th>Ganancia</th>
+                                <th>Ganancia nueva</th>
+                                <th>Ganancia 2025</th>
                                 <th>Gastos</th>
                                 <th>Neta</th>
                             </tr>
@@ -88,12 +91,8 @@ export default function GananciaDiaria({ onError }) {
                                     <td data-etiqueta="Día" className="celda-dia">{formatearDia(d.dia)}</td>
                                     <td data-etiqueta="Ventas">{d.ventas}</td>
                                     <td data-etiqueta="Vendido">{moneda(d.vendido)}</td>
-                                    <td data-etiqueta="Ganancia">
-                                        {moneda(d.ganancia)}
-                                        {Number(d.ganancia2025) > 0 && (
-                                            <small className="nota-2025">incl. {moneda(d.ganancia2025)} del 2025</small>
-                                        )}
-                                    </td>
+                                    <td data-etiqueta="Ganancia nueva" className="celda-nueva">{moneda(d.gananciaNueva)}</td>
+                                    <td data-etiqueta="Ganancia 2025" className="celda-2025">{moneda(d.ganancia2025)}</td>
                                     <td data-etiqueta="Gastos" className="celda-gasto">{moneda(d.gastos)}</td>
                                     <td data-etiqueta="Neta" className={`celda-neta ${Number(d.neta) < 0 ? "negativa" : ""}`}>
                                         {moneda(d.neta)}
@@ -106,7 +105,8 @@ export default function GananciaDiaria({ onError }) {
                                 <td data-etiqueta="Total del mes" className="celda-dia">Total del mes</td>
                                 <td></td>
                                 <td data-etiqueta="Vendido">{moneda(totales.vendido)}</td>
-                                <td data-etiqueta="Ganancia">{moneda(totales.ganancia)}</td>
+                                <td data-etiqueta="Ganancia nueva" className="celda-nueva">{moneda(totales.nueva)}</td>
+                                <td data-etiqueta="Ganancia 2025" className="celda-2025">{moneda(totales.g2025)}</td>
                                 <td data-etiqueta="Gastos" className="celda-gasto">{moneda(totales.gastos)}</td>
                                 <td data-etiqueta="Neta" className={`celda-neta ${totales.neta < 0 ? "negativa" : ""}`}>
                                     {moneda(totales.neta)}

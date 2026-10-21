@@ -2,6 +2,7 @@ const express = require("express");
 const pool = require("../db");
 const { requiereSesion, requiereJefe } = require("../autenticacion");
 const { STOCK_BAJO } = require("./productos");
+const { SALDO } = require("./clientes");
 
 const router = express.Router();
 
@@ -33,10 +34,11 @@ router.get("/", requiereSesion, async (req, res) => {
                     (SELECT COALESCE(SUM(precio * stock), 0) FROM productos) AS "valorInventario",
                     (SELECT COALESCE(SUM(stock_2025), 0) FROM productos) AS "unidades2025",
                     (SELECT COALESCE(SUM(precio * stock_2025), 0) FROM productos) AS "valorInventario2025",
-                    (SELECT COALESCE(SUM(${GANANCIA_NUEVA}), 0) FROM ventas) AS "gananciaVentasNuevas",
-                    (SELECT COALESCE(SUM(${GANANCIA_2025}), 0) FROM ventas) AS "ganancia2025",
+                    (SELECT COALESCE(SUM(${GANANCIA_NUEVA}), 0) FROM ventas WHERE anulada_en IS NULL) AS "gananciaVentasNuevas",
+                    (SELECT COALESCE(SUM(${GANANCIA_2025}), 0) FROM ventas WHERE anulada_en IS NULL) AS "ganancia2025",
                     (SELECT COALESCE(SUM(monto), 0) FROM gastos) AS "gastosTotales",
-                    (SELECT COALESCE(SUM(monto), 0) FROM inversiones) AS "inversionTotal"`
+                    (SELECT COALESCE(SUM(monto), 0) FROM inversiones) AS "inversionTotal",
+                    (SELECT COALESCE(SUM(${SALDO}), 0) FROM clientes) AS "porCobrar"`
             );
 
             const fila = datos.rows[0];
@@ -49,6 +51,8 @@ router.get("/", requiereSesion, async (req, res) => {
             resumen.unidades2025 = Number(fila.unidades2025);
             resumen.valorInventario2025 = Number(fila.valorInventario2025).toFixed(2);
             resumen.gastosTotales = gastos.toFixed(2);
+            // Lo que deben los clientes por ventas fiadas (ya cuenta como venta y ganancia).
+            resumen.porCobrar = Number(fila.porCobrar).toFixed(2);
             resumen.ganancia2025 = ganancia2025.toFixed(2);
             resumen.gananciaVentasNuevas = gananciaNueva.toFixed(2);
             resumen.gananciaTotal = (gananciaNueva + ganancia2025).toFixed(2);
@@ -97,7 +101,8 @@ router.get("/diario", requiereJefe, async (req, res) => {
                     SUM(${GANANCIA_NUEVA}) AS ganancia_nueva,
                     SUM(${GANANCIA_2025}) AS ganancia_2025
                 FROM ventas, limites
-                WHERE ventas.fecha >= limites.inicio
+                WHERE ventas.anulada_en IS NULL
+                  AND ventas.fecha >= limites.inicio
                   AND ventas.fecha < limites.inicio + INTERVAL '1 month'
                 GROUP BY 1
             ),
@@ -113,6 +118,7 @@ router.get("/diario", requiereJefe, async (req, res) => {
                 COALESCE(v.ventas, 0)::INT AS ventas,
                 ROUND(COALESCE(v.vendido, 0), 2) AS vendido,
                 ROUND(COALESCE(v.ganancia_nueva, 0) + COALESCE(v.ganancia_2025, 0), 2) AS ganancia,
+                ROUND(COALESCE(v.ganancia_nueva, 0), 2) AS "gananciaNueva",
                 ROUND(COALESCE(v.ganancia_2025, 0), 2) AS "ganancia2025",
                 ROUND(COALESCE(g.gastos, 0), 2) AS gastos,
                 ROUND(COALESCE(v.ganancia_nueva, 0) + COALESCE(v.ganancia_2025, 0) - COALESCE(g.gastos, 0), 2) AS neta

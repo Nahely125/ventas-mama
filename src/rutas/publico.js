@@ -1,6 +1,6 @@
 const express = require("express");
 const pool = require("../db");
-const { consultarVentas, armarBoleta } = require("./ventas");
+const { consultarVentas, armarBoleta } = require("./consultasVentas");
 
 // Rutas públicas: se abren sin iniciar sesión (catálogo y boletas enviadas a clientes).
 // Nunca devuelven costos, ganancias ni datos internos.
@@ -62,7 +62,7 @@ router.get("/boletas/:token", async (req, res) => {
     try {
         // El enlace usa el grupo de la venta. Los enlaces antiguos (de una sola fila) usaban
         // su token, que es igual al grupo de esas ventas.
-        const filas = await consultarVentas(false, req.params.token);
+        const filas = await consultarVentas(pool, false, { grupo: req.params.token });
 
         if (filas.length === 0) {
             return res.status(404).json({ error: "Boleta no encontrada." });

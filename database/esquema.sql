@@ -90,6 +90,20 @@ CREATE UNIQUE INDEX IF NOT EXISTS productos_codigo_unico
     WHERE codigo IS NOT NULL;
 
 -- ---------------------------------------------------------------------
+-- clientes: clientes frecuentes (para la boleta y las ventas fiadas).
+--   Lo que debe = ventas fiadas no anuladas − abonos.
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS clientes (
+    id         SERIAL PRIMARY KEY,
+    nombre     VARCHAR(100) NOT NULL,
+    telefono   VARCHAR(20),                      -- solo dígitos, con código de país (51...)
+    notas      VARCHAR(200),
+    creado_en  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS clientes_telefono_unico ON clientes (telefono) WHERE telefono IS NOT NULL;
+
+-- ---------------------------------------------------------------------
 -- ventas: cada venta registrada.
 --   cantidad siempre en UNIDADES (una venta de 2 docenas guarda 24).
 --   costo_unitario es una copia del costo del producto al momento de vender,
@@ -109,7 +123,11 @@ CREATE TABLE IF NOT EXISTS ventas (
     token            UUID          NOT NULL DEFAULT gen_random_uuid(),
     grupo            UUID          NOT NULL,                            -- une los productos de una misma venta; es la clave del enlace de la boleta
     autorizado_por   INTEGER       REFERENCES usuarios(id),             -- jefe que autorizó un precio bajo el mínimo
-    unidades_2025    INTEGER       NOT NULL DEFAULT 0,                  -- de la cantidad, cuántas eran del 2025 (su venta es ganancia neta completa)
+    unidades_2025    INTEGER       NOT NULL DEFAULT 0,
+    cliente_id       INTEGER       REFERENCES clientes(id),             -- cliente (obligatorio si metodo_pago = 'fiado')
+    anulada_en       TIMESTAMP,                                         -- si se anuló: no cuenta en totales ni ganancias
+    anulada_por      INTEGER       REFERENCES usuarios(id),
+    motivo_anulacion VARCHAR(200),                  -- de la cantidad, cuántas eran del 2025 (su venta es ganancia neta completa)
     comprobante_url  TEXT,                                              -- en desuso (antigua foto del comprobante)
     fecha            TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP   -- hora de Lima
 );
@@ -117,6 +135,20 @@ CREATE TABLE IF NOT EXISTS ventas (
 CREATE INDEX IF NOT EXISTS ventas_fecha_idx ON ventas (fecha);
 CREATE UNIQUE INDEX IF NOT EXISTS ventas_token_unico ON ventas (token);
 CREATE INDEX IF NOT EXISTS ventas_grupo_idx ON ventas (grupo);
+CREATE INDEX IF NOT EXISTS ventas_cliente_idx ON ventas (cliente_id);
+
+-- ---------------------------------------------------------------------
+-- abonos: pagos a cuenta de lo que debe un cliente por ventas fiadas.
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS abonos (
+    id           SERIAL PRIMARY KEY,
+    cliente_id   INTEGER       NOT NULL REFERENCES clientes(id) ON DELETE CASCADE,
+    monto        NUMERIC(10,2) NOT NULL CHECK (monto > 0),
+    metodo_pago  VARCHAR(20)   NOT NULL DEFAULT 'efectivo',
+    nota         VARCHAR(200),
+    fecha        TIMESTAMP     NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'America/Lima'),
+    usuario_id   INTEGER       REFERENCES usuarios(id)
+);
 
 -- ---------------------------------------------------------------------
 -- gastos: gastos del negocio (transporte, alquiler, etc.).
@@ -152,6 +184,24 @@ CREATE TABLE IF NOT EXISTS inversiones (
 CREATE TABLE IF NOT EXISTS migraciones_unicas (
     nombre       VARCHAR(100) PRIMARY KEY,
     aplicada_en  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ---------------------------------------------------------------------
+-- compras: mercadería que llega (suma al stock y se registra como
+--   inversión, gasto o nada). Se puede deshacer si no se vendió.
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS compras (
+    id            SERIAL PRIMARY KEY,
+    producto_id   INTEGER       NOT NULL REFERENCES productos(id) ON DELETE CASCADE,
+    cantidad      INTEGER       NOT NULL CHECK (cantidad > 0),          -- en unidades
+    costo_total   NUMERIC(12,2) NOT NULL CHECK (costo_total >= 0),
+    proveedor     VARCHAR(120),
+    fecha         DATE          NOT NULL,
+    contabilizar  VARCHAR(12)   NOT NULL DEFAULT 'inversion',           -- inversion, gasto o ninguno
+    gasto_id      INTEGER       REFERENCES gastos(id) ON DELETE SET NULL,
+    inversion_id  INTEGER       REFERENCES inversiones(id) ON DELETE SET NULL,
+    usuario_id    INTEGER       REFERENCES usuarios(id),
+    creado_en     TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 COMMIT;

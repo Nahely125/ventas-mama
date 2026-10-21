@@ -4,6 +4,7 @@ import TarjetaProducto from "./TarjetaProducto.jsx";
 import FormularioProducto from "./FormularioProducto.jsx";
 import ModalEditarProducto from "./ModalEditarProducto.jsx";
 import Escaner from "./Escaner.jsx";
+import IngresarMercaderia from "./IngresarMercaderia.jsx";
 
 export default function Inventario({
     esJefe,
@@ -15,6 +16,8 @@ export default function Inventario({
     const [busqueda, setBusqueda] = useState("");
     const [productoEditando, setProductoEditando] = useState(null);
     const [escaneando, setEscaneando] = useState(false);
+    const [ingresando, setIngresando] = useState(null);
+    const [aviso, setAviso] = useState("");
 
     const codigoLeido = useCallback((codigo) => {
         setEscaneando(false);
@@ -46,6 +49,7 @@ export default function Inventario({
             <section className="tarjeta inventario">
                 <h2>Inventario de productos</h2>
                 <p>Busca un producto por su código o nombre, o escanea su código.</p>
+                {aviso && <p className="mensaje mensaje-exito" role="status">✅ {aviso}</p>}
 
                 <div className="buscador">
                     <label htmlFor="buscar-producto">Buscar por código o nombre</label>
@@ -91,6 +95,7 @@ export default function Inventario({
                                 esJefe={esJefe}
                                 retraso={Math.min(indice * 70, 490)}
                                 onEditar={() => setProductoEditando(producto)}
+                                onIngresar={() => setIngresando(producto)}
                                 onEliminar={() => eliminar(producto)}
                             />
                         ))}
@@ -100,6 +105,20 @@ export default function Inventario({
 
             {esJefe && (
                 <FormularioProducto onCreado={onCambio} onError={onError} />
+            )}
+
+            {ingresando && (
+                <IngresarMercaderia
+                    productos={productos}
+                    productoInicial={ingresando}
+                    onError={onError}
+                    onCerrar={() => setIngresando(null)}
+                    onGuardado={async (resultado) => {
+                        setIngresando(null);
+                        setAviso(`${resultado.mensaje} Nuevo stock: ${resultado.stock} u.`);
+                        await onCambio();
+                    }}
+                />
             )}
 
             {escaneando && (

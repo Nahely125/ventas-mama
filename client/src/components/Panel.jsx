@@ -7,6 +7,8 @@ import Historial from "./Historial.jsx";
 import Inventario from "./Inventario.jsx";
 import Ventas from "./Ventas.jsx";
 import Gastos from "./Gastos.jsx";
+import Clientes from "./Clientes.jsx";
+import Compras from "./Compras.jsx";
 import Inversion from "./Inversion.jsx";
 import Empleados from "./Empleados.jsx";
 import SeccionesCatalogo from "./SeccionesCatalogo.jsx";
@@ -35,6 +37,19 @@ const VISTAS = [
         icono: "🧾",
         nombre: "Historial de ventas",
         descripcion: "Filtra tus ventas por día o mes y revisa los totales."
+    },
+    {
+        clave: "clientes",
+        icono: "🧑‍🤝‍🧑",
+        nombre: "Clientes y fiados",
+        descripcion: "Guarda a tus clientes frecuentes y controla lo que deben por ventas fiadas."
+    },
+    {
+        clave: "compras",
+        icono: "🚚",
+        nombre: "Compras",
+        descripcion: "Ingresa la mercadería que llega: suma al stock y queda como inversión o gasto.",
+        soloJefe: true
     },
     {
         clave: "gastos",
@@ -77,8 +92,6 @@ export default function Panel({ usuario, onSalir, onActualizarUsuario }) {
     const [resumen, setResumen] = useState(null);
     const [alertas, setAlertas] = useState(null);
     const [errorAlertas, setErrorAlertas] = useState("");
-    const [ventas, setVentas] = useState(null);
-    const [errorVentas, setErrorVentas] = useState("");
 
     // Si el servidor responde 401, la sesión expiró o la cuenta fue desactivada: volver al login.
     const manejarError = useCallback((error, mostrarError) => {
@@ -118,24 +131,13 @@ export default function Panel({ usuario, onSalir, onActualizarUsuario }) {
         }
     }, [manejarError]);
 
-    const cargarVentas = useCallback(async () => {
-        try {
-            setVentas(await pedir("/api/ventas"));
-            setErrorVentas("");
-        } catch (error) {
-            manejarError(error, () => setErrorVentas("No se pudo cargar el historial de ventas."));
-        }
-    }, [manejarError]);
-
     const recargarInventario = useCallback(
         () => Promise.all([cargarProductos(), cargarResumen(), cargarAlertas()]),
         [cargarProductos, cargarResumen, cargarAlertas]
     );
 
-    const recargarTodo = useCallback(
-        () => Promise.all([recargarInventario(), cargarVentas()]),
-        [recargarInventario, cargarVentas]
-    );
+    // El historial se carga por partes en su propia pantalla.
+    const recargarTodo = recargarInventario;
 
     useEffect(() => {
         recargarTodo();
@@ -146,12 +148,8 @@ export default function Panel({ usuario, onSalir, onActualizarUsuario }) {
         setMenuAbierto(false);
         window.scrollTo({ top: 0 });
 
-        if (nueva === "ventas" || nueva === "inventario") {
+        if (nueva === "ventas" || nueva === "inventario" || nueva === "compras") {
             cargarProductos();
-        }
-
-        if (nueva === "historial") {
-            cargarVentas();
         }
 
         if (nueva === "panel") {
@@ -223,7 +221,15 @@ export default function Panel({ usuario, onSalir, onActualizarUsuario }) {
                     )}
 
                     {vistaActual.clave === "historial" && (
-                        <Historial esJefe={esJefe} ventas={ventas} error={errorVentas} />
+                        <Historial esJefe={esJefe} onCambio={recargarInventario} onError={manejarError} />
+                    )}
+
+                    {vistaActual.clave === "clientes" && (
+                        <Clientes esJefe={esJefe} onError={manejarError} />
+                    )}
+
+                    {vistaActual.clave === "compras" && (
+                        <Compras productos={productos} onCambio={recargarInventario} onError={manejarError} />
                     )}
 
                     {vistaActual.clave === "gastos" && (

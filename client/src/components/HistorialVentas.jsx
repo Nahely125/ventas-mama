@@ -5,7 +5,7 @@ function monedaOpcional(valor) {
     return valor == null ? "No disponible" : moneda(valor);
 }
 
-export default function HistorialVentas({ ventas, error, esJefe, textoVacio, onVerComprobante }) {
+export default function HistorialVentas({ ventas, error, esJefe, textoVacio, onVerComprobante, onAnular }) {
     // Número de boleta = el id más bajo de las filas de la misma venta.
     const numeros = new Map();
     for (const venta of ventas ?? []) {
@@ -14,6 +14,9 @@ export default function HistorialVentas({ ventas, error, esJefe, textoVacio, onV
     const boletaDe = (venta) => numeros.get(venta.grupo) ?? venta.id;
 
     const columnas = esJefe ? 11 : 8;
+    // El botón de anular va solo en la primera fila de cada venta.
+    const primeraDe = new Set();
+    const esPrimera = (venta) => (primeraDe.has(venta.grupo) ? false : (primeraDe.add(venta.grupo), true));
 
     let filas;
 
@@ -24,12 +27,18 @@ export default function HistorialVentas({ ventas, error, esJefe, textoVacio, onV
     } else {
         // data-etiqueta se usa en móvil para mostrar cada fila como tarjeta.
         filas = ventas.map((venta) => (
-            <tr key={venta.id}>
+            <tr key={venta.id} className={venta.anuladaEn ? "fila-anulada" : ""}>
                 <td data-etiqueta="Fecha" className="celda-fecha">{formatearFecha(venta.fecha)}</td>
                 <td data-etiqueta="Producto" className="celda-producto">
                     {venta.codigo && <span className="codigo-producto">{venta.codigo}</span>}
                     {venta.producto}
                     <small className="numero-boleta">Boleta N° {String(boletaDe(venta)).padStart(6, "0")}</small>
+                    {venta.cliente && <small className="numero-boleta">👤 {venta.cliente}</small>}
+                    {venta.anuladaEn && (
+                        <small className="etiqueta-anulada" title={venta.motivoAnulacion ?? ""}>
+                            ANULADA · {venta.anuladaPor}: {venta.motivoAnulacion}
+                        </small>
+                    )}
                 </td>
                 <td data-etiqueta="Vendedor" className="celda-flexible">{venta.vendedor || "No registrado"}</td>
                 <td data-etiqueta="Cantidad" className="celda-flexible">{describirCantidad(venta)}</td>
@@ -61,6 +70,17 @@ export default function HistorialVentas({ ventas, error, esJefe, textoVacio, onV
                         <span aria-hidden="true">🧾</span>
                         <span className="texto-comprobante" aria-hidden="true"> Comprobante</span>
                     </button>
+                    {onAnular && !venta.anuladaEn && esPrimera(venta) && (
+                        <button
+                            type="button"
+                            className="boton-anular"
+                            onClick={() => onAnular(venta)}
+                            aria-label={`Anular venta N° ${String(boletaDe(venta)).padStart(6, "0")}`}
+                            title="Anular venta"
+                        >
+                            ⊘
+                        </button>
+                    )}
                 </td>
             </tr>
         ));

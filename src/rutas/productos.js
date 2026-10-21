@@ -100,10 +100,6 @@ function validarProducto(cuerpo) {
         return { error: "El precio de venta no puede ser menor que el precio mínimo." };
     }
 
-    if (centimos(precioDocena) < centimos(precioMinimoDocena)) {
-        return { error: "El precio por docena no puede ser menor que el precio mínimo por docena." };
-    }
-
     if (!Number.isInteger(stock2025) || stock2025 < 0 || stock2025 > stock) {
         return { error: "Las unidades del 2025 deben estar entre 0 y el stock total." };
     }

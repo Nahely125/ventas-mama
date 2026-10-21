@@ -9,6 +9,7 @@ export default function Resumen({ resumen, esJefe }) {
         esJefe && { titulo: "Ganancia por ventas", icono: "📈", valor: resumen?.gananciaVentasNuevas, formato: "moneda" },
         esJefe && { titulo: "Ganancia inventario 2025", icono: "📦", valor: resumen?.ganancia2025, formato: "moneda" },
         esJefe && { titulo: "Gastos", icono: "💸", valor: resumen?.gastosTotales, formato: "moneda" },
+        esJefe && Number(resumen?.porCobrar) > 0 && { titulo: "Por cobrar (fiados)", icono: "📝", valor: resumen?.porCobrar, formato: "moneda" },
         esJefe && {
             titulo: "Ganancia neta",
             icono: "✨",

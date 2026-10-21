@@ -5,6 +5,7 @@ import BuscadorProducto from "./BuscadorProducto.jsx";
 import Comprobante from "./Comprobante.jsx";
 import DatosPago from "./DatosPago.jsx";
 import DictadoVenta from "./DictadoVenta.jsx";
+import SelectorCliente from "./SelectorCliente.jsx";
 
 function precioDeLista(producto, modalidad) {
     if (!producto) return "";
@@ -97,6 +98,7 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
     // Carrito y cobro
     const [carrito, setCarrito] = useState([]);
     const [metodoPago, setMetodoPago] = useState("efectivo");
+    const [cliente, setCliente] = useState(null);
     const [mensaje, setMensaje] = useState(null);
     const [enviando, setEnviando] = useState(false);
     const [autorizacion, setAutorizacion] = useState(null); // { error }
@@ -230,6 +232,7 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                         precio: item.precio
                     })),
                     metodoPago,
+                    clienteId: cliente?.id ?? null,
                     ...(passwordJefe ? { passwordJefe } : {})
                 }
             });
@@ -242,6 +245,7 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
             setComprobante(resultado.boleta);
             setCarrito([]);
             setMetodoPago("efectivo");
+            setCliente(null);
             await onVenta();
         } catch (error) {
             onError(error, () => {
@@ -259,6 +263,11 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
 
     function cobrar(evento) {
         evento.preventDefault();
+
+        if (metodoPago === "fiado" && !cliente) {
+            setMensaje({ tipo: "error", texto: "Para vender fiado, elige o registra al cliente." });
+            return;
+        }
 
         if (carrito.length === 0) {
             setMensaje({ tipo: "error", texto: "Agrega al menos un producto a la venta." });
@@ -427,6 +436,16 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                             <span>Total a cobrar</span>
                             <strong>{moneda(total)}</strong>
                         </div>
+                    </div>
+
+                    <div className="campo campo-cliente">
+                        <span className="etiqueta-campo">👤 Cliente</span>
+                        <SelectorCliente
+                            cliente={cliente}
+                            onElegir={setCliente}
+                            obligatorio={metodoPago === "fiado" && !cliente}
+                            onError={onError}
+                        />
                     </div>
 
                     <div className="seccion-metodo-pago">

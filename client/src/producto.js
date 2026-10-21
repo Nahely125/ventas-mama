@@ -17,8 +17,9 @@ export function validarProducto(valores) {
         // Precio de la docena = precio por unidad en la docena × 12.
         precioDocena: Number((Number(valores.precioUnidadDocena) * 12).toFixed(2)),
         precioMinimo: Number(valores.precioMinimo),
-        // Mínimo por docena = mínimo por unidad × 12.
-        precioMinimoDocena: Number((Number(valores.precioMinimo) * 12).toFixed(2)),
+        // Mínimo por docena = mínimo × 12, pero nunca más alto que el precio de la docena
+        // (así vender a ese precio por docena no pide autorización).
+        precioMinimoDocena: Number(Math.min(Number(valores.precioMinimo) * 12, Number(valores.precioUnidadDocena) * 12).toFixed(2)),
         precioCompra: Number(valores.precioCompra),
         unidadesPorCaja: Number(valores.unidadesPorCaja),
         stock: Number(valores.stock),
@@ -55,10 +56,6 @@ export function validarProducto(valores) {
         return {
             error: "Verifica los datos ingresados. Los precios no pueden ser negativos, las unidades por caja deben ser un entero mayor que cero y el stock debe ser un entero no negativo."
         };
-    }
-
-    if (Number(valores.precioUnidadDocena) < datos.precioMinimo) {
-        return { error: "El precio por unidad en la docena no puede ser menor que el precio mínimo por unidad." };
     }
 
     if (datos.precio < datos.precioMinimo) {

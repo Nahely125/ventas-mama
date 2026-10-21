@@ -181,6 +181,8 @@ app.use("/api/resumen", require("./rutas/resumen"));
 app.use("/api/usuarios", require("./rutas/usuarios"));
 app.use("/api/gastos", require("./rutas/gastos"));
 app.use("/api/secciones", require("./rutas/secciones"));
+app.use("/api/clientes", require("./rutas/clientes").router);
+app.use("/api/compras", require("./rutas/compras"));
 app.use("/api/inversiones", require("./rutas/inversiones"));
 
 /* Frontend en React: archivos compilados con "npm run build" en client/dist.

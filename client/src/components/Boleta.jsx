@@ -58,6 +58,9 @@ export default function Boleta({ token }) {
                     </p>
                 ) : (
                     <>
+                        {venta?.anulada && (
+                            <p className="mensaje mensaje-error">⊘ Esta venta fue anulada.</p>
+                        )}
                         <img
                             className="imagen-boleta"
                             src={url}

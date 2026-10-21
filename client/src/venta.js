@@ -4,7 +4,8 @@ export const METODOS_PAGO = [
     { valor: "efectivo", nombre: "Efectivo", icono: "💵" },
     { valor: "yape", nombre: "Yape", icono: "💜" },
     { valor: "plin", nombre: "Plin", icono: "💚" },
-    { valor: "transferencia", nombre: "Transferencia", icono: "🏦" }
+    { valor: "transferencia", nombre: "Transferencia", icono: "🏦" },
+    { valor: "fiado", nombre: "Fiado", icono: "📝" }
 ];
 
 export function nombreMetodoPago(valor) {
@@ -55,6 +56,9 @@ export function boletaDesdeFilas(filas) {
         fecha: primera.fecha,
         vendedor: primera.vendedor,
         metodoPago: primera.metodoPago,
+        cliente: primera.cliente,
+        clienteTelefono: primera.clienteTelefono,
+        anulada: Boolean(primera.anuladaEn),
         total: ordenadas.reduce((suma, f) => suma + Number(f.total), 0).toFixed(2),
         items: ordenadas
     };

@@ -107,6 +107,50 @@ const MIGRACIONES = `
     ALTER TABLE productos ADD COLUMN IF NOT EXISTS stock_2025 INTEGER NOT NULL DEFAULT 0;
     ALTER TABLE ventas ADD COLUMN IF NOT EXISTS unidades_2025 INTEGER NOT NULL DEFAULT 0;
 
+    -- Ventas anuladas (las anula el jefe): se conservan, pero no cuentan en totales ni ganancias.
+    ALTER TABLE ventas ADD COLUMN IF NOT EXISTS anulada_en TIMESTAMP;
+    ALTER TABLE ventas ADD COLUMN IF NOT EXISTS anulada_por INTEGER REFERENCES usuarios(id);
+    ALTER TABLE ventas ADD COLUMN IF NOT EXISTS motivo_anulacion VARCHAR(200);
+
+    -- Clientes frecuentes y ventas fiadas (a crédito).
+    CREATE TABLE IF NOT EXISTS clientes (
+        id SERIAL PRIMARY KEY,
+        nombre VARCHAR(100) NOT NULL,
+        telefono VARCHAR(20),
+        notas VARCHAR(200),
+        creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS clientes_telefono_unico ON clientes (telefono) WHERE telefono IS NOT NULL;
+
+    ALTER TABLE ventas ADD COLUMN IF NOT EXISTS cliente_id INTEGER REFERENCES clientes(id);
+    CREATE INDEX IF NOT EXISTS ventas_cliente_idx ON ventas (cliente_id);
+
+    -- Pagos a cuenta de lo que debe un cliente.
+    CREATE TABLE IF NOT EXISTS abonos (
+        id SERIAL PRIMARY KEY,
+        cliente_id INTEGER NOT NULL REFERENCES clientes(id) ON DELETE CASCADE,
+        monto NUMERIC(10, 2) NOT NULL CHECK (monto > 0),
+        metodo_pago VARCHAR(20) NOT NULL DEFAULT 'efectivo',
+        nota VARCHAR(200),
+        fecha TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'America/Lima'),
+        usuario_id INTEGER REFERENCES usuarios(id)
+    );
+
+    -- Compras y reposiciones de mercadería.
+    CREATE TABLE IF NOT EXISTS compras (
+        id SERIAL PRIMARY KEY,
+        producto_id INTEGER NOT NULL REFERENCES productos(id) ON DELETE CASCADE,
+        cantidad INTEGER NOT NULL CHECK (cantidad > 0),
+        costo_total NUMERIC(12, 2) NOT NULL CHECK (costo_total >= 0),
+        proveedor VARCHAR(120),
+        fecha DATE NOT NULL,
+        contabilizar VARCHAR(12) NOT NULL DEFAULT 'inversion',
+        gasto_id INTEGER REFERENCES gastos(id) ON DELETE SET NULL,
+        inversion_id INTEGER REFERENCES inversiones(id) ON DELETE SET NULL,
+        usuario_id INTEGER REFERENCES usuarios(id),
+        creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
     -- Registro de los cambios de datos que solo deben hacerse una vez.
     CREATE TABLE IF NOT EXISTS migraciones_unicas (
         nombre VARCHAR(100) PRIMARY KEY,

@@ -2,76 +2,20 @@ const crypto = require("crypto");
 const express = require("express");
 const bcrypt = require("bcrypt");
 const pool = require("../db");
-const { requiereSesion } = require("../autenticacion");
+const { requiereSesion, requiereJefe } = require("../autenticacion");
 
 const router = express.Router();
 
-const METODOS_PAGO = ["efectivo", "yape", "plin", "transferencia"];
-const MODALIDADES = ["unidad", "docena"];
-const MAXIMO_PRODUCTOS = 40;
-
-// Límite de intentos con la contraseña del jefe (por sesión), para que no se pueda adivinar probando.
-const INTENTOS_MAXIMOS = 5;
-const BLOQUEO_MS = 10 * 60 * 1000;
-
-// Consulta las filas de ventas (una por producto) para el historial y la boleta.
-async function consultarVentas(esJefe, grupo = null) {
-    const resultado = await pool.query(
-        `SELECT
-            ventas.id,
-            ventas.grupo,
-            TO_CHAR(ventas.fecha, 'YYYY-MM-DD"T"HH24:MI:SS') AS fecha,
-            productos.nombre AS producto,
-            productos.codigo,
-            ventas.modalidad,
-            ventas.cantidad,
-            ventas.precio_unitario AS "precioUnitario",
-            ventas.total,
-            ventas.metodo_pago AS "metodoPago",
-            COALESCE(usuarios.nombre, 'No registrado') AS vendedor,
-            autoriza.nombre AS "autorizadoPor"
-            ${esJefe ? `,
-            ventas.costo_unitario AS "costoUnitario",
-            ventas.unidades_2025 AS "unidades2025",
-            -- Las unidades del 2025 ya se pagaron el año pasado: no se les resta el costo.
-            CASE
-                WHEN ventas.costo_unitario IS NOT NULL
-                THEN ROUND(ventas.total - ventas.costo_unitario * (ventas.cantidad - ventas.unidades_2025), 2)
-            END AS ganancia,
-            ROUND(ventas.total * ventas.unidades_2025 / ventas.cantidad, 2) AS "ganancia2025"` : ""}
-         FROM ventas
-         INNER JOIN productos ON ventas.producto_id = productos.id
-         LEFT JOIN usuarios ON ventas.usuario_id = usuarios.id
-         LEFT JOIN usuarios AS autoriza ON ventas.autorizado_por = autoriza.id
-         ${grupo ? "WHERE ventas.grupo = $1" : ""}
-         ORDER BY ventas.fecha DESC, ventas.id ASC`,
-        grupo ? [grupo] : []
-    );
-
-    return resultado.rows;
-}
-
-// Junta las filas de una venta en una boleta (sin costos ni ganancias).
-function armarBoleta(filas) {
-    const primera = filas[0];
-
-    return {
-        numero: Math.min(...filas.map((f) => f.id)),
-        grupo: primera.grupo,
-        fecha: primera.fecha,
-        vendedor: primera.vendedor,
-        metodoPago: primera.metodoPago,
-        total: filas.reduce((suma, f) => suma + Number(f.total), 0).toFixed(2),
-        items: filas.map((f) => ({
-            producto: f.producto,
-            codigo: f.codigo,
-            modalidad: f.modalidad,
-            cantidad: f.cantidad,
-            precioUnitario: f.precioUnitario,
-            total: f.total
-        }))
-    };
-}
+const {
+    METODOS_PAGO,
+    MODALIDADES,
+    MAXIMO_PRODUCTOS,
+    INTENTOS_MAXIMOS,
+    BLOQUEO_MS,
+    consultarVentas,
+    totalesVentas,
+    armarBoleta
+} = require("./consultasVentas");
 
 function validarItems(items) {
     if (!Array.isArray(items) || items.length === 0 || items.length > MAXIMO_PRODUCTOS) {
@@ -118,7 +62,7 @@ async function verificarJefe(password) {
      precio: precio por unidad o por docena; puede ajustarse.
    Si algún precio está por debajo del mínimo, un trabajador necesita passwordJefe. */
 router.post("/", requiereSesion, async (req, res) => {
-    const { items, metodoPago = "efectivo", passwordJefe } = req.body;
+    const { items, metodoPago = "efectivo", passwordJefe, clienteId = null } = req.body;
     const usuario = req.session.usuario;
     const esJefe = usuario.rol === "jefe";
 
@@ -126,6 +70,15 @@ router.post("/", requiereSesion, async (req, res) => {
 
     if (errorItems || !METODOS_PAGO.includes(metodoPago)) {
         return res.status(400).json({ error: errorItems ?? "Elige un método de pago válido." });
+    }
+
+    if (clienteId !== null && (!Number.isInteger(clienteId) || clienteId <= 0)) {
+        return res.status(400).json({ error: "El cliente elegido no es válido." });
+    }
+
+    // Una venta fiada queda como deuda del cliente: hay que saber quién es.
+    if (metodoPago === "fiado" && clienteId === null) {
+        return res.status(400).json({ error: "Para vender fiado elige o registra al cliente." });
     }
 
     let client;
@@ -245,8 +198,8 @@ router.post("/", requiereSesion, async (req, res) => {
             await client.query(
                 `INSERT INTO ventas
                     (producto_id, cantidad, precio_unitario, costo_unitario, total,
-                     usuario_id, metodo_pago, modalidad, grupo, autorizado_por, unidades_2025, fecha)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
+                     usuario_id, metodo_pago, modalidad, grupo, autorizado_por, unidades_2025, cliente_id, fecha)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
                          CURRENT_TIMESTAMP AT TIME ZONE 'America/Lima')`,
                 [
                     producto.id,
@@ -259,7 +212,8 @@ router.post("/", requiereSesion, async (req, res) => {
                     modalidad,
                     grupo,
                     autorizadoPor,
-                    unidades2025
+                    unidades2025,
+                    clienteId
                 ]
             );
         }
@@ -273,7 +227,7 @@ router.post("/", requiereSesion, async (req, res) => {
 
         await client.query("COMMIT");
 
-        const boleta = armarBoleta(await consultarVentas(esJefe, grupo));
+        const boleta = armarBoleta(await consultarVentas(pool, esJefe, { grupo }));
 
         res.status(201).json({
             mensaje: "Venta registrada correctamente.",
@@ -294,14 +248,100 @@ router.post("/", requiereSesion, async (req, res) => {
     }
 });
 
-// Consultar el historial de ventas (una fila por producto; "grupo" une las de una misma venta).
+/* Historial por partes: ?desde=YYYY-MM-DD&hasta=YYYY-MM-DD&pagina=0
+   Devuelve { filas, hayMas }: hasta 30 ventas completas por página (una fila por producto). */
 router.get("/", requiereSesion, async (req, res) => {
     try {
-        res.json(await consultarVentas(req.session.usuario.rol === "jefe"));
+        const esJefe = req.session.usuario.rol === "jefe";
+        const filas = await consultarVentas(pool, esJefe, req.query);
+        const grupos = [...new Set(filas.map((f) => f.grupo))];
+        const hayMas = grupos.length > 30;
+        const visibles = new Set(grupos.slice(0, 30));
+
+        res.json({ filas: filas.filter((f) => visibles.has(f.grupo)), hayMas });
     } catch (error) {
         console.error("Error al consultar las ventas:", error.message);
         res.status(500).json({ error: "No se pudo consultar el historial de ventas." });
     }
 });
 
-module.exports = { router, consultarVentas, armarBoleta };
+// Totales del periodo (ventas, unidades y, para el jefe, dinero y ganancias). Sin anuladas.
+router.get("/totales", requiereSesion, async (req, res) => {
+    try {
+        res.json(await totalesVentas(pool, req.session.usuario.rol === "jefe", req.query));
+    } catch (error) {
+        console.error("Error al calcular los totales:", error.message);
+        res.status(500).json({ error: "No se pudieron calcular los totales." });
+    }
+});
+
+const FORMATO_GRUPO = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/* Anular una venta completa (solo el jefe). Devuelve el stock (y las unidades del 2025),
+   deja anotado quién la anuló y por qué, y la venta deja de contar en totales y ganancias. */
+router.post("/:grupo/anular", requiereJefe, async (req, res) => {
+    const { grupo } = req.params;
+    const motivo = typeof req.body?.motivo === "string" ? req.body.motivo.trim() : "";
+
+    if (!FORMATO_GRUPO.test(grupo)) {
+        return res.status(404).json({ error: "Venta no encontrada." });
+    }
+
+    if (!motivo || motivo.length > 200) {
+        return res.status(400).json({ error: "Escribe el motivo de la anulación (máximo 200 caracteres)." });
+    }
+
+    let client;
+
+    try {
+        client = await pool.connect();
+        await client.query("BEGIN");
+
+        const filas = await client.query(
+            `SELECT id, producto_id, cantidad, unidades_2025, anulada_en
+             FROM ventas WHERE grupo = $1
+             ORDER BY producto_id
+             FOR UPDATE`,
+            [grupo]
+        );
+
+        if (filas.rows.length === 0) {
+            await client.query("ROLLBACK");
+            return res.status(404).json({ error: "Venta no encontrada." });
+        }
+
+        if (filas.rows.some((f) => f.anulada_en)) {
+            await client.query("ROLLBACK");
+            return res.status(409).json({ error: "Esta venta ya estaba anulada." });
+        }
+
+        for (const fila of filas.rows) {
+            await client.query(
+                `UPDATE productos
+                 SET stock = stock + $1, stock_2025 = stock_2025 + $2
+                 WHERE id = $3`,
+                [fila.cantidad, fila.unidades_2025, fila.producto_id]
+            );
+        }
+
+        await client.query(
+            `UPDATE ventas
+             SET anulada_en = CURRENT_TIMESTAMP AT TIME ZONE 'America/Lima',
+                 anulada_por = $1,
+                 motivo_anulacion = $2
+             WHERE grupo = $3`,
+            [req.session.usuario.id, motivo, grupo]
+        );
+
+        await client.query("COMMIT");
+        res.json({ mensaje: "Venta anulada. El stock se devolvió al inventario." });
+    } catch (error) {
+        if (client) await client.query("ROLLBACK").catch(() => {});
+        console.error("Error al anular la venta:", error.message);
+        res.status(500).json({ error: "No se pudo anular la venta." });
+    } finally {
+        client?.release();
+    }
+});
+
+module.exports = { router };

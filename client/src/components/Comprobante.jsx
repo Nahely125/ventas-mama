@@ -19,7 +19,8 @@ export default function Comprobante({ boleta: venta, onCerrar }) {
     const [archivo, setArchivo] = useState(null);
     const [vistaPrevia, setVistaPrevia] = useState("");
     const [errorImagen, setErrorImagen] = useState(false);
-    const [telefono, setTelefono] = useState("");
+    // Si la venta tiene cliente, su número ya aparece escrito.
+    const [telefono, setTelefono] = useState(() => (venta.clienteTelefono ?? "").replace(/^51(?=9d{8}$)/, ""));
     const [aviso, setAviso] = useState(null);
 
     useEffect(() => {

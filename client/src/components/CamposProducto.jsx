@@ -328,7 +328,7 @@ export default function CamposProducto({ valores, onCambio, prefijo, etiquetaCom
                 <p className="costo-calculado precio-docena-calculado">
                     La docena se vende a: <strong>S/ {porDocena(valores.precioUnidadDocena) || "0.00"}</strong>
                     <small>
-                        {" "}= {valores.precioUnidadDocena || "0.00"} × 12 · Mínimo por docena: S/ {porDocena(valores.precioMinimo) || "0.00"}
+                        {" "}= {valores.precioUnidadDocena || "0.00"} × 12
                     </small>
                 </p>
 
