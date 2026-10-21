@@ -26,9 +26,10 @@ export default function GananciaDiaria({ onError }) {
             nueva: suma.nueva + Number(d.gananciaNueva),
             g2025: suma.g2025 + Number(d.ganancia2025),
             gastos: suma.gastos + Number(d.gastos),
+            invertido: suma.invertido + Number(d.invertido ?? 0),
             neta: suma.neta + Number(d.neta)
         }),
-        { vendido: 0, ganancia: 0, nueva: 0, g2025: 0, gastos: 0, neta: 0 }
+        { vendido: 0, ganancia: 0, nueva: 0, g2025: 0, gastos: 0, invertido: 0, neta: 0 }
     );
 
     // Los últimos 12 meses para elegir.
@@ -70,7 +71,7 @@ export default function GananciaDiaria({ onError }) {
             ) : dias === null ? (
                 <p>Cargando...</p>
             ) : dias.length === 0 ? (
-                <p>No hay ventas ni gastos en este mes.</p>
+                <p>No hay ventas, gastos ni inversiones en este mes.</p>
             ) : (
                 <div className="tabla-contenedor">
                     <table className="tabla-dias">
@@ -82,6 +83,7 @@ export default function GananciaDiaria({ onError }) {
                                 <th>Ganancia nueva</th>
                                 <th>Ganancia 2025</th>
                                 <th>Gastos</th>
+                                <th>Invertido</th>
                                 <th>Neta</th>
                             </tr>
                         </thead>
@@ -94,6 +96,7 @@ export default function GananciaDiaria({ onError }) {
                                     <td data-etiqueta="Ganancia nueva" className="celda-nueva">{moneda(d.gananciaNueva)}</td>
                                     <td data-etiqueta="Ganancia 2025" className="celda-2025">{moneda(d.ganancia2025)}</td>
                                     <td data-etiqueta="Gastos" className="celda-gasto">{moneda(d.gastos)}</td>
+                                    <td data-etiqueta="Invertido" className="celda-invertido">{moneda(d.invertido)}</td>
                                     <td data-etiqueta="Neta" className={`celda-neta ${Number(d.neta) < 0 ? "negativa" : ""}`}>
                                         {moneda(d.neta)}
                                     </td>
@@ -108,6 +111,7 @@ export default function GananciaDiaria({ onError }) {
                                 <td data-etiqueta="Ganancia nueva" className="celda-nueva">{moneda(totales.nueva)}</td>
                                 <td data-etiqueta="Ganancia 2025" className="celda-2025">{moneda(totales.g2025)}</td>
                                 <td data-etiqueta="Gastos" className="celda-gasto">{moneda(totales.gastos)}</td>
+                                <td data-etiqueta="Invertido" className="celda-invertido">{moneda(totales.invertido)}</td>
                                 <td data-etiqueta="Neta" className={`celda-neta ${totales.neta < 0 ? "negativa" : ""}`}>
                                     {moneda(totales.neta)}
                                 </td>

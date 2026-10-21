@@ -4,7 +4,8 @@ export default function Resumen({ resumen, esJefe }) {
     const tarjetas = [
         { titulo: "Total de productos", icono: "🏷️", valor: resumen?.totalProductos },
         { titulo: "Unidades disponibles", icono: "📦", valor: resumen?.unidadesTotales },
-        esJefe && { titulo: "Valor del inventario", icono: "💰", valor: resumen?.valorInventario, formato: "moneda" },
+        esJefe && { titulo: "Valor del inventario nuevo", icono: "💰", valor: resumen?.valorInventarioNuevo, formato: "moneda" },
+        esJefe && { titulo: "Valor del inventario 2025", icono: "📦", valor: resumen?.valorInventario2025, formato: "moneda" },
         { titulo: "Productos con stock bajo", icono: "⚠️", valor: resumen?.productosStockBajo },
         esJefe && { titulo: "Ganancia por ventas", icono: "📈", valor: resumen?.gananciaVentasNuevas, formato: "moneda" },
         esJefe && { titulo: "Ganancia inventario 2025", icono: "📦", valor: resumen?.ganancia2025, formato: "moneda" },

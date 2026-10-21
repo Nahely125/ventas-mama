@@ -32,6 +32,7 @@ router.get("/", requiereSesion, async (req, res) => {
             const datos = await pool.query(
                 `SELECT
                     (SELECT COALESCE(SUM(precio * stock), 0) FROM productos) AS "valorInventario",
+                    (SELECT COALESCE(SUM(precio * GREATEST(stock - stock_2025, 0)), 0) FROM productos) AS "valorInventarioNuevo",
                     (SELECT COALESCE(SUM(stock_2025), 0) FROM productos) AS "unidades2025",
                     (SELECT COALESCE(SUM(precio * stock_2025), 0) FROM productos) AS "valorInventario2025",
                     (SELECT COALESCE(SUM(${GANANCIA_NUEVA}), 0) FROM ventas WHERE anulada_en IS NULL) AS "gananciaVentasNuevas",
@@ -48,6 +49,8 @@ router.get("/", requiereSesion, async (req, res) => {
             const inversiones = Number(fila.inversionTotal);
 
             resumen.valorInventario = Number(fila.valorInventario).toFixed(2);
+            // Valor del stock separado: mercadería nueva y mercadería del 2025.
+            resumen.valorInventarioNuevo = Number(fila.valorInventarioNuevo).toFixed(2);
             resumen.unidades2025 = Number(fila.unidades2025);
             resumen.valorInventario2025 = Number(fila.valorInventario2025).toFixed(2);
             resumen.gastosTotales = gastos.toFixed(2);
@@ -112,18 +115,34 @@ router.get("/diario", requiereJefe, async (req, res) => {
                 WHERE gastos.fecha >= limites.inicio
                   AND gastos.fecha < limites.inicio + INTERVAL '1 month'
                 GROUP BY 1
+            ),
+            por_inversion AS (
+                SELECT inversiones.fecha AS dia, SUM(inversiones.monto) AS invertido
+                FROM inversiones, limites
+                WHERE inversiones.fecha >= limites.inicio
+                  AND inversiones.fecha < limites.inicio + INTERVAL '1 month'
+                GROUP BY 1
+            ),
+            dias AS (
+                SELECT dia FROM por_venta
+                UNION SELECT dia FROM por_gasto
+                UNION SELECT dia FROM por_inversion
             )
             SELECT
-                TO_CHAR(COALESCE(v.dia, g.dia), 'YYYY-MM-DD') AS dia,
+                TO_CHAR(dias.dia, 'YYYY-MM-DD') AS dia,
                 COALESCE(v.ventas, 0)::INT AS ventas,
                 ROUND(COALESCE(v.vendido, 0), 2) AS vendido,
                 ROUND(COALESCE(v.ganancia_nueva, 0) + COALESCE(v.ganancia_2025, 0), 2) AS ganancia,
                 ROUND(COALESCE(v.ganancia_nueva, 0), 2) AS "gananciaNueva",
                 ROUND(COALESCE(v.ganancia_2025, 0), 2) AS "ganancia2025",
                 ROUND(COALESCE(g.gastos, 0), 2) AS gastos,
+                -- Lo invertido ese día (no se resta de la ganancia neta: se recupera con las ventas).
+                ROUND(COALESCE(i.invertido, 0), 2) AS invertido,
                 ROUND(COALESCE(v.ganancia_nueva, 0) + COALESCE(v.ganancia_2025, 0) - COALESCE(g.gastos, 0), 2) AS neta
-            FROM por_venta v
-            FULL OUTER JOIN por_gasto g ON v.dia = g.dia
+            FROM dias
+            LEFT JOIN por_venta v ON v.dia = dias.dia
+            LEFT JOIN por_gasto g ON g.dia = dias.dia
+            LEFT JOIN por_inversion i ON i.dia = dias.dia
             ORDER BY 1 DESC`,
             [mes]
         );

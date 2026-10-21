@@ -7,14 +7,28 @@ import DatosPago from "./DatosPago.jsx";
 import DictadoVenta from "./DictadoVenta.jsx";
 import SelectorCliente from "./SelectorCliente.jsx";
 
+const FACTOR = { unidad: 1, docena: 12 };
+
+// En la docena se escribe el precio de cada unidad; la docena cuesta ese precio × 12.
 function precioDeLista(producto, modalidad) {
     if (!producto) return "";
-    const precio = modalidad === "docena" ? producto.precioDocena : producto.precio;
-    return Number(precio).toFixed(2);
+    const precio = modalidad === "docena" ? Number(producto.precioDocena) / 12 : Number(producto.precio);
+    return precio.toFixed(2);
 }
 
+// Mínimo de la unidad o de la docena completa (el que valida el servidor).
 function minimoDe(producto, modalidad) {
     return Number(modalidad === "docena" ? producto.precioMinimoDocena : producto.precioMinimo);
+}
+
+// Mínimo por unidad (en la docena: mínimo de la docena ÷ 12).
+function minimoUnidad(producto, modalidad) {
+    return minimoDe(producto, modalidad) / FACTOR[modalidad];
+}
+
+// Precio de la docena completa (o de la unidad) a partir del precio por unidad.
+function precioModalidad(precioUnidad, modalidad) {
+    return Number((precioUnidad * FACTOR[modalidad]).toFixed(2));
 }
 
 function centimos(valor) {
@@ -52,8 +66,9 @@ function ModalAutorizacion({ productos, error, enviando, onConfirmar, onCerrar }
                 <ul className="lista-bajo-minimo">
                     {productos.map((item) => (
                         <li key={item.clave}>
-                            <strong>{item.producto.nombre}</strong>: {moneda(item.precio)} (mínimo{" "}
-                            {moneda(minimoDe(item.producto, item.modalidad))} por {item.modalidad})
+                            <strong>{item.producto.nombre}</strong>: {moneda(item.precioUnidad)} c/u (mínimo{" "}
+                            {moneda(minimoUnidad(item.producto, item.modalidad))} c/u
+                            {item.modalidad === "docena" ? " en la docena" : ""})
                         </li>
                     ))}
                 </ul>
@@ -116,9 +131,14 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
     const precioNumero = Number(precio);
     const precioValido = precio !== "" && Number.isFinite(precioNumero) && precioNumero > 0 ? precioNumero : 0;
     const lista = precioDeLista(productoActual, modalidad);
-    const minimo = productoActual ? minimoDe(productoActual, modalidad) : null;
+    const minimo = productoActual ? minimoUnidad(productoActual, modalidad) : null;
+    // Al precio de lista se cobra exactamente la docena registrada (evita redondeos de ÷ 12).
+    const precioTotalModalidad = esDocena && precio === lista
+        ? Number(productoActual.precioDocena)
+        : precioModalidad(precioValido, modalidad);
     // El precio mínimo solo limita a los empleados; el jefe vende al precio que quiera.
-    const bajoMinimo = !esJefe && minimo !== null && precioValido > 0 && centimos(precioValido) < centimos(minimo);
+    const bajoMinimo = !esJefe && productoActual !== null && precioValido > 0
+        && centimos(precioTotalModalidad) < centimos(minimoDe(productoActual, modalidad));
 
     // Unidades ya puestas en el carrito por producto (para avisar del stock).
     const unidadesEnCarrito = (id) =>
@@ -127,9 +147,8 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
             .reduce((suma, item) => suma + item.cantidad * (item.modalidad === "docena" ? 12 : 1), 0);
 
     const total = carrito.reduce((suma, item) => suma + item.precio * item.cantidad, 0);
-    const itemsBajoMinimo = carrito.filter(
-        (item) => centimos(item.precio) < centimos(minimoDe(item.producto, item.modalidad))
-    );
+    const estaBajoMinimo = (item) => centimos(item.precio) < centimos(minimoDe(item.producto, item.modalidad));
+    const itemsBajoMinimo = esJefe ? [] : carrito.filter(estaBajoMinimo);
 
     function seleccionarProducto(nuevo) {
         setProducto(nuevo);
@@ -169,7 +188,8 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                 producto: productoActual,
                 modalidad,
                 cantidad: cantidadValida,
-                precio: Number(precioValido.toFixed(2))
+                precioUnidad: Number(precioValido.toFixed(2)),
+                precio: precioTotalModalidad
             }
         ]);
         setProducto(null);
@@ -202,7 +222,8 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                 producto: actual,
                 modalidad: linea.modalidad,
                 cantidad: linea.cantidad,
-                precio: Number(Number(precioDeLista(actual, linea.modalidad)).toFixed(2))
+                precioUnidad: Number(precioDeLista(actual, linea.modalidad)),
+                precio: Number(Number(linea.modalidad === "docena" ? actual.precioDocena : actual.precio).toFixed(2))
             });
         }
 
@@ -352,7 +373,7 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
 
                                     <div className="campo">
                                         <label htmlFor="precio-venta">
-                                            Precio por {esDocena ? "docena" : "unidad"} (S/)
+                                            {esDocena ? "Precio por unidad en la docena" : "Precio por unidad"} (S/)
                                         </label>
                                         <input
                                             type="number"
@@ -374,7 +395,10 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                                                     </button>
                                                 </>
                                             )}
-                                            {" "}· Mínimo: {moneda(minimo)}
+                                            {!esJefe && <>{" "}· Mínimo: {moneda(minimo)}</>}
+                                            {esDocena && precioValido > 0 && (
+                                                <><br />La docena sale a <strong>{moneda(precioTotalModalidad)}</strong> ({moneda(precioValido)} × 12)</>
+                                            )}
                                             {bajoMinimo && (
                                                 <><br />🔒 Bajo el mínimo: necesitará la contraseña del jefe.</>
                                             )}
@@ -384,7 +408,7 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
 
                                 <button type="button" className="boton-agregar" onClick={agregar}>
                                     ＋ Agregar a la venta
-                                    {cantidadValida > 0 && precioValido > 0 && <> · {moneda(precioValido * cantidadValida)}</>}
+                                    {cantidadValida > 0 && precioValido > 0 && <> · {moneda(precioTotalModalidad * cantidadValida)}</>}
                                 </button>
                             </>
                         )}
@@ -403,7 +427,7 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                         ) : (
                             <ul className="lista-carrito">
                                 {carrito.map((item) => {
-                                    const bajo = centimos(item.precio) < centimos(minimoDe(item.producto, item.modalidad));
+                                    const bajo = estaBajoMinimo(item);
 
                                     return (
                                         <li key={item.clave} className="item-carrito">
@@ -414,6 +438,7 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                                                         ? (item.cantidad === 1 ? "docena" : "docenas")
                                                         : (item.cantidad === 1 ? "unidad" : "unidades")}{" "}
                                                     × {moneda(item.precio)}
+                                                    {item.modalidad === "docena" && <small> ({moneda(item.precioUnidad)} c/u)</small>}
                                                     {bajo && !esJefe && <span className="etiqueta etiqueta-ajustado">🔒 Bajo mínimo</span>}
                                                 </span>
                                             </div>

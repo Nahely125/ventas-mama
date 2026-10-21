@@ -2374,6 +2374,10 @@ input[aria-invalid="true"] {
     color: #9f1239;
 }
 
+.celda-invertido {
+    color: var(--morado-700);
+}
+
 .celda-neta {
     color: #047857;
     font-weight: 700;
@@ -3591,6 +3595,12 @@ textarea {
 
 .total-gastos strong {
     font-size: 1.5rem;
+}
+
+.total-gastos.total-inversiones {
+    background: linear-gradient(135deg, var(--morado-50), #fdf4ff);
+    border-color: var(--morado-200);
+    color: var(--morado-700);
 }
 
 .gastos-categorias {

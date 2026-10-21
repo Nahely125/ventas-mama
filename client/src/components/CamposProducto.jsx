@@ -313,20 +313,22 @@ export default function CamposProducto({ valores, onCambio, prefijo, etiquetaCom
                     </div>
 
                     <div className="campo">
-                        <label htmlFor={id("precioMinimoDocena")}>Precio mínimo por docena (S/)</label>
+                        <label htmlFor={id("precioMinimoUnidadDocena")}>Precio mínimo por unidad en la docena (S/)</label>
                         <input
                             type="number"
-                            id={id("precioMinimoDocena")}
-                            name="precioMinimoDocena"
+                            id={id("precioMinimoUnidadDocena")}
+                            name="precioMinimoUnidadDocena"
                             min="0"
                             step="0.01"
                             inputMode="decimal"
-                            placeholder="24.00"
-                            value={valores.precioMinimoDocena}
+                            placeholder="2.00"
+                            value={valores.precioMinimoUnidadDocena}
                             onChange={cambiar}
                             required
                         />
-                        <span className="ayuda-campo">Lo menos que un empleado puede cobrar por la docena completa.</span>
+                        <span className="ayuda-campo dato-calculado">
+                            Mínimo por docena: <strong>S/ {porDocena(valores.precioMinimoUnidadDocena) || "0.00"}</strong> (× 12). Un empleado no puede cobrar menos.
+                        </span>
                     </div>
                 </div>
 
