@@ -525,6 +525,7 @@ p {
     color: #26352d;
     font-weight: 600;
     text-align: right;
+    white-space: nowrap;
 }
 
 .detalles-producto small {

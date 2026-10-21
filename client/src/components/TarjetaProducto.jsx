@@ -3,6 +3,9 @@ import { urlFoto } from "../fotos.js";
 
 export default function TarjetaProducto({ producto, esJefe, retraso, onEditar, onEliminar, onIngresar }) {
     const precio = Number(producto.precio);
+    // Media docena: la mitad de la docena (igual que al vender), y su mínimo, la mitad del de la docena.
+    const mediaDocena = Number((Number(producto.precioDocena) / 2).toFixed(2));
+    const minimoMediaDocena = Number((Number(producto.precioMinimoDocena) / 2).toFixed(2));
     const stockBajo = producto.stock <= 5;
 
     let detallesJefe = null;
@@ -87,6 +90,18 @@ export default function TarjetaProducto({ producto, esJefe, retraso, onEditar, o
                 <div>
                     <dt>Precio mínimo por docena</dt>
                     <dd>{moneda(producto.precioMinimoDocena)}</dd>
+                </div>
+                <div>
+                    <dt>Precio por unidad en la media docena</dt>
+                    <dd>{moneda(mediaDocena / 6)}</dd>
+                </div>
+                <div>
+                    <dt>Precio por media docena</dt>
+                    <dd>{moneda(mediaDocena)}</dd>
+                </div>
+                <div>
+                    <dt>Precio mínimo por media docena</dt>
+                    <dd>{moneda(minimoMediaDocena)}</dd>
                 </div>
                 <div>
                     <dt>Stock disponible</dt>
