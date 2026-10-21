@@ -43,6 +43,15 @@ export function numeroComprobante(venta) {
     return String(venta.id).padStart(6, "0");
 }
 
+// Enlaces públicos (se abren sin iniciar sesión).
+export function enlaceCatalogo() {
+    return `${window.location.origin}/catalogo`;
+}
+
+export function enlaceBoleta(venta) {
+    return venta.token ? `${window.location.origin}/boleta/${venta.token}` : null;
+}
+
 export function textoComprobante(venta) {
     const porDocena = venta.modalidad === "docena";
 
@@ -57,6 +66,9 @@ export function textoComprobante(venta) {
         `Precio por ${porDocena ? "docena" : "unidad"}: ${moneda(precioCobrado(venta))}`,
         `*Total: ${moneda(venta.total)}*`,
         `Método de pago: ${nombreMetodoPago(venta.metodoPago)}`,
+        "",
+        ...(enlaceBoleta(venta) ? [`🧾 Ver boleta: ${enlaceBoleta(venta)}`] : []),
+        `🛍️ Catálogo: ${enlaceCatalogo()}`,
         "",
         "¡Gracias por su compra!"
     ].join("\n");

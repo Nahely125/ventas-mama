@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { moneda } from "../api.js";
+import Escaner from "./Escaner.jsx";
 
 const MAXIMO_RESULTADOS = 8;
 
@@ -28,6 +29,23 @@ export default function BuscadorProducto({ productos, seleccionado, onSelecciona
     const [texto, setTexto] = useState("");
     const [abierto, setAbierto] = useState(false);
     const [activo, setActivo] = useState(0);
+    const [escaneando, setEscaneando] = useState(false);
+
+    // Si el código escaneado coincide exacto con un producto, se elige directamente.
+    const codigoLeido = useCallback((codigo) => {
+        setEscaneando(false);
+        const exacto = (productos ?? []).find(
+            (producto) => (producto.codigo ?? "").toLowerCase() === codigo.toLowerCase()
+        );
+
+        if (exacto && exacto.stock > 0) {
+            onSeleccionar(exacto);
+            setTexto("");
+        } else {
+            setTexto(codigo);
+            setAbierto(true);
+        }
+    }, [productos, onSeleccionar]);
 
     const resultados = buscar(productos ?? [], texto);
 
@@ -79,6 +97,7 @@ export default function BuscadorProducto({ productos, seleccionado, onSelecciona
 
     return (
         <div className="buscador-producto">
+            <div className="campo-con-boton">
             <input
                 type="search"
                 id="buscar-producto-venta"
@@ -98,6 +117,20 @@ export default function BuscadorProducto({ productos, seleccionado, onSelecciona
                 onBlur={() => setAbierto(false)}
                 onKeyDown={teclado}
             />
+            <button
+                type="button"
+                className="boton-escanear"
+                onClick={() => setEscaneando(true)}
+                aria-label="Escanear código con la cámara"
+                title="Escanear código"
+            >
+                📷
+            </button>
+            </div>
+
+            {escaneando && (
+                <Escaner onLeido={codigoLeido} onCerrar={() => setEscaneando(false)} />
+            )}
 
             {abierto && (
                 <ul className="resultados-producto" id="resultados-producto" role="listbox">

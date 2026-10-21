@@ -1,4 +1,5 @@
 import { moneda } from "../api.js";
+import { urlFoto } from "../fotos.js";
 
 export default function TarjetaProducto({ producto, esJefe, retraso, onEditar, onEliminar }) {
     const precio = Number(producto.precio);
@@ -14,14 +15,6 @@ export default function TarjetaProducto({ producto, esJefe, retraso, onEditar, o
         detallesJefe = (
             <>
                 <dl className="detalles-producto detalles-jefe">
-                    <div>
-                        <dt>Precio mínimo por unidad</dt>
-                        <dd>{moneda(producto.precioMinimo)}</dd>
-                    </div>
-                    <div>
-                        <dt>Precio mínimo por docena</dt>
-                        <dd>{moneda(Number(producto.precioMinimo) * 12)}</dd>
-                    </div>
                     <div>
                         <dt>Costo por caja</dt>
                         <dd>{moneda(costoUnitario * unidadesPorCaja)}</dd>
@@ -57,6 +50,9 @@ export default function TarjetaProducto({ producto, esJefe, retraso, onEditar, o
 
     return (
         <article className="producto" style={{ animationDelay: `${retraso}ms` }}>
+            {urlFoto(producto) && (
+                <img className="foto-producto" src={urlFoto(producto)} alt={producto.nombre} loading="lazy" />
+            )}
             <span className={`codigo-producto ${producto.codigo ? "" : "sin-codigo"}`}>
                 {producto.codigo || "Sin código"}
             </span>
@@ -74,6 +70,14 @@ export default function TarjetaProducto({ producto, esJefe, retraso, onEditar, o
             </div>
 
             <dl className="detalles-producto">
+                <div>
+                    <dt>Precio mínimo por unidad</dt>
+                    <dd>{moneda(producto.precioMinimo)}</dd>
+                </div>
+                <div>
+                    <dt>Precio mínimo por docena</dt>
+                    <dd>{moneda(Number(producto.precioMinimo) * 12)}</dd>
+                </div>
                 <div>
                     <dt>Stock disponible</dt>
                     <dd className={stockBajo ? "stock-bajo" : undefined}>

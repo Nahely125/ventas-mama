@@ -24,7 +24,8 @@ if (enProduccion) {
     app.set("trust proxy", 1);
 }
 
-app.use(express.json());
+// 3 MB: alcanza para la foto de un producto ya reducida por el navegador.
+app.use(express.json({ limit: "3mb" }));
 
 // Revisión de estado para el hosting: responde 200 si el servidor y la base de datos funcionan.
 // Va antes de las sesiones para no crear ni leer sesiones en cada revisión.
@@ -173,6 +174,7 @@ app.post("/api/logout", (req, res) => {
 
 /* API */
 
+app.use("/api/publico", require("./rutas/publico"));
 app.use("/api/productos", require("./rutas/productos").router);
 app.use("/api/ventas", require("./rutas/ventas"));
 app.use("/api/resumen", require("./rutas/resumen"));
@@ -200,7 +202,8 @@ app.get("/imagenes/:archivo", requiereSesion, (req, res) => {
 
 app.use(express.static(carpetaFrontend, { index: false }));
 
-app.get("/", (req, res) => {
+// Páginas de la app React: el panel, el catálogo público y las boletas.
+app.get(["/", "/catalogo", "/boleta/:token"], (req, res) => {
     res.sendFile(path.join(carpetaFrontend, "index.html"));
 });
 

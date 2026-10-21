@@ -19,6 +19,16 @@ const MIGRACIONES = `
     ALTER TABLE ventas
         ADD COLUMN IF NOT EXISTS modalidad VARCHAR(10) NOT NULL DEFAULT 'unidad';
 
+    -- Foto del producto (se guarda comprimida en la base de datos).
+    ALTER TABLE productos ADD COLUMN IF NOT EXISTS foto BYTEA;
+    ALTER TABLE productos ADD COLUMN IF NOT EXISTS foto_tipo VARCHAR(30);
+    ALTER TABLE productos ADD COLUMN IF NOT EXISTS foto_actualizada TIMESTAMP;
+
+    -- Clave aleatoria para el enlace público de cada boleta (no se puede adivinar).
+    ALTER TABLE ventas
+        ADD COLUMN IF NOT EXISTS token UUID NOT NULL DEFAULT gen_random_uuid();
+    CREATE UNIQUE INDEX IF NOT EXISTS ventas_token_unico ON ventas (token);
+
     -- Acelera los filtros del historial por día y mes.
     CREATE INDEX IF NOT EXISTS ventas_fecha_idx ON ventas (fecha);
 

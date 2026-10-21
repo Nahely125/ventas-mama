@@ -37,7 +37,8 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
 
     const lista = precioDeLista(productoActual, modalidad);
     const precioAjustado = productoActual && precio !== "" && Number(precio).toFixed(2) !== lista;
-    const minimo = esJefe && productoActual
+    // El mínimo se muestra a todos (jefe y empleados).
+    const minimo = productoActual
         ? Number(productoActual.precioMinimo) * unidadesPorPaquete
         : null;
     const bajoMinimo = minimo !== null && precioValido > 0 && Math.round(precioValido * 100) < Math.round(minimo * 100);

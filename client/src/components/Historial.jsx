@@ -95,7 +95,7 @@ export default function Historial({ esJefe, ventas, error }) {
                     <span aria-hidden="true">📅</span> {periodo}
                 </p>
 
-                <div className={`totales-historial ${esJefe ? "con-ganancia" : ""}`}>
+                <div className={`totales-historial ${esJefe ? "con-ganancia" : "solo-conteo"}`}>
                     <div className="total-historial">
                         <span>Ventas</span>
                         <strong>{lista.length}</strong>
@@ -104,10 +104,13 @@ export default function Historial({ esJefe, ventas, error }) {
                         <span>Unidades vendidas</span>
                         <strong>{unidades}</strong>
                     </div>
-                    <div className="total-historial">
-                        <span>Total vendido</span>
-                        <strong>{moneda(totalVendido)}</strong>
-                    </div>
+                    {/* Los totales de dinero solo los ve el jefe. */}
+                    {esJefe && (
+                        <div className="total-historial">
+                            <span>Total vendido</span>
+                            <strong>{moneda(totalVendido)}</strong>
+                        </div>
+                    )}
                     {esJefe && (
                         <div className="total-historial total-ganancia">
                             <span>Ganancia</span>
@@ -116,7 +119,7 @@ export default function Historial({ esJefe, ventas, error }) {
                     )}
                 </div>
 
-                {porMetodo.length > 0 && (
+                {esJefe && porMetodo.length > 0 && (
                     <ul className="totales-metodo" aria-label="Total por método de pago">
                         {porMetodo.map((metodo) => (
                             <li key={metodo.valor}>

@@ -33,7 +33,12 @@ export default function Encabezado({ usuario, menuAbierto, onAbrirMenu, onSalir 
 
                 <div className="marca">
                     <h1>Ventas Mamá</h1>
-                    <p>Control de ventas e inventario</p>
+                    <p>
+                        Control de ventas e inventario ·{" "}
+                        <a className="enlace-catalogo" href="/catalogo" target="_blank" rel="noopener">
+                            🛍️ Ver catálogo
+                        </a>
+                    </p>
                 </div>
 
                 <div className="sesion-usuario">

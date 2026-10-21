@@ -73,6 +73,11 @@ export default function Cajonera({ usuario, vistas, vistaActual, abierta, onEleg
                         </li>
                     ))}
                 </ul>
+
+                <a className="boton-cajonera enlace-catalogo-cajonera" href="/catalogo" target="_blank" rel="noopener">
+                    <span className="icono-cajonera" aria-hidden="true">🛍️</span>
+                    Ver catálogo ↗
+                </a>
             </nav>
         </>
     );

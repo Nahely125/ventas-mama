@@ -12,6 +12,7 @@ async function consultarVentas(esJefe, ventaId = null) {
     const resultado = await pool.query(
         `SELECT
             ventas.id,
+            ventas.token,
             TO_CHAR(ventas.fecha, 'YYYY-MM-DD"T"HH24:MI:SS') AS fecha,
             productos.nombre AS producto,
             productos.codigo,
@@ -97,12 +98,8 @@ router.post("/", requiereSesion, async (req, res) => {
         if (Math.round(precioVenta * 100) < Math.round(minimo * 100)) {
             await client.query("ROLLBACK");
 
-            const esJefe = req.session.usuario.rol === "jefe";
-
             return res.status(400).json({
-                error: esJefe
-                    ? `El precio no puede ser menor que el mínimo (S/ ${minimo.toFixed(2)} por ${modalidad}).`
-                    : "El precio está por debajo del mínimo permitido. Consulta con el jefe."
+                error: `El precio no puede ser menor que el mínimo (S/ ${minimo.toFixed(2)} por ${modalidad}).`
             });
         }
 

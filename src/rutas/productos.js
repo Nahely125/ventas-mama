@@ -6,19 +6,22 @@ const router = express.Router();
 
 const STOCK_BAJO = 5;
 
-// Columnas visibles para todos y columnas exclusivas del jefe.
+// Columnas visibles para todos (el precio mínimo también lo ven los empleados)
+// y columnas exclusivas del jefe (costos).
 const COLUMNAS_COMUNES = `
     id,
     codigo,
     nombre,
     precio,
+    precio_minimo AS "precioMinimo",
     precio_docena AS "precioDocena",
-    stock
+    stock,
+    (foto IS NOT NULL) AS "tieneFoto",
+    COALESCE(EXTRACT(EPOCH FROM foto_actualizada)::BIGINT, 0)::INT AS "fotoVersion"
 `;
 
 const COLUMNAS_JEFE = `
     ${COLUMNAS_COMUNES},
-    precio_minimo AS "precioMinimo",
     precio_compra AS "precioCompra",
     unidades_por_caja AS "unidadesPorCaja"
 `;
@@ -317,6 +320,101 @@ router.delete("/:id", requiereJefe, async (req, res) => {
 
         console.error("Error al eliminar el producto:", error.message);
         res.status(500).json({ error: "Error al eliminar el producto" });
+    }
+});
+
+/* Fotos de productos.
+   El navegador reduce la imagen antes de enviarla (JPEG o WEBP, ~600 px). */
+
+const TIPOS_FOTO = ["image/jpeg", "image/png", "image/webp"];
+const TAMANO_MAXIMO_FOTO = 1.5 * 1024 * 1024;
+
+// Pública: la usan el inventario y el catálogo.
+router.get("/:id/foto", async (req, res) => {
+    const id = leerId(req);
+
+    if (!id) {
+        return res.status(404).end();
+    }
+
+    try {
+        const resultado = await pool.query(
+            `SELECT foto, foto_tipo FROM productos WHERE id = $1 AND foto IS NOT NULL`,
+            [id]
+        );
+
+        const fila = resultado.rows[0];
+
+        if (!fila) {
+            return res.status(404).end();
+        }
+
+        // La URL lleva ?v=<versión>, así que se puede guardar en caché mucho tiempo.
+        res.set("Cache-Control", "public, max-age=31536000, immutable");
+        res.type(fila.foto_tipo).send(fila.foto);
+    } catch (error) {
+        console.error("Error al enviar la foto:", error.message);
+        res.status(500).end();
+    }
+});
+
+router.put("/:id/foto", requiereJefe, async (req, res) => {
+    const id = leerId(req);
+    const coincidencia = /^data:(image\/[a-z]+);base64,([A-Za-z0-9+/=]+)$/.exec(req.body?.foto ?? "");
+
+    if (!id) {
+        return res.status(400).json({ error: "ID de producto inválido" });
+    }
+
+    if (!coincidencia || !TIPOS_FOTO.includes(coincidencia[1])) {
+        return res.status(400).json({ error: "La foto debe ser JPG, PNG o WEBP." });
+    }
+
+    const foto = Buffer.from(coincidencia[2], "base64");
+
+    if (foto.length > TAMANO_MAXIMO_FOTO) {
+        return res.status(400).json({ error: "La foto es demasiado grande." });
+    }
+
+    try {
+        const resultado = await pool.query(
+            `UPDATE productos
+             SET foto = $1, foto_tipo = $2, foto_actualizada = CURRENT_TIMESTAMP
+             WHERE id = $3
+             RETURNING id`,
+            [foto, coincidencia[1], id]
+        );
+
+        if (resultado.rows.length === 0) {
+            return res.status(404).json({ error: "Producto no encontrado" });
+        }
+
+        res.json({ mensaje: "Foto guardada correctamente." });
+    } catch (error) {
+        console.error("Error al guardar la foto:", error.message);
+        res.status(500).json({ error: "No se pudo guardar la foto." });
+    }
+});
+
+router.delete("/:id/foto", requiereJefe, async (req, res) => {
+    const id = leerId(req);
+
+    if (!id) {
+        return res.status(400).json({ error: "ID de producto inválido" });
+    }
+
+    try {
+        await pool.query(
+            `UPDATE productos
+             SET foto = NULL, foto_tipo = NULL, foto_actualizada = CURRENT_TIMESTAMP
+             WHERE id = $1`,
+            [id]
+        );
+
+        res.json({ mensaje: "Foto eliminada." });
+    } catch (error) {
+        console.error("Error al eliminar la foto:", error.message);
+        res.status(500).json({ error: "No se pudo eliminar la foto." });
     }
 });
 

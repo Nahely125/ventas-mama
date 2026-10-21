@@ -1,6 +1,7 @@
 import { moneda } from "./api.js";
 import {
     describirCantidad,
+    enlaceCatalogo,
     formatearFecha,
     nombreMetodoPago,
     numeroComprobante,
@@ -90,7 +91,7 @@ export async function generarImagenComprobante(venta) {
     const lineasProducto = partirTexto(ctx, venta.producto, ANCHO - MARGEN * 2 - 40);
     const altoProducto = 30 + lineasProducto.length * 28 + (venta.codigo ? 24 : 0) + 10;
 
-    const alto = 170 + 90 + altoProducto + 150 + 120 + 90;
+    const alto = 170 + 90 + altoProducto + 150 + 120 + 90 + 64;
 
     lienzo.width = ANCHO * ESCALA;
     lienzo.height = alto * ESCALA;
@@ -124,7 +125,7 @@ export async function generarImagenComprobante(venta) {
     ctx.font = `700 38px ${SERIF}`;
     ctx.fillText("Ventas Mamá", ANCHO / 2, 85);
     ctx.font = `500 17px ${SANS}`;
-    ctx.fillText(`Comprobante de venta N° ${numeroComprobante(venta)}`, ANCHO / 2, 120);
+    ctx.fillText(`Boleta de venta N° ${numeroComprobante(venta)}`, ANCHO / 2, 120);
     ctx.textAlign = "left";
 
     let y = 195;
@@ -183,6 +184,15 @@ export async function generarImagenComprobante(venta) {
     ctx.fillStyle = COLORES.suave;
     ctx.font = `600 18px ${SANS}`;
     ctx.fillText("¡Gracias por su compra! 💜", ANCHO / 2, y);
+
+    // Enlace al catálogo para que el cliente vea más productos.
+    y += 40;
+    ctx.fillStyle = COLORES.morado;
+    ctx.font = `700 16px ${SANS}`;
+    ctx.fillText("🛍️ Mira nuestro catálogo:", ANCHO / 2, y);
+    y += 24;
+    ctx.font = `600 15px ${SANS}`;
+    ctx.fillText(enlaceCatalogo().replace(/^https?:\/\//, ""), ANCHO / 2, y);
     ctx.textAlign = "left";
 
     const blob = await new Promise((resolver, rechazar) =>

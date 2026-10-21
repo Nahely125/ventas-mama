@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { pedir } from "../api.js";
 import { textoCostoUnitario, validarProducto } from "../producto.js";
 import CamposProducto from "./CamposProducto.jsx";
+import { guardarFoto, urlFoto } from "../fotos.js";
 
 export default function ModalEditarProducto({ producto, onCerrar, onGuardado, onError }) {
     const dialogo = useRef(null);
@@ -18,7 +19,9 @@ export default function ModalEditarProducto({ producto, onCerrar, onGuardado, on
         precioMinimo: String(producto.precioMinimo ?? ""),
         precioCompra: (Number(producto.precioCompra) * unidades).toFixed(2),
         unidadesPorCaja: String(unidades),
-        stock: String(producto.stock)
+        stock: String(producto.stock),
+        foto: undefined,
+        fotoActual: urlFoto(producto)
     });
     const [error, setError] = useState("");
     const [guardando, setGuardando] = useState(false);
@@ -44,6 +47,7 @@ export default function ModalEditarProducto({ producto, onCerrar, onGuardado, on
                 method: "PUT",
                 cuerpo: resultado.datos
             });
+            await guardarFoto(producto.id, valores.foto);
             await onGuardado();
         } catch (err) {
             onError(err, () => setError(err.message));

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { pedir } from "../api.js";
 import { textoCostoUnitario, validarProducto } from "../producto.js";
 import CamposProducto from "./CamposProducto.jsx";
+import { guardarFoto } from "../fotos.js";
 
 const VALORES_INICIALES = {
     codigo: "",
@@ -12,7 +13,8 @@ const VALORES_INICIALES = {
     precioMinimo: "",
     precioCompra: "",
     unidadesPorCaja: "1",
-    stock: ""
+    stock: "",
+    foto: undefined
 };
 
 export default function FormularioProducto({ onCreado, onError }) {
@@ -33,8 +35,18 @@ export default function FormularioProducto({ onCreado, onError }) {
         setEnviando(true);
 
         try {
-            await pedir("/api/productos", { method: "POST", cuerpo: datos });
-            setMensaje({ tipo: "exito", texto: "¡Producto registrado correctamente!" });
+            const resultado = await pedir("/api/productos", { method: "POST", cuerpo: datos });
+
+            try {
+                await guardarFoto(resultado.producto.id, valores.foto ?? undefined);
+                setMensaje({ tipo: "exito", texto: "¡Producto registrado correctamente!" });
+            } catch (errorFoto) {
+                setMensaje({
+                    tipo: "error",
+                    texto: `El producto se registró, pero la foto no se pudo guardar: ${errorFoto.message}`
+                });
+            }
+
             setValores(VALORES_INICIALES);
             await onCreado();
         } catch (err) {

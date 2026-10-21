@@ -1,8 +1,20 @@
+import { useCallback, useState } from "react";
 import { porDocena } from "../producto.js";
+import CampoFoto from "./CampoFoto.jsx";
+import Escaner from "./Escaner.jsx";
 
 /* Campos compartidos por el formulario de registro y el modal de edición.
-   valores.docenaAuto: mientras sea true, el precio por docena sigue al precio mínimo × 12. */
+   valores.docenaAuto: mientras sea true, el precio por docena sigue al precio mínimo × 12.
+   valores.foto: data URL nueva, null para quitarla, undefined para dejarla igual.
+   valores.fotoActual: URL de la foto ya guardada (solo al editar). */
 export default function CamposProducto({ valores, onCambio, prefijo, etiquetaCompra }) {
+    const [escaneando, setEscaneando] = useState(false);
+
+    const codigoLeido = useCallback((codigo) => {
+        setEscaneando(false);
+        onCambio((anteriores) => ({ ...anteriores, codigo }));
+    }, [onCambio]);
+
     function cambiar(evento) {
         const { name, value } = evento.target;
 
@@ -37,19 +49,30 @@ export default function CamposProducto({ valores, onCambio, prefijo, etiquetaCom
             <div className="fila-campos fila-codigo">
                 <div className="campo">
                     <label htmlFor={id("codigo")}>Código del producto</label>
-                    <input
-                        type="text"
-                        id={id("codigo")}
-                        name="codigo"
-                        placeholder="Ej. CIN-001"
-                        maxLength={50}
-                        autoCapitalize="characters"
-                        autoComplete="off"
-                        spellCheck={false}
-                        value={valores.codigo}
-                        onChange={cambiar}
-                        required
-                    />
+                    <div className="campo-con-boton">
+                        <input
+                            type="text"
+                            id={id("codigo")}
+                            name="codigo"
+                            placeholder="Escanéalo o escríbelo"
+                            maxLength={50}
+                            autoCapitalize="characters"
+                            autoComplete="off"
+                            spellCheck={false}
+                            value={valores.codigo}
+                            onChange={cambiar}
+                            required
+                        />
+                        <button
+                            type="button"
+                            className="boton-escanear"
+                            onClick={() => setEscaneando(true)}
+                            aria-label="Escanear código con la cámara"
+                            title="Escanear código"
+                        >
+                            📷
+                        </button>
+                    </div>
                 </div>
 
                 <div className="campo">
@@ -182,6 +205,17 @@ export default function CamposProducto({ valores, onCambio, prefijo, etiquetaCom
                     </div>
                 </div>
             </fieldset>
+
+            <CampoFoto
+                id={id("foto")}
+                foto={valores.foto}
+                fotoActual={valores.fotoActual}
+                onCambio={(foto) => onCambio((anteriores) => ({ ...anteriores, foto }))}
+            />
+
+            {escaneando && (
+                <Escaner onLeido={codigoLeido} onCerrar={() => setEscaneando(false)} />
+            )}
         </>
     );
 }

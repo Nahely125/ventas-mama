@@ -45,6 +45,9 @@ CREATE TABLE IF NOT EXISTS productos (
     precio_compra      NUMERIC(10,2) CHECK (precio_compra >= 0),            -- costo por unidad
     unidades_por_caja  INTEGER       NOT NULL DEFAULT 1 CHECK (unidades_por_caja >= 1),
     stock              INTEGER       NOT NULL CHECK (stock >= 0),           -- siempre en unidades
+    foto               BYTEA,                                               -- foto reducida (JPEG)
+    foto_tipo          VARCHAR(30),
+    foto_actualizada   TIMESTAMP,
     CHECK (precio >= precio_minimo)
 );
 
@@ -70,11 +73,13 @@ CREATE TABLE IF NOT EXISTS ventas (
     costo_unitario   NUMERIC(10,2),
     total            NUMERIC(10,2) NOT NULL CHECK (total >= 0),
     metodo_pago      VARCHAR(20)   NOT NULL DEFAULT 'efectivo',         -- efectivo, yape, plin, transferencia
+    token            UUID          NOT NULL DEFAULT gen_random_uuid(),  -- enlace público de la boleta
     comprobante_url  TEXT,                                              -- en desuso (antigua foto del comprobante)
     fecha            TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP   -- hora de Lima
 );
 
 CREATE INDEX IF NOT EXISTS ventas_fecha_idx ON ventas (fecha);
+CREATE UNIQUE INDEX IF NOT EXISTS ventas_token_unico ON ventas (token);
 
 -- ---------------------------------------------------------------------
 -- gastos: gastos del negocio (transporte, alquiler, etc.).
