@@ -1,0 +1,21 @@
+
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "commonjs",
+    "strict": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "rootDir": "./practica",
+    "outDir": "./practica/compilado",
+    "noEmitOnError": true
+  },
+  "include": [
+    "practica/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "practica/compilado"
+  ]
+}
