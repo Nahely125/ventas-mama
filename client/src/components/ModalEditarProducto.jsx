@@ -13,16 +13,15 @@ export default function ModalEditarProducto({ producto, onCerrar, onGuardado, on
         codigo: producto.codigo ?? "",
         nombre: producto.nombre,
         precio: String(producto.precio),
-        precioDocena: String(producto.precioDocena ?? ""),
-        // Los precios por docena se recalculan solos si coinciden con unidad × 12.
-        docenaAuto: Number(producto.precioDocena).toFixed(2) === (Number(producto.precio) * 12).toFixed(2),
+        // El mínimo por docena se recalcula solo si coincide con mínimo × 12.
         precioMinimoDocena: String(producto.precioMinimoDocena ?? ""),
         minimoDocenaAuto: Number(producto.precioMinimoDocena).toFixed(2) === (Number(producto.precioMinimo) * 12).toFixed(2),
         stock2025: String(producto.stock2025 ?? 0),
         precioMinimo: String(producto.precioMinimo ?? ""),
         precioCompra: (Number(producto.precioCompra) * unidades).toFixed(2),
         unidadesPorCaja: String(unidades),
-        stock: String(producto.stock),
+        // Stock nuevo = total − sobrante del 2025.
+        stockNuevo: String(producto.stock - (producto.stock2025 ?? 0)),
         seccionId: producto.seccionId ? String(producto.seccionId) : "",
         categoriaId: producto.categoriaId ? String(producto.categoriaId) : "",
         // Al editar no se cambia la ubicación sola: ya fue elegida.

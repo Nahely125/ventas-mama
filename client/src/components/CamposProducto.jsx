@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { calcularGanancias, porDocena, textoCostoUnitario } from "../producto.js";
+import { calcularGanancias, porDocena, stockTotal, textoCostoUnitario } from "../producto.js";
 import { moneda } from "../api.js";
 import CampoFoto from "./CampoFoto.jsx";
 import Escaner from "./Escaner.jsx";
@@ -54,7 +54,9 @@ function valorUbicacion(valores) {
 }
 
 /* Campos compartidos por el formulario de registro y el modal de edición.
-   valores.docenaAuto / minimoDocenaAuto: mientras sean true, los precios por docena siguen al de unidad × 12.
+   valores.minimoDocenaAuto: mientras sea true, el mínimo por docena sigue al mínimo por unidad × 12.
+   El precio por docena no se escribe: es precio por unidad × 12.
+   valores.stockNuevo + valores.stock2025 = stock total.
    valores.foto: data URL nueva, null para quitarla, undefined para dejarla igual.
    valores.fotoActual: URL de la foto ya guardada (solo al editar). */
 export default function CamposProducto({ valores, onCambio, prefijo, etiquetaCompra }) {
@@ -91,16 +93,8 @@ export default function CamposProducto({ valores, onCambio, prefijo, etiquetaCom
             }
 
             // Los precios por docena se calculan solos (× 12) hasta que se escriban a mano.
-            if (name === "precioDocena") {
-                nuevos.docenaAuto = false;
-            }
-
             if (name === "precioMinimoDocena") {
                 nuevos.minimoDocenaAuto = false;
-            }
-
-            if (name === "precio" && anteriores.docenaAuto) {
-                nuevos.precioDocena = porDocena(value);
             }
 
             if (name === "precioMinimo" && anteriores.minimoDocenaAuto) {
@@ -247,24 +241,32 @@ export default function CamposProducto({ valores, onCambio, prefijo, etiquetaCom
                     </div>
 
                     <div className="campo">
-                        <label htmlFor={id("stock")}>Stock (unidades)</label>
+                        <label htmlFor={id("stockNuevo")}>Stock nuevo (comprado este año)</label>
                         <input
                             type="number"
-                            id={id("stock")}
-                            name="stock"
+                            id={id("stockNuevo")}
+                            name="stockNuevo"
                             min="0"
                             step="1"
                             inputMode="numeric"
                             placeholder="24"
-                            value={valores.stock}
+                            value={valores.stockNuevo}
                             onChange={cambiar}
                             required
                         />
                     </div>
                 </div>
 
+                <p className="costo-calculado">
+                    {textoCostoUnitario(valores.precioCompra, valores.unidadesPorCaja)}
+                </p>
+            </fieldset>
+
+            <fieldset className="grupo-campos grupo-sobrante">
+                <legend>📦 Mercadería sobrante del año pasado</legend>
+
                 <div className="campo">
-                    <label htmlFor={id("stock2025")}>De ese stock, ¿cuántas unidades son del 2025?</label>
+                    <label htmlFor={id("stock2025")}>Unidades sobrantes del 2025</label>
                     <input
                         type="number"
                         id={id("stock2025")}
@@ -277,23 +279,32 @@ export default function CamposProducto({ valores, onCambio, prefijo, etiquetaCom
                         onChange={cambiar}
                     />
                     <span className="ayuda-campo">
-                        Mercadería del año pasado (ya pagada): al venderla, todo lo cobrado es ganancia neta y no
-                        cuenta para recuperar la inversión de este año. Déjalo en 0 si todo es nuevo.
+                        Ya se pagó el año pasado: al venderla, todo lo cobrado es <strong>ganancia neta</strong> y no
+                        cuenta para recuperar la inversión de este año. Se vende primero. Déjalo en 0 si no hay sobrante.
                     </span>
                 </div>
 
-                <p className="costo-calculado">
-                    {textoCostoUnitario(valores.precioCompra, valores.unidadesPorCaja)}
+                <p className="resumen-stock">
+                    Stock total: <strong>{stockTotal(valores)} unidades</strong>
+                    {Number(valores.stock2025) > 0 && (
+                        <> ({Number(valores.stockNuevo) || 0} nuevas + {Number(valores.stock2025)} sobrantes)</>
+                    )}
+                    {Number(valores.stock2025) > 0 && Number(valores.precio) > 0 && (
+                        <>
+                            <br />
+                            Lo sobrante deja hasta <strong>{moneda(Number(valores.stock2025) * Number(valores.precio))}</strong> de
+                            ganancia neta al precio por unidad.
+                        </>
+                    )}
                 </p>
             </fieldset>
 
             <fieldset className="grupo-campos">
                 <legend>Precios de venta</legend>
 
-                <div className="fila-campos fila-dos tabla-precios">
+                <div className="fila-campos tabla-precios">
                     {[
                         { campo: "precio", etiqueta: "Precio por unidad (S/)", ejemplo: "3.00" },
-                        { campo: "precioDocena", etiqueta: "Precio por docena (S/)", ejemplo: "36.00", base: "precio", bandera: "docenaAuto", texto: "precio por unidad" },
                         { campo: "precioMinimo", etiqueta: "Precio mínimo por unidad (S/)", ejemplo: "2.50" },
                         { campo: "precioMinimoDocena", etiqueta: "Precio mínimo por docena (S/)", ejemplo: "30.00", base: "precioMinimo", bandera: "minimoDocenaAuto", texto: "mínimo por unidad" }
                     ].map((precio) => (
@@ -329,6 +340,11 @@ export default function CamposProducto({ valores, onCambio, prefijo, etiquetaCom
                         </div>
                     ))}
                 </div>
+
+                <p className="costo-calculado">
+                    Precio por docena: <strong>S/ {porDocena(valores.precio) || "0.00"}</strong>
+                    <small> (calculado: precio por unidad × 12)</small>
+                </p>
 
                 <ResumenGanancia ganancias={calcularGanancias(valores)} stock2025={Number(valores.stock2025 || 0)} />
             </fieldset>

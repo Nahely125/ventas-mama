@@ -1837,6 +1837,26 @@ input[aria-invalid="true"] {
     color: #047857;
 }
 
+.grupo-sobrante {
+    background: #fffbeb;
+    border-color: #fde68a;
+}
+
+.grupo-sobrante legend {
+    color: #b45309;
+}
+
+.resumen-stock {
+    padding: 10px 12px;
+    background: #ffffff;
+    border-radius: 10px;
+    font-size: 0.875rem;
+}
+
+.resumen-stock strong {
+    color: var(--texto);
+}
+
 .dato-2025 dt,
 .dato-2025 dd {
     color: #b45309 !important;
