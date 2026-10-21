@@ -13,7 +13,7 @@ export default function HistorialVentas({ ventas, error, esJefe, textoVacio, onV
     }
     const boletaDe = (venta) => numeros.get(venta.grupo) ?? venta.id;
 
-    const columnas = esJefe ? 10 : 8;
+    const columnas = esJefe ? 11 : 8;
 
     let filas;
 
@@ -41,7 +41,13 @@ export default function HistorialVentas({ ventas, error, esJefe, textoVacio, onV
                 {esJefe && (
                     <>
                         <td data-etiqueta="Costo por unidad">{monedaOpcional(venta.costoUnitario)}</td>
-                        <td data-etiqueta="Ganancia">{monedaOpcional(venta.ganancia)}</td>
+                        {/* Ganancia de este año y, aparte, la de la mercadería 2025. */}
+                        <td data-etiqueta="Ganancia">
+                            {venta.ganancia == null ? "No disponible" : moneda(Number(venta.ganancia) - Number(venta.ganancia2025 ?? 0))}
+                        </td>
+                        <td data-etiqueta="Ganancia 2025" className={Number(venta.ganancia2025) > 0 ? "celda-2025" : "celda-vacia-2025"}>
+                            {Number(venta.ganancia2025) > 0 ? moneda(venta.ganancia2025) : "—"}
+                        </td>
                     </>
                 )}
                 <td className="celda-accion">
@@ -79,6 +85,7 @@ export default function HistorialVentas({ ventas, error, esJefe, textoVacio, onV
                                 <>
                                     <th>Costo unit.</th>
                                     <th>Ganancia</th>
+                                    <th>Gan. 2025</th>
                                 </>
                             )}
                             <th><span className="solo-lector">Acciones</span></th>

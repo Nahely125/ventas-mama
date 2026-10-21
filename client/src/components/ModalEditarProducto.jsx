@@ -13,15 +13,12 @@ export default function ModalEditarProducto({ producto, onCerrar, onGuardado, on
         codigo: producto.codigo ?? "",
         nombre: producto.nombre,
         precio: String(producto.precio),
-        // El mínimo por docena se recalcula solo si coincide con mínimo × 12.
-        precioMinimoDocena: String(producto.precioMinimoDocena ?? ""),
-        minimoDocenaAuto: Number(producto.precioMinimoDocena).toFixed(2) === (Number(producto.precioMinimo) * 12).toFixed(2),
-        stock2025: String(producto.stock2025 ?? 0),
+        // Casilla marcada si el producto tiene mercadería del 2025.
+        es2025: (producto.stock2025 ?? 0) > 0,
         precioMinimo: String(producto.precioMinimo ?? ""),
         precioCompra: (Number(producto.precioCompra) * unidades).toFixed(2),
         unidadesPorCaja: String(unidades),
-        // Stock nuevo = total − sobrante del 2025.
-        stockNuevo: String(producto.stock - (producto.stock2025 ?? 0)),
+        stock: String(producto.stock),
         seccionId: producto.seccionId ? String(producto.seccionId) : "",
         categoriaId: producto.categoriaId ? String(producto.categoriaId) : "",
         // Al editar no se cambia la ubicación sola: ya fue elegida.

@@ -1837,6 +1837,85 @@ input[aria-invalid="true"] {
     color: #047857;
 }
 
+.casilla-2025 {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 14px;
+    background: #ffffff;
+    border: 2px dashed #fcd34d;
+    border-radius: 12px;
+    cursor: pointer;
+}
+
+.casilla-2025.marcada {
+    background: #fffbeb;
+    border-style: solid;
+    border-color: #f59e0b;
+}
+
+.casilla-2025 input {
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    margin-top: 2px;
+    accent-color: #d97706;
+}
+
+.casilla-2025 span {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.casilla-2025 strong {
+    color: #92400e;
+}
+
+.casilla-2025 small {
+    color: var(--texto-suave);
+    font-size: 0.8rem;
+    line-height: 1.45;
+}
+
+.casilla-2025 small strong {
+    color: #b45309;
+}
+
+.campo-calculado {
+    background: var(--morado-100) !important;
+    border-style: dashed !important;
+    color: var(--morado-900) !important;
+    font-weight: 700;
+    cursor: default;
+}
+
+.total-ganancia-2025 {
+    background: #fffbeb;
+    border-color: #fde68a;
+}
+
+.total-ganancia-2025 strong {
+    color: #b45309;
+}
+
+.celda-2025 {
+    color: #b45309 !important;
+    font-weight: 600;
+}
+
+@media (max-width: 767px) {
+    .tabla-ventas .celda-vacia-2025 {
+        display: none;
+    }
+}
+
+@media (min-width: 600px) {
+    .totales-historial.con-ganancia {
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)) !important;
+    }
+}
+
 .grupo-sobrante {
     background: #fffbeb;
     border-color: #fde68a;

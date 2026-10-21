@@ -32,7 +32,9 @@ export default function Historial({ esJefe, ventas, error }) {
     const lista = filtradas ?? [];
     const totalVendido = lista.reduce((suma, v) => suma + Number(v.total), 0);
     const unidades = lista.reduce((suma, v) => suma + v.cantidad, 0);
+    // ganancia incluye la del 2025; se muestran por separado.
     const ganancia = lista.reduce((suma, v) => suma + Number(v.ganancia ?? 0), 0);
+    const ganancia2025 = lista.reduce((suma, v) => suma + Number(v.ganancia2025 ?? 0), 0);
     const porMetodo = METODOS_PAGO
         .map((metodo) => ({
             ...metodo,
@@ -114,7 +116,13 @@ export default function Historial({ esJefe, ventas, error }) {
                     {esJefe && (
                         <div className="total-historial total-ganancia">
                             <span>Ganancia</span>
-                            <strong>{moneda(ganancia)}</strong>
+                            <strong>{moneda(ganancia - ganancia2025)}</strong>
+                        </div>
+                    )}
+                    {esJefe && (
+                        <div className="total-historial total-ganancia-2025">
+                            <span>📦 Ganancia 2025</span>
+                            <strong>{moneda(ganancia2025)}</strong>
                         </div>
                     )}
                 </div>

@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { calcularGanancias, porDocena, stockTotal, textoCostoUnitario } from "../producto.js";
+import { calcularGanancias, porDocena, textoCostoUnitario } from "../producto.js";
 import { moneda } from "../api.js";
 import CampoFoto from "./CampoFoto.jsx";
 import Escaner from "./Escaner.jsx";
@@ -7,7 +7,7 @@ import { iconoTema, useSecciones } from "../secciones.js";
 import { sugerirCategoria } from "../categoriasAuto.js";
 
 // Ganancia que deja cada precio (se actualiza mientras se escribe).
-function ResumenGanancia({ ganancias, stock2025 }) {
+function ResumenGanancia({ ganancias, es2025 }) {
     if (!ganancias) {
         return <p className="ayuda-campo">Escribe el costo de compra para ver la ganancia de cada precio.</p>;
     }
@@ -36,7 +36,7 @@ function ResumenGanancia({ ganancias, stock2025 }) {
             {ganancias.todoElStock !== null && (
                 <p className="ganancia-total-stock">
                     Si vendes todo el stock por unidad: <strong>{moneda(ganancias.todoElStock)}</strong>
-                    {stock2025 > 0 && <small> (las {stock2025} u. del 2025 no restan costo)</small>}
+                    {es2025 && <small> (mercadería 2025: todo es ganancia del inventario 2025)</small>}
                 </p>
             )}
             {filas.some((f) => f.valor !== null && f.valor < 0) && (
@@ -54,9 +54,8 @@ function valorUbicacion(valores) {
 }
 
 /* Campos compartidos por el formulario de registro y el modal de edición.
-   valores.minimoDocenaAuto: mientras sea true, el mínimo por docena sigue al mínimo por unidad × 12.
-   El precio por docena no se escribe: es precio por unidad × 12.
-   valores.stockNuevo + valores.stock2025 = stock total.
+   Los precios por docena no se escriben: docena = precio × 12 y mínimo por docena = mínimo × 12.
+   valores.es2025: casilla de mercadería sobrante del año pasado (todo su stock cuenta como 2025).
    valores.foto: data URL nueva, null para quitarla, undefined para dejarla igual.
    valores.fotoActual: URL de la foto ya guardada (solo al editar). */
 export default function CamposProducto({ valores, onCambio, prefijo, etiquetaCompra }) {
@@ -93,24 +92,8 @@ export default function CamposProducto({ valores, onCambio, prefijo, etiquetaCom
             }
 
             // Los precios por docena se calculan solos (× 12) hasta que se escriban a mano.
-            if (name === "precioMinimoDocena") {
-                nuevos.minimoDocenaAuto = false;
-            }
-
-            if (name === "precioMinimo" && anteriores.minimoDocenaAuto) {
-                nuevos.precioMinimoDocena = porDocena(value);
-            }
-
             return nuevos;
         });
-    }
-
-    function recalcular(campo, base, bandera) {
-        onCambio((anteriores) => ({
-            ...anteriores,
-            [campo]: porDocena(anteriores[base]),
-            [bandera]: true
-        }));
     }
 
     function cambiarUbicacion(evento) {
@@ -241,16 +224,16 @@ export default function CamposProducto({ valores, onCambio, prefijo, etiquetaCom
                     </div>
 
                     <div className="campo">
-                        <label htmlFor={id("stockNuevo")}>Stock nuevo (comprado este año)</label>
+                        <label htmlFor={id("stock")}>Stock (unidades)</label>
                         <input
                             type="number"
-                            id={id("stockNuevo")}
-                            name="stockNuevo"
+                            id={id("stock")}
+                            name="stock"
                             min="0"
                             step="1"
                             inputMode="numeric"
                             placeholder="24"
-                            value={valores.stockNuevo}
+                            value={valores.stock}
                             onChange={cambiar}
                             required
                         />
@@ -260,93 +243,76 @@ export default function CamposProducto({ valores, onCambio, prefijo, etiquetaCom
                 <p className="costo-calculado">
                     {textoCostoUnitario(valores.precioCompra, valores.unidadesPorCaja)}
                 </p>
-            </fieldset>
 
-            <fieldset className="grupo-campos grupo-sobrante">
-                <legend>📦 Mercadería sobrante del año pasado</legend>
-
-                <div className="campo">
-                    <label htmlFor={id("stock2025")}>Unidades sobrantes del 2025</label>
+                <label className={`casilla casilla-2025 ${valores.es2025 ? "marcada" : ""}`}>
                     <input
-                        type="number"
-                        id={id("stock2025")}
-                        name="stock2025"
-                        min="0"
-                        step="1"
-                        inputMode="numeric"
-                        placeholder="0"
-                        value={valores.stock2025 ?? ""}
-                        onChange={cambiar}
+                        type="checkbox"
+                        checked={Boolean(valores.es2025)}
+                        onChange={(e) => onCambio((anteriores) => ({ ...anteriores, es2025: e.target.checked }))}
                     />
-                    <span className="ayuda-campo">
-                        Ya se pagó el año pasado: al venderla, todo lo cobrado es <strong>ganancia neta</strong> y no
-                        cuenta para recuperar la inversión de este año. Se vende primero. Déjalo en 0 si no hay sobrante.
+                    <span>
+                        <strong>📦 Mercadería sobrante del año pasado (2025)</strong>
+                        <small>
+                            Ya se pagó el año pasado: al venderla, todo lo cobrado va a la <strong>ganancia del
+                            inventario 2025</strong> (ganancia neta) y no cuenta para recuperar la inversión de este año.
+                        </small>
                     </span>
-                </div>
-
-                <p className="resumen-stock">
-                    Stock total: <strong>{stockTotal(valores)} unidades</strong>
-                    {Number(valores.stock2025) > 0 && (
-                        <> ({Number(valores.stockNuevo) || 0} nuevas + {Number(valores.stock2025)} sobrantes)</>
-                    )}
-                    {Number(valores.stock2025) > 0 && Number(valores.precio) > 0 && (
-                        <>
-                            <br />
-                            Lo sobrante deja hasta <strong>{moneda(Number(valores.stock2025) * Number(valores.precio))}</strong> de
-                            ganancia neta al precio por unidad.
-                        </>
-                    )}
-                </p>
+                </label>
             </fieldset>
 
             <fieldset className="grupo-campos">
                 <legend>Precios de venta</legend>
 
                 <div className="fila-campos tabla-precios">
-                    {[
-                        { campo: "precio", etiqueta: "Precio por unidad (S/)", ejemplo: "3.00" },
-                        { campo: "precioMinimo", etiqueta: "Precio mínimo por unidad (S/)", ejemplo: "2.50" },
-                        { campo: "precioMinimoDocena", etiqueta: "Precio mínimo por docena (S/)", ejemplo: "30.00", base: "precioMinimo", bandera: "minimoDocenaAuto", texto: "mínimo por unidad" }
-                    ].map((precio) => (
-                        <div className="campo" key={precio.campo}>
-                            <label htmlFor={id(precio.campo)}>{precio.etiqueta}</label>
-                            <input
-                                type="number"
-                                id={id(precio.campo)}
-                                name={precio.campo}
-                                min="0"
-                                step="0.01"
-                                inputMode="decimal"
-                                placeholder={precio.ejemplo}
-                                value={valores[precio.campo]}
-                                onChange={cambiar}
-                                required
-                            />
-                            {precio.base && (
-                                <span className="ayuda-campo dato-calculado">
-                                    {valores[precio.bandera] ? (
-                                        <>Calculado: {precio.texto} × 12. Puedes cambiarlo.</>
-                                    ) : (
-                                        <button
-                                            type="button"
-                                            className="boton-enlace"
-                                            onClick={() => recalcular(precio.campo, precio.base, precio.bandera)}
-                                        >
-                                            Usar {precio.texto} × 12 (S/ {porDocena(valores[precio.base]) || "0.00"})
-                                        </button>
-                                    )}
-                                </span>
-                            )}
-                        </div>
-                    ))}
+                    <div className="campo">
+                        <label htmlFor={id("precio")}>Precio por unidad (S/)</label>
+                        <input
+                            type="number"
+                            id={id("precio")}
+                            name="precio"
+                            min="0"
+                            step="0.01"
+                            inputMode="decimal"
+                            placeholder="3.00"
+                            value={valores.precio}
+                            onChange={cambiar}
+                            required
+                        />
+                    </div>
+
+                    <div className="campo">
+                        <label htmlFor={id("precioMinimo")}>Precio mínimo por unidad (S/)</label>
+                        <input
+                            type="number"
+                            id={id("precioMinimo")}
+                            name="precioMinimo"
+                            min="0"
+                            step="0.01"
+                            inputMode="decimal"
+                            placeholder="2.50"
+                            value={valores.precioMinimo}
+                            onChange={cambiar}
+                            required
+                        />
+                    </div>
+
+                    <div className="campo">
+                        <label htmlFor={id("precioDocena")}>Precio por docena (S/)</label>
+                        <input
+                            type="text"
+                            id={id("precioDocena")}
+                            className="campo-calculado"
+                            value={porDocena(valores.precio) || "—"}
+                            readOnly
+                            tabIndex={-1}
+                        />
+                        <span className="ayuda-campo dato-calculado">
+                            Precio por unidad × 12. Mínimo por docena: <strong>S/ {porDocena(valores.precioMinimo) || "0.00"}</strong>
+                        </span>
+                    </div>
                 </div>
 
-                <p className="costo-calculado">
-                    Precio por docena: <strong>S/ {porDocena(valores.precio) || "0.00"}</strong>
-                    <small> (calculado: precio por unidad × 12)</small>
-                </p>
-
-                <ResumenGanancia ganancias={calcularGanancias(valores)} stock2025={Number(valores.stock2025 || 0)} />
+                <ResumenGanancia ganancias={calcularGanancias(valores)} es2025={Boolean(valores.es2025)} />
             </fieldset>
 
             <CampoFoto
