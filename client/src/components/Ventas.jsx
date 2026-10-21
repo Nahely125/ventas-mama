@@ -140,8 +140,10 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
 
     const porUnidades = unidadesDe(modalidad);
     const esDePaquete = esPaquete(modalidad);
-    // Productos que se pueden regalar (menos de S/ 5 por unidad).
-    const productosObsequio = productos === null ? null : (productos ?? []).filter((p) => p.obsequiable);
+    // Productos que se pueden regalar: costo menor a S/ 5 por unidad y con stock.
+    const productosObsequio = (productos ?? [])
+        .filter((p) => p.obsequiable && p.stock > 0)
+        .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
     const regaloActual = regalo ? buscarActual(regalo.id) ?? regalo : null;
     const cantidadNumero = Number(cantidad);
     const cantidadValida = Number.isInteger(cantidadNumero) && cantidadNumero > 0 ? cantidadNumero : 0;
@@ -534,18 +536,30 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                         </p>
 
                         <div className="campo">
-                            <label htmlFor="buscar-obsequio">Producto para regalar</label>
-                            <BuscadorProducto
-                                id="buscar-obsequio"
-                                productos={productosObsequio}
-                                seleccionado={regaloActual}
-                                onSeleccionar={(nuevo) => {
-                                    setRegalo(nuevo);
+                            <label htmlFor="producto-obsequio">Producto para regalar</label>
+                            <select
+                                id="producto-obsequio"
+                                value={regaloActual?.id ?? ""}
+                                onChange={(e) => {
+                                    setRegalo(productosObsequio.find((p) => String(p.id) === e.target.value) ?? null);
                                     setCantidadRegalo("1");
                                     setErrorRegalo("");
                                 }}
-                                textoVacio="No hay productos de menos de S/ 5 con ese código o nombre."
-                            />
+                                disabled={productos === null || productosObsequio.length === 0}
+                            >
+                                <option value="">
+                                    {productos === null
+                                        ? "Cargando productos..."
+                                        : productosObsequio.length === 0
+                                            ? "No hay productos para regalar"
+                                            : `Elige un producto (${productosObsequio.length} disponibles)`}
+                                </option>
+                                {productosObsequio.map((p) => (
+                                    <option key={p.id} value={p.id}>
+                                        {p.codigo ? `${p.codigo} · ` : ""}{p.nombre} (quedan {p.stock})
+                                    </option>
+                                ))}
+                            </select>
                         </div>
 
                         {regaloActual && (
