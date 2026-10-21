@@ -11,6 +11,7 @@ import Clientes from "./Clientes.jsx";
 import Compras from "./Compras.jsx";
 import Inversion from "./Inversion.jsx";
 import CodigosAjuste from "./CodigosAjuste.jsx";
+import Reportes from "./Reportes.jsx";
 import Empleados from "./Empleados.jsx";
 import SeccionesCatalogo from "./SeccionesCatalogo.jsx";
 
@@ -38,6 +39,13 @@ const VISTAS = [
         icono: "🧾",
         nombre: "Historial de ventas",
         descripcion: "Filtra tus ventas por día o mes y revisa los totales."
+    },
+    {
+        clave: "reportes",
+        icono: "📈",
+        nombre: "Reportes",
+        descripcion: "Cierre de caja del día, ventas por empleado y los productos que más y menos se venden.",
+        soloJefe: true
     },
     {
         clave: "clientes",
@@ -246,6 +254,10 @@ export default function Panel({ usuario, onSalir, onActualizarUsuario }) {
 
                     {vistaActual.clave === "inversion" && (
                         <Inversion resumen={resumen} onCambio={cargarResumen} onError={manejarError} />
+                    )}
+
+                    {vistaActual.clave === "reportes" && (
+                        <Reportes onError={manejarError} />
                     )}
 
                     {vistaActual.clave === "ajustes" && (

@@ -140,6 +140,7 @@ CREATE TABLE IF NOT EXISTS ventas (
     descuento        NUMERIC(10,2) NOT NULL DEFAULT 0,                  -- parte del ajuste de la venta (total ya lo descuenta)
     codigo_ajuste    VARCHAR(20),                                       -- código de descuento usado (o DESCUENTO DEL JEFE)
     obsequio         BOOLEAN       NOT NULL DEFAULT FALSE,              -- mercadería regalada (precio 0)
+    unidades_devueltas INTEGER     NOT NULL DEFAULT 0,                  -- devueltas después (la fila ya las descuenta)
     anulada_en       TIMESTAMP,                                         -- si se anuló: no cuenta en totales ni ganancias
     anulada_por      INTEGER       REFERENCES usuarios(id),
     motivo_anulacion VARCHAR(200),                  -- de la cantidad, cuántas eran del 2025 (su venta es ganancia neta completa)
@@ -151,6 +152,40 @@ CREATE INDEX IF NOT EXISTS ventas_fecha_idx ON ventas (fecha);
 CREATE UNIQUE INDEX IF NOT EXISTS ventas_token_unico ON ventas (token);
 CREATE INDEX IF NOT EXISTS ventas_grupo_idx ON ventas (grupo);
 CREATE INDEX IF NOT EXISTS ventas_cliente_idx ON ventas (cliente_id);
+
+-- ---------------------------------------------------------------------
+-- Devoluciones parciales: la fila de ventas se reduce (cantidad, total) y aquí
+-- queda lo devuelto, con su fecha (para el cierre de caja).
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS devoluciones (
+    id            SERIAL PRIMARY KEY,
+    grupo         UUID          NOT NULL,
+    venta_id      INTEGER       NOT NULL REFERENCES ventas(id),
+    producto_id   INTEGER       NOT NULL REFERENCES productos(id),
+    unidades      INTEGER       NOT NULL CHECK (unidades > 0),
+    monto         NUMERIC(10,2) NOT NULL CHECK (monto >= 0),           -- lo que se devolvió al cliente
+    unidades_2025 INTEGER       NOT NULL DEFAULT 0,
+    metodo_pago   VARCHAR(20)   NOT NULL,
+    motivo        VARCHAR(200)  NOT NULL,
+    usuario_id    INTEGER       REFERENCES usuarios(id),
+    fecha         TIMESTAMP     NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'America/Lima')
+);
+
+CREATE INDEX IF NOT EXISTS devoluciones_fecha_idx ON devoluciones (fecha);
+CREATE INDEX IF NOT EXISTS devoluciones_venta_idx ON devoluciones (venta_id);
+
+-- ---------------------------------------------------------------------
+-- Cierre de caja: efectivo contado al final del día frente al esperado.
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS cierres_caja (
+    id                SERIAL PRIMARY KEY,
+    dia               DATE          NOT NULL UNIQUE,
+    efectivo_esperado NUMERIC(12,2) NOT NULL,
+    efectivo_contado  NUMERIC(12,2) NOT NULL CHECK (efectivo_contado >= 0),
+    nota              VARCHAR(300),
+    usuario_id        INTEGER       REFERENCES usuarios(id),
+    creado_en         TIMESTAMP     NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'America/Lima')
+);
 
 -- ---------------------------------------------------------------------
 -- abonos: pagos a cuenta de lo que debe un cliente por ventas fiadas.

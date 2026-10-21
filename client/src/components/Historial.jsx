@@ -96,6 +96,102 @@ function ModalAnular({ boleta, onAnulada, onCerrar, onError }) {
     );
 }
 
+// Ventana para devolver unidades de un producto de la venta (solo el jefe).
+function ModalDevolver({ venta, onDevuelta, onCerrar, onError }) {
+    const dialogo = useRef(null);
+    const [unidades, setUnidades] = useState("1");
+    const [motivo, setMotivo] = useState("");
+    const [error, setError] = useState("");
+    const [enviando, setEnviando] = useState(false);
+
+    useEffect(() => {
+        dialogo.current?.showModal();
+    }, []);
+
+    const cantidad = Number(unidades);
+    const valida = Number.isInteger(cantidad) && cantidad > 0 && cantidad <= venta.cantidad;
+    // Lo que se devuelve, en proporción (igual que lo calcula el servidor).
+    const quedan = venta.cantidad - cantidad;
+    const monto = valida ? Number(venta.total) - Number((Number(venta.total) * quedan / venta.cantidad).toFixed(2)) : 0;
+
+    async function devolver(evento) {
+        evento.preventDefault();
+        setEnviando(true);
+
+        try {
+            const resultado = await pedir(`/api/ventas/${venta.grupo}/devolver`, {
+                method: "POST",
+                cuerpo: { ventaId: venta.id, unidades: cantidad, motivo: motivo.trim() }
+            });
+            await onDevuelta(resultado.mensaje);
+        } catch (err) {
+            onError(err, () => setError(err.message));
+            setEnviando(false);
+        }
+    }
+
+    return (
+        <dialog ref={dialogo} className="modal" onClose={onCerrar} aria-labelledby="titulo-devolver">
+            <form className="formulario modal-contenido" onSubmit={devolver}>
+                <div className="modal-encabezado">
+                    <h2 id="titulo-devolver">↩ Devolver producto</h2>
+                    <button type="button" className="boton-cerrar-modal" onClick={onCerrar} aria-label="Cerrar">✕</button>
+                </div>
+
+                <p>
+                    <strong>{venta.producto}</strong>: se vendieron {venta.cantidad} unidades por {moneda(venta.total)}.
+                    Las devueltas vuelven al inventario.
+                </p>
+
+                <div className="fila-campos fila-dos">
+                    <div className="campo">
+                        <label htmlFor="unidades-devolver">Unidades que devuelve</label>
+                        <input
+                            type="number"
+                            id="unidades-devolver"
+                            min="1"
+                            max={venta.cantidad}
+                            step="1"
+                            inputMode="numeric"
+                            value={unidades}
+                            onChange={(e) => setUnidades(e.target.value)}
+                            aria-invalid={!valida}
+                        />
+                    </div>
+                    <div className="campo">
+                        <label htmlFor="motivo-devolucion">Motivo</label>
+                        <input
+                            type="text"
+                            id="motivo-devolucion"
+                            maxLength={200}
+                            placeholder="Ej. Vino fallado"
+                            value={motivo}
+                            onChange={(e) => setMotivo(e.target.value)}
+                            required
+                        />
+                    </div>
+                </div>
+
+                {valida && (
+                    <p className="caja-esperada">
+                        <span>{venta.metodoPago === "fiado" ? "Se descuenta de la deuda" : "Devuelves al cliente"}</span>
+                        <strong>{moneda(monto)}</strong>
+                    </p>
+                )}
+
+                {error && <p className="mensaje mensaje-error" role="alert">{error}</p>}
+
+                <div className="modal-acciones">
+                    <button type="button" className="boton-secundario" onClick={onCerrar}>Cancelar</button>
+                    <button type="submit" className="boton-peligro" disabled={enviando || !valida || !motivo.trim()}>
+                        {enviando ? "Registrando..." : "Registrar devolución"}
+                    </button>
+                </div>
+            </form>
+        </dialog>
+    );
+}
+
 export default function Historial({ esJefe, onCambio, onError }) {
     const [modo, setModo] = useState("hoy");
     const [dia, setDia] = useState(hoy());
@@ -108,6 +204,8 @@ export default function Historial({ esJefe, onCambio, onError }) {
     const [error, setError] = useState("");
     const [comprobante, setComprobante] = useState(null);
     const [anulando, setAnulando] = useState(null);
+    const [devolviendo, setDevolviendo] = useState(null);
+    const [aviso, setAviso] = useState("");
 
     // Rango de fechas del periodo elegido (el servidor filtra y entrega por partes).
     const rango = {
@@ -270,6 +368,8 @@ export default function Historial({ esJefe, onCambio, onError }) {
                 )}
             </section>
 
+            {aviso && <p className="mensaje mensaje-exito" role="status">{aviso}</p>}
+
             <HistorialVentas
                 ventas={filas}
                 error={error}
@@ -277,6 +377,7 @@ export default function Historial({ esJefe, onCambio, onError }) {
                 textoVacio={modo === "todo" ? "Todavía no hay ventas registradas." : "No hay ventas en este periodo."}
                 onVerComprobante={(venta) => setComprobante(boletaDe(venta))}
                 onAnular={esJefe ? (venta) => setAnulando(boletaDe(venta)) : null}
+                onDevolver={esJefe ? setDevolviendo : null}
             />
 
             {hayMas && (
@@ -287,6 +388,19 @@ export default function Historial({ esJefe, onCambio, onError }) {
 
             {comprobante && (
                 <Comprobante boleta={comprobante} onCerrar={() => setComprobante(null)} />
+            )}
+
+            {devolviendo && (
+                <ModalDevolver
+                    venta={devolviendo}
+                    onError={onError}
+                    onCerrar={() => setDevolviendo(null)}
+                    onDevuelta={async (texto) => {
+                        setDevolviendo(null);
+                        setAviso(`↩ ${texto}`);
+                        await Promise.all([cargar(), onCambio()]);
+                    }}
+                />
             )}
 
             {anulando && (

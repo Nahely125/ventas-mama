@@ -508,8 +508,24 @@ router.get("/totales", requiereSesion, async (req, res) => {
 
 const FORMATO_GRUPO = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// Fiado: si el cliente ya abonó, quitarle deuda podría dejarle saldo a favor (deuda negativa).
+async function errorSaldoFiado(client, fila, monto, accion) {
+    if (fila.metodo_pago !== "fiado" || !fila.cliente_id) return null;
+
+    const deuda = await client.query(
+        `SELECT ROUND(${SALDO}, 2) AS saldo FROM clientes WHERE id = $1 FOR UPDATE`,
+        [fila.cliente_id]
+    );
+    const saldo = Number(deuda.rows[0]?.saldo ?? 0);
+
+    return Math.round((saldo - monto) * 100) < 0
+        ? `El cliente ya abonó parte de esta venta: su deuda es S/ ${saldo.toFixed(2)} y ${accion} es de S/ ${monto.toFixed(2)}. Elimina primero los abonos que sobren (en Clientes) y luego vuelve a intentarlo.`
+        : null;
+}
+
 /* Anular una venta completa (solo el jefe). Devuelve el stock (y las unidades del 2025),
-   deja anotado quién la anuló y por qué, y la venta deja de contar en totales y ganancias. */
+   deja anotado quién la anuló y por qué, y la venta deja de contar en totales y ganancias.
+   Si algún producto ya se había devuelto entero, solo se anula lo que queda. */
 router.post("/:grupo/anular", requiereJefe, async (req, res) => {
     const { grupo } = req.params;
     const motivo = typeof req.body?.motivo === "string" ? req.body.motivo.trim() : "";
@@ -541,31 +557,22 @@ router.post("/:grupo/anular", requiereJefe, async (req, res) => {
             return res.status(404).json({ error: "Venta no encontrada." });
         }
 
-        if (filas.rows.some((f) => f.anulada_en)) {
+        const activas = filas.rows.filter((f) => !f.anulada_en);
+
+        if (activas.length === 0) {
             await client.query("ROLLBACK");
             return res.status(409).json({ error: "Esta venta ya estaba anulada." });
         }
 
-        // Fiado: si el cliente ya abonó, anularla podría dejarle saldo a favor (deuda negativa).
-        const primera = filas.rows[0];
+        const totalVenta = activas.reduce((suma, f) => suma + Number(f.total), 0);
+        const errorFiado = await errorSaldoFiado(client, activas[0], totalVenta, "la venta");
 
-        if (primera.metodo_pago === "fiado" && primera.cliente_id) {
-            const deuda = await client.query(
-                `SELECT ROUND(${SALDO}, 2) AS saldo FROM clientes WHERE id = $1 FOR UPDATE`,
-                [primera.cliente_id]
-            );
-            const totalVenta = filas.rows.reduce((suma, f) => suma + Number(f.total), 0);
-            const saldo = Number(deuda.rows[0]?.saldo ?? 0);
-
-            if (Math.round((saldo - totalVenta) * 100) < 0) {
-                await client.query("ROLLBACK");
-                return res.status(409).json({
-                    error: `El cliente ya abonó parte de esta venta: su deuda es S/ ${saldo.toFixed(2)} y la venta es de S/ ${totalVenta.toFixed(2)}. Elimina primero los abonos que sobren (en Clientes) y luego anúlala.`
-                });
-            }
+        if (errorFiado) {
+            await client.query("ROLLBACK");
+            return res.status(409).json({ error: errorFiado });
         }
 
-        for (const fila of filas.rows) {
+        for (const fila of activas) {
             await client.query(
                 `UPDATE productos
                  SET stock = stock + $1, stock_2025 = stock_2025 + $2
@@ -579,7 +586,7 @@ router.post("/:grupo/anular", requiereJefe, async (req, res) => {
              SET anulada_en = CURRENT_TIMESTAMP AT TIME ZONE 'America/Lima',
                  anulada_por = $1,
                  motivo_anulacion = $2
-             WHERE grupo = $3`,
+             WHERE grupo = $3 AND anulada_en IS NULL`,
             [req.session.usuario.id, motivo, grupo]
         );
 
@@ -589,6 +596,131 @@ router.post("/:grupo/anular", requiereJefe, async (req, res) => {
         if (client) await client.query("ROLLBACK").catch(() => {});
         console.error("Error al anular la venta:", error.message);
         res.status(500).json({ error: "No se pudo anular la venta." });
+    } finally {
+        client?.release();
+    }
+});
+
+/* Devolución parcial (solo el jefe): { ventaId, unidades, motivo } devuelve unidades de un
+   producto de la boleta. La fila se reduce en proporción (cantidad, total y descuento), el stock
+   vuelve al inventario (primero como mercadería nueva) y queda anotada en devoluciones con su
+   fecha, para el cierre de caja. Si se devuelve todo el producto, esa fila queda como anulada. */
+router.post("/:grupo/devolver", requiereJefe, async (req, res) => {
+    const { grupo } = req.params;
+    const { ventaId, unidades } = req.body ?? {};
+    const motivo = typeof req.body?.motivo === "string" ? req.body.motivo.trim() : "";
+
+    if (!FORMATO_GRUPO.test(grupo)) {
+        return res.status(404).json({ error: "Venta no encontrada." });
+    }
+
+    if (!Number.isInteger(ventaId) || ventaId <= 0 || !Number.isInteger(unidades) || unidades <= 0) {
+        return res.status(400).json({ error: "Indica el producto y cuántas unidades se devuelven." });
+    }
+
+    if (!motivo || motivo.length > 200) {
+        return res.status(400).json({ error: "Escribe el motivo de la devolución (máximo 200 caracteres)." });
+    }
+
+    let client;
+
+    try {
+        client = await pool.connect();
+        await client.query("BEGIN");
+
+        const filas = await client.query(
+            `SELECT id, producto_id, cantidad, modalidad, total, descuento, unidades_2025, anulada_en,
+                    metodo_pago, cliente_id
+             FROM ventas WHERE grupo = $1
+             ORDER BY id
+             FOR UPDATE`,
+            [grupo]
+        );
+        const fila = filas.rows.find((f) => f.id === ventaId);
+
+        if (!fila) {
+            await client.query("ROLLBACK");
+            return res.status(404).json({ error: "Ese producto no está en la venta." });
+        }
+
+        if (fila.anulada_en) {
+            await client.query("ROLLBACK");
+            return res.status(409).json({ error: "Ese producto ya se anuló o se devolvió completo." });
+        }
+
+        if (unidades > fila.cantidad) {
+            await client.query("ROLLBACK");
+            return res.status(400).json({ error: `Solo se vendieron ${fila.cantidad} unidades de ese producto.` });
+        }
+
+        const devuelveTodo = unidades === fila.cantidad;
+
+        if (devuelveTodo && filas.rows.filter((f) => !f.anulada_en).length === 1) {
+            await client.query("ROLLBACK");
+            return res.status(400).json({ error: "Es el único producto de la venta: para devolverlo todo, anula la venta." });
+        }
+
+        // Lo que queda de la fila, en proporción a las unidades que quedan.
+        const quedan = fila.cantidad - unidades;
+        const total = Number(fila.total);
+        const nuevoTotal = devuelveTodo ? 0 : Number((total * quedan / fila.cantidad).toFixed(2));
+        const monto = Number((total - nuevoTotal).toFixed(2));
+        const nuevoDescuento = devuelveTodo ? Number(fila.descuento) : Number((Number(fila.descuento) * quedan / fila.cantidad).toFixed(2));
+        // Se devuelven primero unidades nuevas; las del 2025, solo si no alcanzan.
+        const devueltas2025 = Math.max(0, unidades - (fila.cantidad - fila.unidades_2025));
+        // Si ya no completa la media docena o la docena, lo que queda se muestra por unidad.
+        const modalidad = quedan % UNIDADES_MODALIDAD[fila.modalidad] === 0 ? fila.modalidad : "unidad";
+
+        const errorFiado = await errorSaldoFiado(client, fila, monto, "la devolución");
+
+        if (errorFiado) {
+            await client.query("ROLLBACK");
+            return res.status(409).json({ error: errorFiado });
+        }
+
+        if (devuelveTodo) {
+            await client.query(
+                `UPDATE ventas
+                 SET anulada_en = CURRENT_TIMESTAMP AT TIME ZONE 'America/Lima',
+                     anulada_por = $1,
+                     motivo_anulacion = $2,
+                     unidades_devueltas = unidades_devueltas + $3
+                 WHERE id = $4`,
+                [req.session.usuario.id, `Devolución: ${motivo}`.slice(0, 200), unidades, fila.id]
+            );
+        } else {
+            await client.query(
+                `UPDATE ventas
+                 SET cantidad = $1, total = $2, descuento = $3, unidades_2025 = unidades_2025 - $4,
+                     modalidad = $5, unidades_devueltas = unidades_devueltas + $6
+                 WHERE id = $7`,
+                [quedan, nuevoTotal, nuevoDescuento, devueltas2025, modalidad, unidades, fila.id]
+            );
+        }
+
+        await client.query(
+            `UPDATE productos SET stock = stock + $1, stock_2025 = stock_2025 + $2 WHERE id = $3`,
+            [unidades, devueltas2025, fila.producto_id]
+        );
+
+        await client.query(
+            `INSERT INTO devoluciones
+                (grupo, venta_id, producto_id, unidades, monto, unidades_2025, metodo_pago, motivo, usuario_id)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+            [grupo, fila.id, fila.producto_id, unidades, monto, devueltas2025, fila.metodo_pago, motivo, req.session.usuario.id]
+        );
+
+        await client.query("COMMIT");
+        res.json({
+            mensaje: fila.metodo_pago === "fiado"
+                ? `Devolución registrada: se descontaron S/ ${monto.toFixed(2)} de la deuda del cliente.`
+                : `Devolución registrada: devuelve S/ ${monto.toFixed(2)} al cliente.`,
+            monto: monto.toFixed(2)
+        });
+    } catch (error) {
+        if (client) await client.query("ROLLBACK").catch(() => {});
+        console.error("Error al registrar la devolución:", error.message);
+        res.status(500).json({ error: "No se pudo registrar la devolución." });
     } finally {
         client?.release();
     }

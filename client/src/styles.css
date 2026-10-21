@@ -444,6 +444,44 @@ p {
 .lista-alertas {
     display: grid;
     gap: 8px;
+    list-style: none;
+}
+
+.grupo-alertas + .grupo-alertas {
+    margin-top: 14px;
+}
+
+.grupo-alertas h3 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    color: #7f1d1d;
+    font-size: 0.95rem;
+}
+
+.grupo-alertas h3 span {
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: #fee2e2;
+    font-size: 0.75rem;
+}
+
+.alerta-producto {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px 12px;
+}
+
+.alerta-producto.agotado {
+    background: #fef2f2;
+}
+
+.alerta-datos {
+    color: #991b1b;
+    font-size: 0.82rem;
 }
 
 /* ========================================
@@ -5078,4 +5116,115 @@ body.sin-desplazamiento {
         transition-duration: 0.01ms !important;
         scroll-behavior: auto !important;
     }
+}
+
+/* ========================================
+   REPORTES (cierre de caja, por empleado, productos)
+======================================== */
+
+.pestanas-reportes {
+    margin-bottom: 16px;
+}
+
+.reporte {
+    display: grid;
+    gap: 14px;
+}
+
+.selector-periodo {
+    display: grid;
+    gap: 10px;
+}
+
+.texto-exito {
+    color: #047857;
+}
+
+.notas-caja {
+    display: grid;
+    gap: 6px;
+    list-style: none;
+    color: var(--texto-suave);
+    font-size: 0.88rem;
+}
+
+.cierre-caja {
+    padding: 14px;
+    border: 1px solid var(--morado-200);
+    border-radius: 14px;
+    background: var(--morado-50);
+}
+
+.caja-esperada {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    color: var(--morado-900);
+    font-weight: 700;
+}
+
+.caja-esperada strong {
+    font-size: 1.5rem;
+    white-space: nowrap;
+}
+
+.titulo-reporte {
+    margin-top: 6px;
+    color: var(--morado-900);
+    font-size: 1rem;
+}
+
+.ranking {
+    display: grid;
+    gap: 8px;
+    padding-left: 22px;
+}
+
+.ranking-quietos {
+    padding-left: 0;
+    list-style: none;
+}
+
+.ranking li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px 12px;
+    padding: 8px 12px;
+    border: 1px solid var(--morado-150);
+    border-radius: 10px;
+    background: #ffffff;
+    font-size: 0.9rem;
+}
+
+.ranking li > div {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+
+.ranking small {
+    color: var(--texto-suave);
+}
+
+.ranking li > span {
+    color: var(--morado-700);
+    font-size: 0.85rem;
+}
+
+/* Devolución parcial en el historial */
+.etiqueta-devuelta {
+    margin-left: 6px;
+    background: #e0f2fe;
+    color: #075985;
+    vertical-align: middle;
+}
+
+.boton-anular.boton-devolver {
+    background: #f0f9ff;
+    border-color: #bae6fd;
+    color: #075985;
 }

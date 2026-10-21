@@ -14,25 +14,50 @@ export default function PanelControl({ esJefe, resumen, alertas, errorAlertas, o
             )}
 
             <section className="tarjeta alertas">
-                <h2>Alertas de inventario</h2>
-
-                <div className="lista-alertas">
-                    {errorAlertas ? (
-                        <p>{errorAlertas}</p>
-                    ) : alertas === null ? (
-                        <p>Consultando productos con stock bajo...</p>
-                    ) : alertas.length === 0 ? (
-                        <p>¡Excelente! No hay productos con stock bajo.</p>
-                    ) : (
-                        alertas.map((producto) => (
-                            <div className="alerta-producto" key={producto.id}>
-                                {producto.codigo && <span className="codigo-producto">{producto.codigo}</span>}
-                                <strong>{producto.nombre}</strong>: quedan {producto.stock} unidades.
-                                Debes reponer {producto.unidadesParaReponer} unidades.
-                            </div>
-                        ))
+                <div className="encabezado-seccion">
+                    <h2>Alertas de inventario</h2>
+                    {esJefe && alertas?.length > 0 && (
+                        <button type="button" className="boton-secundario boton-pequeno" onClick={() => onIrA("compras")}>
+                            🚚 Ingresar mercadería
+                        </button>
                     )}
                 </div>
+
+                {errorAlertas ? (
+                    <p>{errorAlertas}</p>
+                ) : alertas === null ? (
+                    <p>Consultando productos con stock bajo...</p>
+                ) : alertas.length === 0 ? (
+                    <p>¡Excelente! No hay productos con stock bajo.</p>
+                ) : (
+                    [
+                        { titulo: "⛔ Agotados", productos: alertas.filter((p) => p.stock === 0) },
+                        { titulo: "⚠️ Por acabarse", productos: alertas.filter((p) => p.stock > 0) }
+                    ]
+                        .filter((grupo) => grupo.productos.length > 0)
+                        .map((grupo) => (
+                            <div className="grupo-alertas" key={grupo.titulo}>
+                                <h3>{grupo.titulo} <span>{grupo.productos.length}</span></h3>
+                                <ul className="lista-alertas">
+                                    {grupo.productos.map((producto) => (
+                                        <li className={`alerta-producto ${producto.stock === 0 ? "agotado" : ""}`} key={producto.id}>
+                                            <div>
+                                                {producto.codigo && <span className="codigo-producto">{producto.codigo}</span>}
+                                                <strong>{producto.nombre}</strong>
+                                            </div>
+                                            <span className="alerta-datos">
+                                                {producto.stock === 0 ? "Sin stock" : `Quedan ${producto.stock}`}
+                                                {" · "}
+                                                {producto.vendidas30 > 0
+                                                    ? `se vendieron ${producto.vendidas30} en 30 días`
+                                                    : "sin ventas en 30 días"}
+                                            </span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        ))
+                )}
             </section>
 
             <section className="accesos-rapidos" aria-label="Accesos rápidos">

@@ -88,9 +88,10 @@ function medirItems(ctx, items) {
         // El nombre deja espacio a la derecha para el importe.
         const lineas = partirTexto(ctx, item.producto, DERECHA - IZQUIERDA - 130);
         const porPaquete = item.modalidad === "docena" ? " c/docena" : item.modalidad === "media" ? " c/media docena" : "";
+        const devueltas = Number(item.unidadesDevueltas ?? 0) > 0 ? ` · ↩ ${item.unidadesDevueltas} devueltas` : "";
         const detalle = item.obsequio
-            ? `${describirCantidad(item)} · 🎁 Obsequio`
-            : `${describirCantidad(item)} × ${moneda(precioCobrado(item))}${porPaquete}`;
+            ? `${describirCantidad(item)} · 🎁 Obsequio${devueltas}`
+            : `${describirCantidad(item)} × ${moneda(precioCobrado(item))}${porPaquete}${devueltas}`;
         return { item, lineas, detalle, alto: lineas.length * 24 + (item.codigo ? 20 : 0) + 26 + 18 };
     });
 }

@@ -128,6 +128,35 @@ const MIGRACIONES = `
     ALTER TABLE ventas ADD COLUMN IF NOT EXISTS descuento NUMERIC(10,2) NOT NULL DEFAULT 0;
     ALTER TABLE ventas ADD COLUMN IF NOT EXISTS codigo_ajuste VARCHAR(20);
     ALTER TABLE ventas ADD COLUMN IF NOT EXISTS obsequio BOOLEAN NOT NULL DEFAULT FALSE;
+
+    -- Devoluciones parciales: la fila de la venta se reduce y aquí queda lo devuelto y cuándo.
+    ALTER TABLE ventas ADD COLUMN IF NOT EXISTS unidades_devueltas INTEGER NOT NULL DEFAULT 0;
+    CREATE TABLE IF NOT EXISTS devoluciones (
+        id SERIAL PRIMARY KEY,
+        grupo UUID NOT NULL,
+        venta_id INTEGER NOT NULL REFERENCES ventas(id),
+        producto_id INTEGER NOT NULL REFERENCES productos(id),
+        unidades INTEGER NOT NULL CHECK (unidades > 0),
+        monto NUMERIC(10, 2) NOT NULL CHECK (monto >= 0),
+        unidades_2025 INTEGER NOT NULL DEFAULT 0,
+        metodo_pago VARCHAR(20) NOT NULL,
+        motivo VARCHAR(200) NOT NULL,
+        usuario_id INTEGER REFERENCES usuarios(id),
+        fecha TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'America/Lima')
+    );
+    CREATE INDEX IF NOT EXISTS devoluciones_fecha_idx ON devoluciones (fecha);
+    CREATE INDEX IF NOT EXISTS devoluciones_venta_idx ON devoluciones (venta_id);
+
+    -- Cierre de caja: lo que se contó al final del día frente a lo que debía haber.
+    CREATE TABLE IF NOT EXISTS cierres_caja (
+        id SERIAL PRIMARY KEY,
+        dia DATE NOT NULL UNIQUE,
+        efectivo_esperado NUMERIC(12, 2) NOT NULL,
+        efectivo_contado NUMERIC(12, 2) NOT NULL CHECK (efectivo_contado >= 0),
+        nota VARCHAR(300),
+        usuario_id INTEGER REFERENCES usuarios(id),
+        creado_en TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'America/Lima')
+    );
     CREATE INDEX IF NOT EXISTS ventas_cliente_idx ON ventas (cliente_id);
 
     -- Pagos a cuenta de lo que debe un cliente.

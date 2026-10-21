@@ -157,10 +157,14 @@ router.get("/stock-bajo", requiereSesion, async (req, res) => {
         const resultado = await pool.query(
             `SELECT
                 ${columnasSegunRol(req)},
-                GREATEST($1 - stock, 0) AS "unidadesParaReponer"
+                GREATEST($1 - stock, 0) AS "unidadesParaReponer",
+                -- Unidades vendidas en los últimos 30 días (para saber cuánto conviene reponer).
+                (SELECT COALESCE(SUM(ventas.cantidad), 0) FROM ventas
+                 WHERE ventas.producto_id = productos.id AND ventas.anulada_en IS NULL
+                   AND ventas.fecha >= (CURRENT_TIMESTAMP AT TIME ZONE 'America/Lima')::DATE - 29)::INT AS "vendidas30"
              FROM productos
              WHERE stock <= $1
-             ORDER BY stock ASC`,
+             ORDER BY stock ASC, "vendidas30" DESC, nombre`,
             [STOCK_BAJO]
         );
 

@@ -76,6 +76,7 @@ async function consultarVentas(pool, esJefe, opciones = {}) {
             ventas.descuento,
             ventas.codigo_ajuste AS "codigoAjuste",
             ventas.obsequio,
+            ventas.unidades_devueltas AS "unidadesDevueltas",
             ventas.metodo_pago AS "metodoPago",
             COALESCE(usuarios.nombre, 'No registrado') AS vendedor,
             autoriza.nombre AS "autorizadoPor",
@@ -138,18 +139,22 @@ async function totalesVentas(pool, esJefe, opciones = {}) {
 }
 
 // Junta las filas de una venta en una boleta (sin costos ni ganancias).
-function armarBoleta(filas) {
-    const primera = filas[0];
+function armarBoleta(todas) {
+    const primera = todas[0];
+    // Los productos devueltos completos (filas anuladas) ya no van en la boleta, salvo que toda
+    // la venta esté anulada.
+    const vigentes = todas.filter((f) => !f.anuladaEn);
+    const filas = vigentes.length > 0 ? vigentes : todas;
 
     return {
-        numero: Math.min(...filas.map((f) => f.id)),
+        numero: Math.min(...todas.map((f) => f.id)),
         grupo: primera.grupo,
         fecha: primera.fecha,
         vendedor: primera.vendedor,
         metodoPago: primera.metodoPago,
         cliente: primera.cliente,
         clienteTelefono: primera.clienteTelefono,
-        anulada: Boolean(primera.anuladaEn),
+        anulada: vigentes.length === 0,
         total: filas.reduce((suma, f) => suma + Number(f.total), 0).toFixed(2),
         // Antes del ajuste y cuánto se descontó.
         subtotal: filas.reduce((suma, f) => suma + Number(f.total) + Number(f.descuento), 0).toFixed(2),
@@ -165,7 +170,8 @@ function armarBoleta(filas) {
             precioUnitario: f.precioUnitario,
             total: f.total,
             descuento: f.descuento,
-            obsequio: f.obsequio
+            obsequio: f.obsequio,
+            unidadesDevueltas: f.unidadesDevueltas
         }))
     };
 }

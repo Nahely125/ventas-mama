@@ -5,7 +5,7 @@ function monedaOpcional(valor) {
     return valor == null ? "No disponible" : moneda(valor);
 }
 
-export default function HistorialVentas({ ventas, error, esJefe, textoVacio, onVerComprobante, onAnular }) {
+export default function HistorialVentas({ ventas, error, esJefe, textoVacio, onVerComprobante, onAnular, onDevolver }) {
     // Número de boleta = el id más bajo de las filas de la misma venta.
     const numeros = new Map();
     for (const venta of ventas ?? []) {
@@ -39,6 +39,9 @@ export default function HistorialVentas({ ventas, error, esJefe, textoVacio, onV
                         <small className="etiqueta etiqueta-ajustado">
                             🏷️ {venta.codigoAjuste}: −{moneda(venta.descuento)}
                         </small>
+                    )}
+                    {venta.unidadesDevueltas > 0 && !venta.anuladaEn && (
+                        <small className="etiqueta etiqueta-devuelta">↩ {venta.unidadesDevueltas} devueltas</small>
                     )}
                     {venta.anuladaEn && (
                         <small className="etiqueta-anulada" title={venta.motivoAnulacion ?? ""}>
@@ -76,6 +79,17 @@ export default function HistorialVentas({ ventas, error, esJefe, textoVacio, onV
                         <span aria-hidden="true">🧾</span>
                         <span className="texto-comprobante" aria-hidden="true"> Comprobante</span>
                     </button>
+                    {onDevolver && !venta.anuladaEn && (
+                        <button
+                            type="button"
+                            className="boton-anular boton-devolver"
+                            onClick={() => onDevolver(venta)}
+                            aria-label={`Devolver unidades de ${venta.producto}`}
+                            title="Devolver unidades de este producto"
+                        >
+                            ↩
+                        </button>
+                    )}
                     {onAnular && !venta.anuladaEn && esPrimera(venta) && (
                         <button
                             type="button"

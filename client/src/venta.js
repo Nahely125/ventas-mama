@@ -65,8 +65,11 @@ export function numeroComprobante(boleta) {
 
 // Agrupa las filas del historial (una por producto) en boletas.
 export function boletaDesdeFilas(filas) {
-    const ordenadas = [...filas].sort((a, b) => a.id - b.id);
-    const primera = ordenadas[0];
+    const todas = [...filas].sort((a, b) => a.id - b.id);
+    const primera = todas[0];
+    // Los productos devueltos completos ya no van en la boleta, salvo que toda la venta esté anulada.
+    const vigentes = todas.filter((f) => !f.anuladaEn);
+    const ordenadas = vigentes.length > 0 ? vigentes : todas;
 
     return {
         numero: primera.id,
@@ -76,7 +79,7 @@ export function boletaDesdeFilas(filas) {
         metodoPago: primera.metodoPago,
         cliente: primera.cliente,
         clienteTelefono: primera.clienteTelefono,
-        anulada: Boolean(primera.anuladaEn),
+        anulada: vigentes.length === 0,
         total: ordenadas.reduce((suma, f) => suma + Number(f.total), 0).toFixed(2),
         subtotal: ordenadas.reduce((suma, f) => suma + importeItem(f), 0).toFixed(2),
         ajuste: {
