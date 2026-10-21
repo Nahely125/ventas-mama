@@ -16,6 +16,7 @@ const {
     totalesVentas,
     armarBoleta
 } = require("./consultasVentas");
+const { COSTO_MAXIMO_OBSEQUIO, resolverAjuste, repartirAjuste } = require("./ajustes");
 
 function validarItems(items) {
     if (!Array.isArray(items) || items.length === 0 || items.length > MAXIMO_PRODUCTOS) {
@@ -32,9 +33,13 @@ function validarItems(items) {
             !MODALIDADES.includes(item.modalidad ?? "unidad") ||
             typeof item.precio !== "number" ||
             !Number.isFinite(item.precio) ||
-            item.precio <= 0
+            (item.obsequio === true ? item.precio !== 0 : item.precio <= 0)
         ) {
             return "Revisa la cantidad y el precio de cada producto.";
+        }
+
+        if (item.obsequio === true && (item.modalidad ?? "unidad") !== "unidad") {
+            return "Los obsequios se registran por unidad.";
         }
     }
 
@@ -56,13 +61,50 @@ async function verificarJefe(password) {
     return null;
 }
 
+// Bloqueo por sesión tras varios intentos fallidos (contraseña del jefe o código de ajuste).
+function bloqueado(req, clave) {
+    return (req.session[clave]?.hasta ?? 0) > Date.now();
+}
+
+function anotarFallo(req, clave) {
+    const bloqueo = req.session[clave] ?? { fallos: 0, hasta: 0 };
+    bloqueo.fallos += 1;
+
+    if (bloqueo.fallos >= INTENTOS_MAXIMOS) {
+        bloqueo.fallos = 0;
+        bloqueo.hasta = Date.now() + BLOQUEO_MS;
+    }
+
+    req.session[clave] = bloqueo;
+}
+
+/* Comprueba un código de ajuste antes de cobrar: { codigo } → { codigo, monto }
+   (monto null = ajuste propio: el empleado escribe el monto). */
+router.post("/validar-ajuste", requiereSesion, (req, res) => {
+    if (bloqueado(req, "bloqueoAjuste")) {
+        return res.status(429).json({ error: "Demasiados códigos incorrectos. Espera 10 minutos." });
+    }
+
+    const resultado = resolverAjuste({ codigo: req.body?.codigo, monto: 1 });
+
+    if (resultado.error) {
+        anotarFallo(req, "bloqueoAjuste");
+        return res.status(400).json({ error: resultado.error });
+    }
+
+    req.session.bloqueoAjuste = { fallos: 0, hasta: 0 };
+    const propio = resultado.codigo === "AJUSTE PROPIO";
+    res.json({ codigo: resultado.codigo, monto: propio ? null : resultado.monto });
+});
+
 /* Registrar una venta con uno o varios productos.
-   items: [{ productoId, cantidad, modalidad, precio }]
+   items: [{ productoId, cantidad, modalidad, precio, obsequio }]
      cantidad: número de unidades o de docenas, según la modalidad.
-     precio: precio por unidad o por docena; puede ajustarse.
+     precio: precio por unidad o por docena; puede ajustarse. Obsequio: precio 0, por unidad.
+   ajuste: { codigo, monto } descuento sobre el total permitido por el jefe con un código.
    Si algún precio está por debajo del mínimo, un trabajador necesita passwordJefe. */
 router.post("/", requiereSesion, async (req, res) => {
-    const { items, metodoPago = "efectivo", passwordJefe, clienteId = null } = req.body;
+    const { items, metodoPago = "efectivo", passwordJefe, clienteId = null, ajuste = null } = req.body;
     const usuario = req.session.usuario;
     const esJefe = usuario.rol === "jefe";
 
@@ -70,6 +112,27 @@ router.post("/", requiereSesion, async (req, res) => {
 
     if (errorItems || !METODOS_PAGO.includes(metodoPago)) {
         return res.status(400).json({ error: errorItems ?? "Elige un método de pago válido." });
+    }
+
+    let ajusteVenta = null;
+
+    if (ajuste !== null) {
+        if (bloqueado(req, "bloqueoAjuste")) {
+            return res.status(429).json({ error: "Demasiados códigos incorrectos. Espera 10 minutos." });
+        }
+
+        ajusteVenta = resolverAjuste(ajuste);
+
+        if (ajusteVenta.error) {
+            anotarFallo(req, "bloqueoAjuste");
+            return res.status(400).json({ error: ajusteVenta.error });
+        }
+
+        const subtotal = items.reduce((suma, item) => suma + Number(item.precio.toFixed(2)) * item.cantidad, 0);
+
+        if (Math.round(ajusteVenta.monto * 100) > Math.round(subtotal * 100)) {
+            return res.status(400).json({ error: "El ajuste no puede ser mayor que el total de la venta." });
+        }
     }
 
     if (clienteId !== null && (!Number.isInteger(clienteId) || clienteId <= 0)) {
@@ -114,6 +177,20 @@ router.post("/", requiereSesion, async (req, res) => {
             const unidades = item.cantidad * (esDocena ? 12 : 1);
             unidadesPorProducto.set(producto.id, (unidadesPorProducto.get(producto.id) ?? 0) + unidades);
 
+            if (item.obsequio === true) {
+                // Un empleado solo puede obsequiar mercadería barata; el jefe, cualquiera.
+                const costo = producto.precio_compra === null ? null : Number(producto.precio_compra);
+
+                if (!esJefe && (costo === null || costo >= COSTO_MAXIMO_OBSEQUIO)) {
+                    await client.query("ROLLBACK");
+                    return res.status(400).json({
+                        error: `${producto.nombre} no se puede obsequiar: solo mercadería que cueste menos de S/ ${COSTO_MAXIMO_OBSEQUIO.toFixed(2)} por unidad.`
+                    });
+                }
+
+                continue;
+            }
+
             const minimo = Number(esDocena ? producto.precio_minimo_docena : producto.precio_minimo);
 
             if (Math.round(item.precio * 100) < Math.round(minimo * 100)) {
@@ -139,9 +216,7 @@ router.post("/", requiereSesion, async (req, res) => {
             if (esJefe) {
                 autorizadoPor = usuario.id;
             } else {
-                const bloqueo = req.session.bloqueoAutorizacion ?? { fallos: 0, hasta: 0 };
-
-                if (bloqueo.hasta > Date.now()) {
+                if (bloqueado(req, "bloqueoAutorizacion")) {
                     await client.query("ROLLBACK");
                     return res.status(429).json({
                         error: "Demasiados intentos con la contraseña del jefe. Espera 10 minutos.",
@@ -160,14 +235,7 @@ router.post("/", requiereSesion, async (req, res) => {
                 autorizadoPor = await verificarJefe(passwordJefe);
 
                 if (!autorizadoPor) {
-                    bloqueo.fallos += 1;
-
-                    if (bloqueo.fallos >= INTENTOS_MAXIMOS) {
-                        bloqueo.fallos = 0;
-                        bloqueo.hasta = Date.now() + BLOQUEO_MS;
-                    }
-
-                    req.session.bloqueoAutorizacion = bloqueo;
+                    anotarFallo(req, "bloqueoAutorizacion");
                     await client.query("ROLLBACK");
                     return res.status(403).json({
                         error: "La contraseña del jefe no es correcta.",
@@ -181,16 +249,21 @@ router.post("/", requiereSesion, async (req, res) => {
 
         const grupo = crypto.randomUUID();
 
+        // El ajuste se reparte entre los productos: así totales, ganancias y deudas ya lo descuentan.
+        const importes = items.map((item) => Number((Number(item.precio.toFixed(2)) * item.cantidad).toFixed(2)));
+        const descuentos = ajusteVenta ? repartirAjuste(importes, ajusteVenta.monto) : importes.map(() => 0);
+
         // Unidades del 2025 que quedan por producto: se descuentan primero.
         const quedan2025 = new Map([...productos.values()].map((p) => [p.id, p.stock_2025]));
 
-        for (const item of items) {
+        for (const [indice, item] of items.entries()) {
             const producto = productos.get(item.productoId);
             const modalidad = item.modalidad ?? "unidad";
             const esDocena = modalidad === "docena";
             const unidades = item.cantidad * (esDocena ? 12 : 1);
             const precioVenta = Number(item.precio.toFixed(2));
-            const total = Number((precioVenta * item.cantidad).toFixed(2));
+            const descuento = descuentos[indice];
+            const total = Number((importes[indice] - descuento).toFixed(2));
             const precioUnitario = Number((esDocena ? precioVenta / 12 : precioVenta).toFixed(2));
             const unidades2025 = Math.min(quedan2025.get(producto.id), unidades);
             quedan2025.set(producto.id, quedan2025.get(producto.id) - unidades2025);
@@ -198,8 +271,9 @@ router.post("/", requiereSesion, async (req, res) => {
             await client.query(
                 `INSERT INTO ventas
                     (producto_id, cantidad, precio_unitario, costo_unitario, total,
-                     usuario_id, metodo_pago, modalidad, grupo, autorizado_por, unidades_2025, cliente_id, fecha)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
+                     usuario_id, metodo_pago, modalidad, grupo, autorizado_por, unidades_2025, cliente_id,
+                     descuento, codigo_ajuste, obsequio, fecha)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
                          CURRENT_TIMESTAMP AT TIME ZONE 'America/Lima')`,
                 [
                     producto.id,
@@ -213,7 +287,10 @@ router.post("/", requiereSesion, async (req, res) => {
                     grupo,
                     autorizadoPor,
                     unidades2025,
-                    clienteId
+                    clienteId,
+                    descuento,
+                    ajusteVenta?.codigo ?? null,
+                    item.obsequio === true
                 ]
             );
         }

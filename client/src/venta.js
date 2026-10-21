@@ -36,8 +36,13 @@ export function describirCantidad(venta) {
 // Precio cobrado por unidad o por docena, según cómo se vendió.
 export function precioCobrado(venta) {
     return venta.modalidad === "docena"
-        ? Number(venta.total) / (venta.cantidad / 12)
+        ? importeItem(venta) / (venta.cantidad / 12)
         : Number(venta.precioUnitario);
+}
+
+// Importe del producto antes del ajuste de la venta (el total ya trae descontada su parte).
+export function importeItem(venta) {
+    return Number(venta.total) + Number(venta.descuento ?? 0);
 }
 
 // Una boleta junta todos los productos de una misma venta (mismo "grupo").
@@ -60,6 +65,11 @@ export function boletaDesdeFilas(filas) {
         clienteTelefono: primera.clienteTelefono,
         anulada: Boolean(primera.anuladaEn),
         total: ordenadas.reduce((suma, f) => suma + Number(f.total), 0).toFixed(2),
+        subtotal: ordenadas.reduce((suma, f) => suma + importeItem(f), 0).toFixed(2),
+        ajuste: {
+            codigo: primera.codigoAjuste,
+            monto: ordenadas.reduce((suma, f) => suma + Number(f.descuento ?? 0), 0).toFixed(2)
+        },
         items: ordenadas
     };
 }

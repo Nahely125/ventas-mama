@@ -7,29 +7,20 @@ import DatosPago from "./DatosPago.jsx";
 import DictadoVenta from "./DictadoVenta.jsx";
 import SelectorCliente from "./SelectorCliente.jsx";
 
-const FACTOR = { unidad: 1, docena: 12 };
-
-// En la docena se escribe el precio de cada unidad; la docena cuesta ese precio × 12.
+// Precio de lista de la modalidad: por unidad, por docena completa o gratis (obsequio).
 function precioDeLista(producto, modalidad) {
     if (!producto) return "";
-    const precio = modalidad === "docena" ? Number(producto.precioDocena) / 12 : Number(producto.precio);
-    return precio.toFixed(2);
+    if (modalidad === "obsequio") return "0.00";
+    return Number(modalidad === "docena" ? producto.precioDocena : producto.precio).toFixed(2);
 }
 
 // Mínimo de la unidad o de la docena completa (el que valida el servidor).
 function minimoDe(producto, modalidad) {
+    if (modalidad === "obsequio") return 0;
     return Number(modalidad === "docena" ? producto.precioMinimoDocena : producto.precioMinimo);
 }
 
-// Mínimo por unidad (en la docena: mínimo de la docena ÷ 12).
-function minimoUnidad(producto, modalidad) {
-    return minimoDe(producto, modalidad) / FACTOR[modalidad];
-}
-
-// Precio de la docena completa (o de la unidad) a partir del precio por unidad.
-function precioModalidad(precioUnidad, modalidad) {
-    return Number((precioUnidad * FACTOR[modalidad]).toFixed(2));
-}
+const unidadesDe = (modalidad) => (modalidad === "docena" ? 12 : 1);
 
 function centimos(valor) {
     return Math.round(Number(valor) * 100);
@@ -66,9 +57,8 @@ function ModalAutorizacion({ productos, error, enviando, onConfirmar, onCerrar }
                 <ul className="lista-bajo-minimo">
                     {productos.map((item) => (
                         <li key={item.clave}>
-                            <strong>{item.producto.nombre}</strong>: {moneda(item.precioUnidad)} c/u (mínimo{" "}
-                            {moneda(minimoUnidad(item.producto, item.modalidad))} c/u
-                            {item.modalidad === "docena" ? " en la docena" : ""})
+                            <strong>{item.producto.nombre}</strong>: {moneda(item.precio)} (mínimo{" "}
+                            {moneda(minimoDe(item.producto, item.modalidad))} por {item.modalidad})
                         </li>
                     ))}
                 </ul>
@@ -120,39 +110,53 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
     const [comprobante, setComprobante] = useState(null);
     const [dictando, setDictando] = useState(false);
 
+    // Ajuste (descuento) con el código que da el jefe: AJUSTE10, AJUSTE20 o AJUSTE PROPIO.
+    const [codigoAjuste, setCodigoAjuste] = useState("");
+    const [ajuste, setAjuste] = useState(null); // { codigo, monto } (monto null = propio)
+    const [montoPropio, setMontoPropio] = useState("");
+    const [errorAjuste, setErrorAjuste] = useState("");
+    const [validandoAjuste, setValidandoAjuste] = useState(false);
+
     const buscarActual = (id) => (productos ?? []).find((p) => p.id === id);
 
     // Usar siempre los datos más recientes del producto (por ejemplo, el stock).
     const productoActual = producto ? buscarActual(producto.id) ?? producto : null;
 
     const esDocena = modalidad === "docena";
+    const esObsequio = modalidad === "obsequio";
+    // El jefe puede obsequiar cualquier producto; un empleado, solo los de costo menor a S/ 5.
+    const puedeObsequiar = Boolean(productoActual && (esJefe || productoActual.obsequiable));
     const cantidadNumero = Number(cantidad);
     const cantidadValida = Number.isInteger(cantidadNumero) && cantidadNumero > 0 ? cantidadNumero : 0;
     const precioNumero = Number(precio);
     const precioValido = precio !== "" && Number.isFinite(precioNumero) && precioNumero > 0 ? precioNumero : 0;
     const lista = precioDeLista(productoActual, modalidad);
-    const minimo = productoActual ? minimoUnidad(productoActual, modalidad) : null;
-    // Al precio de lista se cobra exactamente la docena registrada (evita redondeos de ÷ 12).
-    const precioTotalModalidad = esDocena && precio === lista
-        ? Number(productoActual.precioDocena)
-        : precioModalidad(precioValido, modalidad);
+    const minimo = productoActual ? minimoDe(productoActual, modalidad) : null;
     // El precio mínimo solo limita a los empleados; el jefe vende al precio que quiera.
-    const bajoMinimo = !esJefe && productoActual !== null && precioValido > 0
-        && centimos(precioTotalModalidad) < centimos(minimoDe(productoActual, modalidad));
+    const bajoMinimo = !esJefe && !esObsequio && minimo !== null && precioValido > 0
+        && centimos(precioValido) < centimos(minimo);
 
     // Unidades ya puestas en el carrito por producto (para avisar del stock).
     const unidadesEnCarrito = (id) =>
         carrito
             .filter((item) => item.producto.id === id)
-            .reduce((suma, item) => suma + item.cantidad * (item.modalidad === "docena" ? 12 : 1), 0);
+            .reduce((suma, item) => suma + item.cantidad * unidadesDe(item.modalidad), 0);
 
-    const total = carrito.reduce((suma, item) => suma + item.precio * item.cantidad, 0);
-    const estaBajoMinimo = (item) => centimos(item.precio) < centimos(minimoDe(item.producto, item.modalidad));
+    const subtotal = carrito.reduce((suma, item) => suma + item.precio * item.cantidad, 0);
+    const montoAjuste = ajuste
+        ? (ajuste.monto ?? (Number(montoPropio) > 0 ? Number(Number(montoPropio).toFixed(2)) : 0))
+        : 0;
+    const ajusteExcede = centimos(montoAjuste) > centimos(subtotal);
+    const total = Math.max(subtotal - montoAjuste, 0);
+    const estaBajoMinimo = (item) =>
+        item.modalidad !== "obsequio" && centimos(item.precio) < centimos(minimoDe(item.producto, item.modalidad));
     const itemsBajoMinimo = esJefe ? [] : carrito.filter(estaBajoMinimo);
 
     function seleccionarProducto(nuevo) {
+        const nuevaModalidad = modalidad === "obsequio" && !(esJefe || nuevo?.obsequiable) ? "unidad" : modalidad;
         setProducto(nuevo);
-        setPrecio(precioDeLista(nuevo, modalidad));
+        setModalidad(nuevaModalidad);
+        setPrecio(precioDeLista(nuevo, nuevaModalidad));
         setCantidad("1");
         setErrorItem("");
     }
@@ -168,12 +172,12 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
             return;
         }
 
-        if (cantidadValida === 0 || precioValido === 0) {
+        if (cantidadValida === 0 || (!esObsequio && precioValido === 0)) {
             setErrorItem("Ingresa una cantidad y un precio válidos.");
             return;
         }
 
-        const unidades = cantidadValida * (esDocena ? 12 : 1);
+        const unidades = cantidadValida * unidadesDe(modalidad);
         const disponibles = productoActual.stock - unidadesEnCarrito(productoActual.id);
 
         if (unidades > disponibles) {
@@ -188,8 +192,7 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                 producto: productoActual,
                 modalidad,
                 cantidad: cantidadValida,
-                precioUnidad: Number(precioValido.toFixed(2)),
-                precio: precioTotalModalidad
+                precio: esObsequio ? 0 : Number(precioValido.toFixed(2))
             }
         ]);
         setProducto(null);
@@ -208,7 +211,7 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
 
         for (const linea of lineas) {
             const actual = buscarActual(linea.producto.id) ?? linea.producto;
-            const unidades = linea.cantidad * (linea.modalidad === "docena" ? 12 : 1);
+            const unidades = linea.cantidad * unidadesDe(linea.modalidad);
             const yaUsadas = unidadesEnCarrito(actual.id) + (usadas.get(actual.id) ?? 0);
 
             if (unidades > actual.stock - yaUsadas) {
@@ -222,8 +225,7 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                 producto: actual,
                 modalidad: linea.modalidad,
                 cantidad: linea.cantidad,
-                precioUnidad: Number(precioDeLista(actual, linea.modalidad)),
-                precio: Number(Number(linea.modalidad === "docena" ? actual.precioDocena : actual.precio).toFixed(2))
+                precio: Number(precioDeLista(actual, linea.modalidad))
             });
         }
 
@@ -234,6 +236,36 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                 ? { tipo: "error", texto: `Se agregaron ${nuevos.length}. Sin stock suficiente: ${avisos.join(", ")}.` }
                 : { tipo: "info", texto: `🎤 Se agregaron ${nuevos.length} ${nuevos.length === 1 ? "producto" : "productos"} a la venta.` }
         );
+    }
+
+    async function aplicarAjuste() {
+        if (!codigoAjuste.trim()) {
+            setErrorAjuste("Escribe el código que te dio el jefe.");
+            return;
+        }
+
+        setValidandoAjuste(true);
+
+        try {
+            const resultado = await pedir("/api/ventas/validar-ajuste", {
+                method: "POST",
+                cuerpo: { codigo: codigoAjuste }
+            });
+            setAjuste(resultado);
+            setMontoPropio("");
+            setErrorAjuste("");
+        } catch (error) {
+            onError(error, () => setErrorAjuste(error.message));
+        } finally {
+            setValidandoAjuste(false);
+        }
+    }
+
+    function quitarAjuste() {
+        setAjuste(null);
+        setCodigoAjuste("");
+        setMontoPropio("");
+        setErrorAjuste("");
     }
 
     function quitar(clave) {
@@ -250,10 +282,12 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                     items: carrito.map((item) => ({
                         productoId: item.producto.id,
                         cantidad: item.cantidad,
-                        modalidad: item.modalidad,
-                        precio: item.precio
+                        modalidad: item.modalidad === "obsequio" ? "unidad" : item.modalidad,
+                        precio: item.precio,
+                        ...(item.modalidad === "obsequio" ? { obsequio: true } : {})
                     })),
                     metodoPago,
+                    ajuste: ajuste ? { codigo: ajuste.codigo, monto: montoAjuste } : null,
                     clienteId: cliente?.id ?? null,
                     ...(passwordJefe ? { passwordJefe } : {})
                 }
@@ -266,6 +300,7 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
             });
             setComprobante(resultado.boleta);
             setCarrito([]);
+            quitarAjuste();
             setMetodoPago("efectivo");
             setCliente(null);
             await onVenta();
@@ -293,6 +328,13 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
 
         if (carrito.length === 0) {
             setMensaje({ tipo: "error", texto: "Agrega al menos un producto a la venta." });
+            return;
+        }
+
+        if (ajuste && (montoAjuste <= 0 || ajusteExcede)) {
+            setErrorAjuste(ajusteExcede
+                ? "El ajuste no puede ser mayor que el total."
+                : "Escribe el monto del ajuste propio.");
             return;
         }
 
@@ -336,8 +378,9 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                                     <div className="selector-modalidad" role="radiogroup" aria-labelledby="etiqueta-modalidad">
                                         {[
                                             { valor: "unidad", texto: "Unidad" },
-                                            { valor: "docena", texto: "Docena (12 u.)" }
-                                        ].map((opcion) => (
+                                            { valor: "docena", texto: "Docena (12 u.)" },
+                                            puedeObsequiar && { valor: "obsequio", texto: "🎁 Obsequio" }
+                                        ].filter(Boolean).map((opcion) => (
                                             <button
                                                 key={opcion.valor}
                                                 type="button"
@@ -371,44 +414,56 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                                         )}
                                     </div>
 
-                                    <div className="campo">
-                                        <label htmlFor="precio-venta">
-                                            {esDocena ? "Precio por unidad en la docena" : "Precio por unidad"} (S/)
-                                        </label>
-                                        <input
-                                            type="number"
-                                            id="precio-venta"
-                                            min="0.01"
-                                            step="0.01"
-                                            inputMode="decimal"
-                                            value={precio}
-                                            onChange={(e) => setPrecio(e.target.value)}
-                                            aria-invalid={bajoMinimo}
-                                        />
-                                        <span className={`ayuda-campo ${bajoMinimo ? "texto-aviso" : ""}`}>
-                                            Lista: {moneda(lista)}
-                                            {precio !== lista && (
-                                                <>
-                                                    {" "}
-                                                    <button type="button" className="boton-enlace" onClick={() => setPrecio(lista)}>
-                                                        Restaurar
-                                                    </button>
-                                                </>
-                                            )}
-                                            {!esJefe && <>{" "}· Mínimo: {moneda(minimo)}</>}
-                                            {esDocena && precioValido > 0 && (
-                                                <><br />La docena sale a <strong>{moneda(precioTotalModalidad)}</strong> ({moneda(precioValido)} × 12)</>
-                                            )}
-                                            {bajoMinimo && (
-                                                <><br />🔒 Bajo el mínimo: necesitará la contraseña del jefe.</>
-                                            )}
-                                        </span>
-                                    </div>
+                                    {esObsequio ? (
+                                        <div className="campo aviso-obsequio">
+                                            <span className="etiqueta-campo">Precio</span>
+                                            <p>
+                                                🎁 <strong>Gratis.</strong> Se descuenta del stock y su costo cuenta como gasto en la ganancia.
+                                                {!esJefe && <> Solo mercadería que cueste menos de S/ 5 por unidad.</>}
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <div className="campo">
+                                            <label htmlFor="precio-venta">
+                                                Precio por {esDocena ? "docena (12 u.)" : "unidad"} (S/)
+                                            </label>
+                                            <input
+                                                type="number"
+                                                id="precio-venta"
+                                                min="0.01"
+                                                step="0.01"
+                                                inputMode="decimal"
+                                                value={precio}
+                                                onChange={(e) => setPrecio(e.target.value)}
+                                                aria-invalid={bajoMinimo}
+                                            />
+                                            <span className={`ayuda-campo ${bajoMinimo ? "texto-aviso" : ""}`}>
+                                                Lista: {moneda(lista)}
+                                                {precio !== lista && (
+                                                    <>
+                                                        {" "}
+                                                        <button type="button" className="boton-enlace" onClick={() => setPrecio(lista)}>
+                                                            Restaurar
+                                                        </button>
+                                                    </>
+                                                )}
+                                                {!esJefe && (
+                                                    <>{" "}· Mínimo{esDocena ? " por docena" : ""}: <strong>{moneda(minimo)}</strong></>
+                                                )}
+                                                {esDocena && precioValido > 0 && (
+                                                    <><br />Sale a {moneda(precioValido / 12)} cada unidad</>
+                                                )}
+                                                {bajoMinimo && (
+                                                    <><br />🔒 Bajo el mínimo: necesitará la contraseña del jefe.</>
+                                                )}
+                                            </span>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <button type="button" className="boton-agregar" onClick={agregar}>
                                     ＋ Agregar a la venta
-                                    {cantidadValida > 0 && precioValido > 0 && <> · {moneda(precioTotalModalidad * cantidadValida)}</>}
+                                    {cantidadValida > 0 && (esObsequio ? <> · Gratis</> : precioValido > 0 && <> · {moneda(precioValido * cantidadValida)}</>)}
                                 </button>
                             </>
                         )}
@@ -437,12 +492,17 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                                                     {item.cantidad} {item.modalidad === "docena"
                                                         ? (item.cantidad === 1 ? "docena" : "docenas")
                                                         : (item.cantidad === 1 ? "unidad" : "unidades")}{" "}
-                                                    × {moneda(item.precio)}
-                                                    {item.modalidad === "docena" && <small> ({moneda(item.precioUnidad)} c/u)</small>}
+                                                    {item.modalidad === "obsequio" ? (
+                                                        <span className="etiqueta etiqueta-obsequio">🎁 Obsequio</span>
+                                                    ) : (
+                                                        <>× {moneda(item.precio)}</>
+                                                    )}
                                                     {bajo && !esJefe && <span className="etiqueta etiqueta-ajustado">🔒 Bajo mínimo</span>}
                                                 </span>
                                             </div>
-                                            <strong className="item-carrito-total">{moneda(item.precio * item.cantidad)}</strong>
+                                            <strong className="item-carrito-total">
+                                                {item.modalidad === "obsequio" ? "Gratis" : moneda(item.precio * item.cantidad)}
+                                            </strong>
                                             <button
                                                 type="button"
                                                 className="boton-icono"
@@ -456,6 +516,82 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                                     );
                                 })}
                             </ul>
+                        )}
+
+                        {carrito.length > 0 && (
+                            <div className="ajuste-venta">
+                                {!ajuste ? (
+                                    <div className="campo">
+                                        <label htmlFor="codigo-ajuste">🏷️ Código de ajuste (opcional)</label>
+                                        <div className="campo-con-boton">
+                                            <input
+                                                type="text"
+                                                id="codigo-ajuste"
+                                                placeholder="Ej. AJUSTE10"
+                                                autoCapitalize="characters"
+                                                autoComplete="off"
+                                                spellCheck={false}
+                                                maxLength={20}
+                                                value={codigoAjuste}
+                                                onChange={(e) => setCodigoAjuste(e.target.value)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === "Enter") {
+                                                        e.preventDefault();
+                                                        aplicarAjuste();
+                                                    }
+                                                }}
+                                            />
+                                            <button
+                                                type="button"
+                                                className="boton-secundario boton-pequeno"
+                                                onClick={aplicarAjuste}
+                                                disabled={validandoAjuste}
+                                            >
+                                                {validandoAjuste ? "..." : "Aplicar"}
+                                            </button>
+                                        </div>
+                                        <span className="ayuda-campo">El jefe te da el código para descontar del total.</span>
+                                    </div>
+                                ) : (
+                                    <div className="ajuste-aplicado">
+                                        <div className="ajuste-encabezado">
+                                            <span>🏷️ <strong>{ajuste.codigo}</strong></span>
+                                            <button type="button" className="boton-enlace" onClick={quitarAjuste}>
+                                                Quitar
+                                            </button>
+                                        </div>
+                                        {ajuste.monto === null && (
+                                            <div className="campo">
+                                                <label htmlFor="monto-ajuste">Monto del ajuste (S/)</label>
+                                                <input
+                                                    type="number"
+                                                    id="monto-ajuste"
+                                                    min="0.01"
+                                                    step="0.01"
+                                                    inputMode="decimal"
+                                                    placeholder="0.00"
+                                                    value={montoPropio}
+                                                    onChange={(e) => setMontoPropio(e.target.value)}
+                                                    aria-invalid={ajusteExcede}
+                                                />
+                                            </div>
+                                        )}
+                                        <div className="linea-total">
+                                            <span>Subtotal</span>
+                                            <span>{moneda(subtotal)}</span>
+                                        </div>
+                                        <div className="linea-total linea-ajuste">
+                                            <span>Ajuste</span>
+                                            <span>− {moneda(montoAjuste)}</span>
+                                        </div>
+                                    </div>
+                                )}
+                                {(errorAjuste || ajusteExcede) && (
+                                    <p className="mensaje mensaje-error" role="alert">
+                                        {ajusteExcede ? "El ajuste no puede ser mayor que el total." : errorAjuste}
+                                    </p>
+                                )}
+                            </div>
                         )}
 
                         <div className="total-venta">

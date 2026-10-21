@@ -3,6 +3,7 @@ import {
     describirCantidad,
     enlaceCatalogo,
     formatearFecha,
+    importeItem,
     nombreMetodoPago,
     numeroComprobante,
     precioCobrado
@@ -87,7 +88,9 @@ function medirItems(ctx, items) {
         // El nombre deja espacio a la derecha para el importe.
         const lineas = partirTexto(ctx, item.producto, DERECHA - IZQUIERDA - 130);
         const porDocena = item.modalidad === "docena";
-        const detalle = `${describirCantidad(item)} × ${moneda(precioCobrado(item))}${porDocena ? " c/docena" : ""}`;
+        const detalle = item.obsequio
+            ? `${describirCantidad(item)} · 🎁 Obsequio`
+            : `${describirCantidad(item)} × ${moneda(precioCobrado(item))}${porDocena ? " c/docena" : ""}`;
         return { item, lineas, detalle, alto: lineas.length * 24 + (item.codigo ? 20 : 0) + 26 + 18 };
     });
 }
@@ -104,7 +107,8 @@ export async function generarImagenComprobante(boleta) {
 
     const medidos = medirItems(ctx, boleta.items);
     const altoItems = medidos.reduce((suma, m) => suma + m.alto, 0);
-    const alto = 150 + 110 + 50 + altoItems + 40 + 120 + 140;
+    const conAjuste = Number(boleta.ajuste?.monto ?? 0) > 0;
+    const alto = 150 + 110 + 50 + altoItems + 40 + 120 + 140 + (conAjuste ? 70 : 0);
 
     lienzo.width = ANCHO * ESCALA;
     lienzo.height = alto * ESCALA;
@@ -172,7 +176,7 @@ export async function generarImagenComprobante(boleta) {
 
         ctx.textAlign = "right";
         ctx.fillStyle = COLORES.texto;
-        ctx.fillText(moneda(item.total), DERECHA, yItem);
+        ctx.fillText(item.obsequio ? "Gratis" : moneda(importeItem(item)), DERECHA, yItem);
         ctx.textAlign = "left";
 
         yItem += (lineas.length - 1) * 24;
@@ -204,6 +208,19 @@ export async function generarImagenComprobante(boleta) {
     ctx.lineTo(DERECHA, y);
     ctx.stroke();
     y += 52;
+
+    // Subtotal y ajuste (descuento permitido por el jefe)
+    if (conAjuste) {
+        ctx.font = `500 17px ${SANS}`;
+        ctx.fillStyle = COLORES.suave;
+        ctx.fillText("Subtotal", IZQUIERDA, y - 12);
+        ctx.fillText("Ajuste", IZQUIERDA, y + 20);
+        ctx.textAlign = "right";
+        ctx.fillText(moneda(boleta.subtotal), DERECHA, y - 12);
+        ctx.fillText(`− ${moneda(boleta.ajuste.monto)}`, DERECHA, y + 20);
+        ctx.textAlign = "left";
+        y += 70;
+    }
 
     // Total
     ctx.font = `700 22px ${SANS}`;

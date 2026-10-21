@@ -123,6 +123,11 @@ const MIGRACIONES = `
     CREATE UNIQUE INDEX IF NOT EXISTS clientes_telefono_unico ON clientes (telefono) WHERE telefono IS NOT NULL;
 
     ALTER TABLE ventas ADD COLUMN IF NOT EXISTS cliente_id INTEGER REFERENCES clientes(id);
+
+    -- Ajuste (descuento con código del jefe) repartido entre los productos, y obsequios (precio 0).
+    ALTER TABLE ventas ADD COLUMN IF NOT EXISTS descuento NUMERIC(10,2) NOT NULL DEFAULT 0;
+    ALTER TABLE ventas ADD COLUMN IF NOT EXISTS codigo_ajuste VARCHAR(20);
+    ALTER TABLE ventas ADD COLUMN IF NOT EXISTS obsequio BOOLEAN NOT NULL DEFAULT FALSE;
     CREATE INDEX IF NOT EXISTS ventas_cliente_idx ON ventas (cliente_id);
 
     -- Pagos a cuenta de lo que debe un cliente.

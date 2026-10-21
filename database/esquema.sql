@@ -124,6 +124,9 @@ CREATE TABLE IF NOT EXISTS ventas (
     autorizado_por   INTEGER       REFERENCES usuarios(id),             -- jefe que autorizó un precio bajo el mínimo
     unidades_2025    INTEGER       NOT NULL DEFAULT 0,
     cliente_id       INTEGER       REFERENCES clientes(id),             -- cliente (obligatorio si metodo_pago = 'fiado')
+    descuento        NUMERIC(10,2) NOT NULL DEFAULT 0,                  -- parte del ajuste de la venta (total ya lo descuenta)
+    codigo_ajuste    VARCHAR(20),                                       -- AJUSTE10, AJUSTE20 o AJUSTE PROPIO
+    obsequio         BOOLEAN       NOT NULL DEFAULT FALSE,              -- mercadería regalada (precio 0)
     anulada_en       TIMESTAMP,                                         -- si se anuló: no cuenta en totales ni ganancias
     anulada_por      INTEGER       REFERENCES usuarios(id),
     motivo_anulacion VARCHAR(200),                  -- de la cantidad, cuántas eran del 2025 (su venta es ganancia neta completa)

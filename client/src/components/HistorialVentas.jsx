@@ -34,6 +34,12 @@ export default function HistorialVentas({ ventas, error, esJefe, textoVacio, onV
                     {venta.producto}
                     <small className="numero-boleta">Boleta N° {String(boletaDe(venta)).padStart(6, "0")}</small>
                     {venta.cliente && <small className="numero-boleta">👤 {venta.cliente}</small>}
+                    {venta.obsequio && <small className="etiqueta etiqueta-obsequio">🎁 Obsequio</small>}
+                    {Number(venta.descuento) > 0 && (
+                        <small className="etiqueta etiqueta-ajustado">
+                            🏷️ {venta.codigoAjuste}: −{moneda(venta.descuento)}
+                        </small>
+                    )}
                     {venta.anuladaEn && (
                         <small className="etiqueta-anulada" title={venta.motivoAnulacion ?? ""}>
                             ANULADA · {venta.anuladaPor}: {venta.motivoAnulacion}

@@ -71,6 +71,9 @@ async function consultarVentas(pool, esJefe, opciones = {}) {
             ventas.cantidad,
             ventas.precio_unitario AS "precioUnitario",
             ventas.total,
+            ventas.descuento,
+            ventas.codigo_ajuste AS "codigoAjuste",
+            ventas.obsequio,
             ventas.metodo_pago AS "metodoPago",
             COALESCE(usuarios.nombre, 'No registrado') AS vendedor,
             autoriza.nombre AS "autorizadoPor",
@@ -146,13 +149,21 @@ function armarBoleta(filas) {
         clienteTelefono: primera.clienteTelefono,
         anulada: Boolean(primera.anuladaEn),
         total: filas.reduce((suma, f) => suma + Number(f.total), 0).toFixed(2),
+        // Antes del ajuste y cuánto se descontó.
+        subtotal: filas.reduce((suma, f) => suma + Number(f.total) + Number(f.descuento), 0).toFixed(2),
+        ajuste: {
+            codigo: primera.codigoAjuste,
+            monto: filas.reduce((suma, f) => suma + Number(f.descuento), 0).toFixed(2)
+        },
         items: filas.map((f) => ({
             producto: f.producto,
             codigo: f.codigo,
             modalidad: f.modalidad,
             cantidad: f.cantidad,
             precioUnitario: f.precioUnitario,
-            total: f.total
+            total: f.total,
+            descuento: f.descuento,
+            obsequio: f.obsequio
         }))
     };
 }

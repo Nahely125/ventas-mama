@@ -1,6 +1,7 @@
 const express = require("express");
 const pool = require("../db");
 const { requiereSesion, requiereJefe, leerId } = require("../autenticacion");
+const { COSTO_MAXIMO_OBSEQUIO } = require("./ajustes");
 
 const router = express.Router();
 
@@ -20,6 +21,7 @@ const COLUMNAS_COMUNES = `
     seccion_id AS "seccionId",
     categoria_id AS "categoriaId",
     (foto IS NOT NULL) AS "tieneFoto",
+    COALESCE(precio_compra < ${COSTO_MAXIMO_OBSEQUIO}, FALSE) AS "obsequiable",
     COALESCE(EXTRACT(EPOCH FROM foto_actualizada)::BIGINT, 0)::INT AS "fotoVersion"
 `;
 
