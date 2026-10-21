@@ -82,7 +82,55 @@ const MIGRACIONES = `
         usuario_id INTEGER REFERENCES usuarios(id),
         creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
+
+    -- Registro de los cambios de datos que solo deben hacerse una vez.
+    CREATE TABLE IF NOT EXISTS migraciones_unicas (
+        nombre VARCHAR(100) PRIMARY KEY,
+        aplicada_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
 `;
+
+// Nombres que empiezan con "Árbol"/"Arbol" (así "Estrella para árbol" no cuenta como árbol).
+const PATRON_ARBOL = "^\\s*[aáAÁ]rbol";
+
+/* Cambios de datos que se aplican UNA sola vez (quedan anotados en migraciones_unicas).
+   Así, si luego se borra o cambia algo a mano, no vuelve a aparecer. */
+const MIGRACIONES_UNICAS = [
+    {
+        nombre: "2026-10-seccion-arboles",
+        async aplicar(client) {
+            const existente = await client.query(
+                `SELECT id FROM secciones WHERE nombre ~* $1 LIMIT 1`,
+                ["[aá]rbol"]
+            );
+
+            let seccionId = existente.rows[0]?.id;
+
+            if (!seccionId) {
+                // Se ubica justo después de la Feria Navideña.
+                const navidad = await client.query(
+                    `SELECT orden FROM secciones WHERE tema = 'navidad' ORDER BY orden LIMIT 1`
+                );
+                const base = navidad.rows[0]?.orden ?? 0;
+
+                await client.query(`UPDATE secciones SET orden = orden + 1 WHERE orden > $1`, [base]);
+
+                const creada = await client.query(
+                    `INSERT INTO secciones (nombre, descripcion, tema, visible, orden)
+                     VALUES ('Árboles de Navidad', 'Árboles navideños de todos los tamaños.', 'navidad', TRUE, $1)
+                     RETURNING id`,
+                    [base + 1]
+                );
+                seccionId = creada.rows[0].id;
+            }
+
+            await client.query(
+                `UPDATE productos SET seccion_id = $1 WHERE nombre ~* $2`,
+                [seccionId, PATRON_ARBOL]
+            );
+        }
+    }
+];
 
 async function ejecutarMigraciones() {
     const client = await pool.connect();
@@ -90,6 +138,20 @@ async function ejecutarMigraciones() {
     try {
         await client.query("BEGIN");
         await client.query(MIGRACIONES);
+
+        for (const migracion of MIGRACIONES_UNICAS) {
+            const aplicada = await client.query(
+                `SELECT 1 FROM migraciones_unicas WHERE nombre = $1`,
+                [migracion.nombre]
+            );
+
+            if (aplicada.rows.length === 0) {
+                await migracion.aplicar(client);
+                await client.query(`INSERT INTO migraciones_unicas (nombre) VALUES ($1)`, [migracion.nombre]);
+                console.log(`Cambio de datos aplicado: ${migracion.nombre}`);
+            }
+        }
+
         await client.query("COMMIT");
     } catch (error) {
         await client.query("ROLLBACK");

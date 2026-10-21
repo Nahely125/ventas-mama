@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { pedir } from "../api.js";
-import { textoCostoUnitario, validarProducto } from "../producto.js";
+import { validarProducto } from "../producto.js";
 import CamposProducto from "./CamposProducto.jsx";
 import { guardarFoto, urlFoto } from "../fotos.js";
 
@@ -21,6 +21,8 @@ export default function ModalEditarProducto({ producto, onCerrar, onGuardado, on
         unidadesPorCaja: String(unidades),
         stock: String(producto.stock),
         seccionId: producto.seccionId ? String(producto.seccionId) : "",
+        // Al editar no se cambia la sección sola: ya fue elegida.
+        seccionManual: true,
         foto: undefined,
         fotoActual: urlFoto(producto)
     });
@@ -83,10 +85,6 @@ export default function ModalEditarProducto({ producto, onCerrar, onGuardado, on
                     prefijo="editar"
                     etiquetaCompra="Costo de compra por caja (S/)"
                 />
-
-                <p className="costo-calculado">
-                    {textoCostoUnitario(valores.precioCompra, valores.unidadesPorCaja)}
-                </p>
 
                 {error && <p className="mensaje mensaje-error" role="alert">{error}</p>}
 

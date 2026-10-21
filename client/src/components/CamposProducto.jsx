@@ -1,8 +1,10 @@
 import { useCallback, useState } from "react";
-import { porDocena } from "../producto.js";
+import { porDocena, textoCostoUnitario } from "../producto.js";
 import CampoFoto from "./CampoFoto.jsx";
 import Escaner from "./Escaner.jsx";
 import { iconoTema, useSecciones } from "../secciones.js";
+
+const ESARBOL = /^\s*[aá]rbol/i;
 
 /* Campos compartidos por el formulario de registro y el modal de edición.
    valores.docenaAuto: mientras sea true, el precio por docena sigue al precio mínimo × 12.
@@ -11,6 +13,7 @@ import { iconoTema, useSecciones } from "../secciones.js";
 export default function CamposProducto({ valores, onCambio, prefijo, etiquetaCompra }) {
     const [escaneando, setEscaneando] = useState(false);
     const secciones = useSecciones();
+    const seccionArboles = secciones.find((s) => /[aá]rbol/i.test(s.nombre));
 
     const codigoLeido = useCallback((codigo) => {
         setEscaneando(false);
@@ -22,6 +25,26 @@ export default function CamposProducto({ valores, onCambio, prefijo, etiquetaCom
 
         onCambio((anteriores) => {
             const nuevos = { ...anteriores, [name]: value };
+
+            // Si el nombre empieza con "Árbol", se elige sola la sección de árboles
+            // (mientras no se haya elegido una sección a mano).
+            if (name === "seccionId") {
+                nuevos.seccionManual = true;
+            }
+
+            if (name === "nombre" && !anteriores.seccionManual && seccionArboles) {
+                const idArboles = String(seccionArboles.id);
+
+                if (ESARBOL.test(value)) {
+                    if (anteriores.seccionId !== idArboles) {
+                        nuevos.seccionAnterior = anteriores.seccionId;
+                        nuevos.seccionId = idArboles;
+                    }
+                } else if (anteriores.seccionId === idArboles && anteriores.seccionAnterior !== undefined) {
+                    nuevos.seccionId = anteriores.seccionAnterior;
+                    nuevos.seccionAnterior = undefined;
+                }
+            }
 
             if (name === "precioDocena") {
                 nuevos.docenaAuto = false;
@@ -110,6 +133,63 @@ export default function CamposProducto({ valores, onCambio, prefijo, etiquetaCom
             </div>
 
             <fieldset className="grupo-campos">
+                <legend>Compra y stock</legend>
+
+                <div className="fila-campos">
+                    <div className="campo">
+                        <label htmlFor={id("precioCompra")}>{etiquetaCompra}</label>
+                        <input
+                            type="number"
+                            id={id("precioCompra")}
+                            name="precioCompra"
+                            min="0"
+                            step="0.01"
+                            inputMode="decimal"
+                            placeholder="48.00"
+                            value={valores.precioCompra}
+                            onChange={cambiar}
+                            required
+                        />
+                    </div>
+
+                    <div className="campo">
+                        <label htmlFor={id("unidadesPorCaja")}>Unidades por caja</label>
+                        <input
+                            type="number"
+                            id={id("unidadesPorCaja")}
+                            name="unidadesPorCaja"
+                            min="1"
+                            step="1"
+                            inputMode="numeric"
+                            value={valores.unidadesPorCaja}
+                            onChange={cambiar}
+                            required
+                        />
+                    </div>
+
+                    <div className="campo">
+                        <label htmlFor={id("stock")}>Stock (unidades)</label>
+                        <input
+                            type="number"
+                            id={id("stock")}
+                            name="stock"
+                            min="0"
+                            step="1"
+                            inputMode="numeric"
+                            placeholder="24"
+                            value={valores.stock}
+                            onChange={cambiar}
+                            required
+                        />
+                    </div>
+                </div>
+
+                <p className="costo-calculado">
+                    {textoCostoUnitario(valores.precioCompra, valores.unidadesPorCaja)}
+                </p>
+            </fieldset>
+
+            <fieldset className="grupo-campos">
                 <legend>Precios de venta</legend>
 
                 <div className="fila-campos">
@@ -169,59 +249,6 @@ export default function CamposProducto({ valores, onCambio, prefijo, etiquetaCom
                         </span>
                     </div>
 
-                </div>
-            </fieldset>
-
-            <fieldset className="grupo-campos">
-                <legend>Compra y stock</legend>
-
-                <div className="fila-campos">
-                    <div className="campo">
-                        <label htmlFor={id("precioCompra")}>{etiquetaCompra}</label>
-                        <input
-                            type="number"
-                            id={id("precioCompra")}
-                            name="precioCompra"
-                            min="0"
-                            step="0.01"
-                            inputMode="decimal"
-                            placeholder="48.00"
-                            value={valores.precioCompra}
-                            onChange={cambiar}
-                            required
-                        />
-                    </div>
-
-                    <div className="campo">
-                        <label htmlFor={id("unidadesPorCaja")}>Unidades por caja</label>
-                        <input
-                            type="number"
-                            id={id("unidadesPorCaja")}
-                            name="unidadesPorCaja"
-                            min="1"
-                            step="1"
-                            inputMode="numeric"
-                            value={valores.unidadesPorCaja}
-                            onChange={cambiar}
-                            required
-                        />
-                    </div>
-
-                    <div className="campo">
-                        <label htmlFor={id("stock")}>Stock (unidades)</label>
-                        <input
-                            type="number"
-                            id={id("stock")}
-                            name="stock"
-                            min="0"
-                            step="1"
-                            inputMode="numeric"
-                            placeholder="24"
-                            value={valores.stock}
-                            onChange={cambiar}
-                            required
-                        />
-                    </div>
                 </div>
             </fieldset>
 

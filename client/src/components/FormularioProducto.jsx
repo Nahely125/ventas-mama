@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { pedir } from "../api.js";
-import { textoCostoUnitario, validarProducto } from "../producto.js";
+import { validarProducto } from "../producto.js";
 import CamposProducto from "./CamposProducto.jsx";
 import { guardarFoto } from "../fotos.js";
 
@@ -69,10 +69,6 @@ export default function FormularioProducto({ onCreado, onError }) {
                     prefijo="nuevo"
                     etiquetaCompra="Costo de compra (S/)"
                 />
-
-                <p className="costo-calculado">
-                    {textoCostoUnitario(valores.precioCompra, valores.unidadesPorCaja)}
-                </p>
 
                 <button type="submit" className="boton-principal" disabled={enviando}>
                     {enviando ? "Registrando..." : "Registrar producto"}
