@@ -88,6 +88,63 @@ function anotarFallo(req, clave) {
     req.session[clave] = bloqueo;
 }
 
+/* Revisa los obsequios de un empleado: [{ producto (con obsequiable y valor_obsequio), unidades }].
+   Devuelve el mensaje de error o null. Los mensajes no muestran montos (el empleado no ve costos). */
+function errorObsequios(regalos) {
+    let valor = 0;
+
+    for (const { producto, unidades } of regalos) {
+        if (!producto.obsequiable) {
+            return `${producto.nombre} no se puede obsequiar.`;
+        }
+
+        // Sin valor conocido (sin costo registrado): cuenta como que excede.
+        valor += producto.valor_obsequio === null ? Infinity : Number(producto.valor_obsequio) * unidades;
+    }
+
+    // Máximo de S/ 5 por venta (ver VALOR_OBSEQUIO).
+    return Math.round(valor * 100) > COSTO_MAXIMO_OBSEQUIO * 100
+        ? "El obsequio pasa del máximo permitido. Regala menos unidades u otro producto, o pídeselo al jefe."
+        : null;
+}
+
+/* Antes de agregar un obsequio a la venta: { obsequios: [{ productoId, cantidad }] } con todos los
+   regalos de la venta (los que ya están y el nuevo). Responde { ok: true } o el error. El jefe no tiene límite. */
+router.post("/validar-obsequio", requiereSesion, async (req, res) => {
+    const obsequios = req.body?.obsequios;
+
+    if (
+        !Array.isArray(obsequios) || obsequios.length === 0 || obsequios.length > MAXIMO_PRODUCTOS ||
+        obsequios.some((o) => !Number.isInteger(o?.productoId) || o.productoId <= 0 || !Number.isInteger(o.cantidad) || o.cantidad <= 0)
+    ) {
+        return res.status(400).json({ error: "Revisa el producto y la cantidad del obsequio." });
+    }
+
+    if (req.session.usuario.rol === "jefe") {
+        return res.json({ ok: true });
+    }
+
+    try {
+        const resultado = await pool.query(
+            `SELECT id, nombre, ${OBSEQUIABLE} AS obsequiable, ${VALOR_OBSEQUIO} AS valor_obsequio
+             FROM productos
+             WHERE id = ANY($1::int[])`,
+            [[...new Set(obsequios.map((o) => o.productoId))]]
+        );
+        const productos = new Map(resultado.rows.map((p) => [p.id, p]));
+
+        if (obsequios.some((o) => !productos.has(o.productoId))) {
+            return res.status(404).json({ error: "Uno de los productos ya no existe." });
+        }
+
+        const error = errorObsequios(obsequios.map((o) => ({ producto: productos.get(o.productoId), unidades: o.cantidad })));
+        return error ? res.status(400).json({ error }) : res.json({ ok: true });
+    } catch (error) {
+        console.error("Error al revisar el obsequio:", error.message);
+        res.status(500).json({ error: "No se pudo revisar el obsequio." });
+    }
+});
+
 /* Comprueba un código de ajuste antes de cobrar: { codigo } → { codigo, monto }
    (monto null = monto libre: se escribe al vender). */
 router.post("/validar-ajuste", requiereSesion, async (req, res) => {
@@ -190,8 +247,8 @@ router.post("/", requiereSesion, async (req, res) => {
         const productos = new Map(resultado.rows.map((p) => [p.id, p]));
         const unidadesPorProducto = new Map();
         const bajoMinimo = [];
-        // Costo de lo que se regala en esta venta (un empleado tiene un máximo).
-        let costoObsequios = 0;
+        // Lo que se regala en esta venta (un empleado tiene límites).
+        const regalos = [];
 
         for (const item of items) {
             const producto = productos.get(item.productoId);
@@ -206,16 +263,7 @@ router.post("/", requiereSesion, async (req, res) => {
             unidadesPorProducto.set(producto.id, (unidadesPorProducto.get(producto.id) ?? 0) + unidades);
 
             if (item.obsequio === true) {
-                // El empleado solo regala productos permitidos (ver OBSEQUIABLE). El mensaje no da montos.
-                if (!esJefe && !producto.obsequiable) {
-                    await client.query("ROLLBACK");
-                    return res.status(400).json({ error: `${producto.nombre} no se puede obsequiar.` });
-                }
-
-                // Sin valor conocido (sin costo registrado): para el empleado cuenta como que excede.
-                costoObsequios += producto.valor_obsequio === null
-                    ? Infinity
-                    : Number(producto.valor_obsequio) * unidades;
+                regalos.push({ producto, unidades });
                 continue;
             }
 
@@ -226,13 +274,12 @@ router.post("/", requiereSesion, async (req, res) => {
             }
         }
 
-        // El empleado puede regalar como máximo S/ 5 por venta (ver VALOR_OBSEQUIO); el jefe, lo que quiera.
-        // El mensaje no muestra el costo, que el empleado no ve.
-        if (!esJefe && Math.round(costoObsequios * 100) > COSTO_MAXIMO_OBSEQUIO * 100) {
+        // Se vuelve a revisar al cobrar (por si cambió algo); el jefe regala lo que quiera.
+        const errorRegalos = esJefe ? null : errorObsequios(regalos);
+
+        if (errorRegalos) {
             await client.query("ROLLBACK");
-            return res.status(400).json({
-                error: "El obsequio pasa del máximo permitido. Regala menos unidades u otro producto, o pídeselo al jefe."
-            });
+            return res.status(400).json({ error: errorRegalos });
         }
 
         for (const [id, unidades] of unidadesPorProducto) {

@@ -115,6 +115,7 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
     const [regalo, setRegalo] = useState(null);
     const [cantidadRegalo, setCantidadRegalo] = useState("1");
     const [errorRegalo, setErrorRegalo] = useState("");
+    const [revisandoRegalo, setRevisandoRegalo] = useState(false);
 
     // Carrito y cobro
     const [carrito, setCarrito] = useState([]);
@@ -230,7 +231,7 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
         setMensaje(null);
     }
 
-    function agregarRegalo() {
+    async function agregarRegalo() {
         const cantidadNum = Number(cantidadRegalo);
 
         if (!regaloActual) {
@@ -248,6 +249,30 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
         if (cantidadNum > disponibles) {
             setErrorRegalo(`Stock insuficiente. Quedan ${Math.max(disponibles, 0)} unidades disponibles.`);
             return;
+        }
+
+        // Antes de agregarlo se revisa que el regalo (junto con los que ya están) se pueda dar.
+        if (!esJefe) {
+            setRevisandoRegalo(true);
+
+            try {
+                await pedir("/api/ventas/validar-obsequio", {
+                    method: "POST",
+                    cuerpo: {
+                        obsequios: [
+                            ...carrito
+                                .filter((item) => item.modalidad === "obsequio")
+                                .map((item) => ({ productoId: item.producto.id, cantidad: item.cantidad })),
+                            { productoId: regaloActual.id, cantidad: cantidadNum }
+                        ]
+                    }
+                });
+            } catch (error) {
+                onError(error, () => setErrorRegalo(`🚫 No se puede agregar: ${error.message}`));
+                return;
+            } finally {
+                setRevisandoRegalo(false);
+            }
         }
 
         setCarrito((anterior) => [
@@ -601,8 +626,13 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                                         onChange={(e) => setCantidadRegalo(e.target.value)}
                                     />
                                 </div>
-                                <button type="button" className="boton-agregar boton-agregar-obsequio" onClick={agregarRegalo}>
-                                    🎁 Agregar obsequio · Gratis
+                                <button
+                                    type="button"
+                                    className="boton-agregar boton-agregar-obsequio"
+                                    onClick={agregarRegalo}
+                                    disabled={revisandoRegalo}
+                                >
+                                    {revisandoRegalo ? "Revisando..." : "🎁 Agregar obsequio · Gratis"}
                                 </button>
                             </div>
                         )}
