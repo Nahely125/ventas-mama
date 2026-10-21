@@ -1,7 +1,7 @@
 const express = require("express");
 const pool = require("../db");
 const { requiereSesion, requiereJefe, leerId } = require("../autenticacion");
-const { COSTO_MAXIMO_OBSEQUIO } = require("./ajustes");
+const { OBSEQUIABLE } = require("./ajustes");
 
 const router = express.Router();
 
@@ -22,7 +22,7 @@ const COLUMNAS_COMUNES = `
     categoria_id AS "categoriaId",
     (foto IS NOT NULL) AS "tieneFoto",
     -- Se puede regalar (el empleado solo ve si sí o no, nunca el costo).
-    COALESCE(precio_compra < ${COSTO_MAXIMO_OBSEQUIO}, FALSE) AS "obsequiable",
+    ${OBSEQUIABLE} AS "obsequiable",
     COALESCE(EXTRACT(EPOCH FROM foto_actualizada)::BIGINT, 0)::INT AS "fotoVersion"
 `;
 

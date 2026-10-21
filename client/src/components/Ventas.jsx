@@ -140,7 +140,7 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
 
     const porUnidades = unidadesDe(modalidad);
     const esDePaquete = esPaquete(modalidad);
-    // Productos que se pueden regalar: costo menor a S/ 5 por unidad y con stock.
+    // Productos que se pueden regalar (el servidor decide cuáles: ver OBSEQUIABLE) y con stock.
     const productosObsequio = (productos ?? [])
         .filter((p) => p.obsequiable && p.stock > 0)
         .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
@@ -544,7 +544,8 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                     <fieldset className="grupo-campos agregar-obsequio">
                         <legend>🎁 Obsequio (opcional)</legend>
                         <p className="ayuda-campo">
-                            Solo aparecen los productos de menos de <strong>S/ 5</strong>. Va gratis en la boleta y se descuenta del stock.
+                            {esJefe && <>Solo aparecen los productos que se pueden regalar (costo menor a <strong>S/ 5</strong>). </>}
+                            Va gratis en la boleta y se descuenta del stock.
                         </p>
 
                         <div className="campo">

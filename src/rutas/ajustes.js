@@ -10,6 +10,16 @@ const router = express.Router();
 // (al costo) no más de esto por venta.
 const COSTO_MAXIMO_OBSEQUIO = 5;
 
+// Si un producto de una sección navideña se puede regalar: costo menor a S/ 5 y, además,
+// su precio por unidad y por unidad en la docena no pasan de S/ 5. (SQL sobre la tabla productos.)
+const OBSEQUIABLE = `(
+    COALESCE(productos.precio_compra < ${COSTO_MAXIMO_OBSEQUIO}, FALSE)
+    AND NOT (
+        EXISTS (SELECT 1 FROM secciones WHERE secciones.id = productos.seccion_id AND secciones.tema = 'navidad')
+        AND (productos.precio > ${COSTO_MAXIMO_OBSEQUIO} OR productos.precio_docena / 12 > ${COSTO_MAXIMO_OBSEQUIO})
+    )
+)`;
+
 // Nombre con el que queda el descuento que hace el jefe directamente, sin código.
 const AJUSTE_DEL_JEFE = "DESCUENTO DEL JEFE";
 
@@ -209,6 +219,7 @@ module.exports = {
     router,
     AJUSTE_DEL_JEFE,
     COSTO_MAXIMO_OBSEQUIO,
+    OBSEQUIABLE,
     normalizarCodigo,
     resolverAjuste,
     repartirAjuste
