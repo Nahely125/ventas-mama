@@ -8,6 +8,9 @@
 #   DATABASE_URL        la misma dirección de Neon que usa Render.
 #   RCLONE_DRIVE_TOKEN  el permiso de Google Drive que da «rclone authorize "drive"» (el texto {...}).
 # Y, si quieres otra carpeta, la variable (no secreto) DRIVE_CARPETA (por defecto «Respaldos Mil Deseos»).
+# Opcional: RCLONE_DRIVE_CLIENT_ID y RCLONE_DRIVE_CLIENT_SECRET si se usa un acceso propio de Google
+# (el compartido de rclone se retira en 2026: https://rclone.org/drive/#making-your-own-client-id).
+# Con un acceso propio hay que volver a sacar el token: rclone authorize "drive" "CLIENT_ID" "CLIENT_SECRET".
 #
 # Para recuperar una copia: pg_restore --clean --if-exists --no-owner --dbname "DATABASE_URL" archivo.dump
 
@@ -37,6 +40,8 @@ jobs:
       RCLONE_CONFIG_DRIVE_TYPE: drive
       RCLONE_CONFIG_DRIVE_SCOPE: drive
       RCLONE_CONFIG_DRIVE_TOKEN: ${{ secrets.RCLONE_DRIVE_TOKEN }}
+      RCLONE_CONFIG_DRIVE_CLIENT_ID: ${{ secrets.RCLONE_DRIVE_CLIENT_ID }}
+      RCLONE_CONFIG_DRIVE_CLIENT_SECRET: ${{ secrets.RCLONE_DRIVE_CLIENT_SECRET }}
 
     steps:
       - name: Revisar los secretos
