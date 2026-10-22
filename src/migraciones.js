@@ -147,6 +147,20 @@ const MIGRACIONES = `
     CREATE INDEX IF NOT EXISTS devoluciones_fecha_idx ON devoluciones (fecha);
     CREATE INDEX IF NOT EXISTS devoluciones_venta_idx ON devoluciones (venta_id);
 
+    -- Costos con hasta 4 decimales (por ejemplo, S/ 0.0833 por unidad). Solo se cambia una vez.
+    DO $$
+    BEGIN
+        IF (SELECT numeric_scale FROM information_schema.columns
+            WHERE table_name = 'productos' AND column_name = 'precio_compra') < 4 THEN
+            ALTER TABLE productos ALTER COLUMN precio_compra TYPE NUMERIC(14, 4);
+        END IF;
+
+        IF (SELECT numeric_scale FROM information_schema.columns
+            WHERE table_name = 'ventas' AND column_name = 'costo_unitario') < 4 THEN
+            ALTER TABLE ventas ALTER COLUMN costo_unitario TYPE NUMERIC(14, 4);
+        END IF;
+    END $$;
+
     -- Colores de un producto (opcional): cada color con su stock; el del producto es la suma.
     CREATE TABLE IF NOT EXISTS producto_colores (
         id SERIAL PRIMARY KEY,
@@ -206,6 +220,13 @@ const MIGRACIONES = `
         usuario_id INTEGER REFERENCES usuarios(id),
         creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
+    DO $$
+    BEGIN
+        IF (SELECT numeric_scale FROM information_schema.columns
+            WHERE table_name = 'compras' AND column_name = 'costo_total') < 4 THEN
+            ALTER TABLE compras ALTER COLUMN costo_total TYPE NUMERIC(16, 4);
+        END IF;
+    END $$;
     ALTER TABLE compras ADD COLUMN IF NOT EXISTS color_id INTEGER REFERENCES producto_colores(id) ON DELETE SET NULL;
     ALTER TABLE compras ADD COLUMN IF NOT EXISTS color VARCHAR(40);
 

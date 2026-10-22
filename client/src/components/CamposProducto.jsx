@@ -295,7 +295,7 @@ export default function CamposProducto({ valores, onCambio, prefijo, etiquetaCom
                             id={id("precioCompra")}
                             name="precioCompra"
                             min="0"
-                            step="0.01"
+                            step="0.0001"
                             inputMode="decimal"
                             placeholder="48.00"
                             value={valores.precioCompra}

@@ -72,7 +72,7 @@ CREATE TABLE IF NOT EXISTS productos (
     precio_minimo      NUMERIC(10,2) NOT NULL CHECK (precio_minimo >= 0),   -- un empleado no puede vender por debajo (sin el jefe)
     precio_docena      NUMERIC(10,2) NOT NULL CHECK (precio_docena >= 0),   -- precio de venta por docena
     precio_minimo_docena NUMERIC(10,2) NOT NULL CHECK (precio_minimo_docena >= 0), -- ídem para la docena
-    precio_compra      NUMERIC(10,2) CHECK (precio_compra >= 0),            -- costo por unidad
+    precio_compra      NUMERIC(14,4) CHECK (precio_compra >= 0),            -- costo por unidad (hasta 4 decimales)
     unidades_por_caja  INTEGER       NOT NULL DEFAULT 1 CHECK (unidades_por_caja >= 1),
     stock              INTEGER       NOT NULL CHECK (stock >= 0),           -- siempre en unidades
     stock_2025         INTEGER       NOT NULL DEFAULT 0,                    -- unidades del stock que son mercadería del 2025 (ya pagada)
@@ -129,7 +129,7 @@ CREATE TABLE IF NOT EXISTS ventas (
     cantidad         INTEGER       NOT NULL CHECK (cantidad > 0),
     modalidad        VARCHAR(10)   NOT NULL DEFAULT 'unidad',           -- 'unidad' o 'docena'
     precio_unitario  NUMERIC(10,2) NOT NULL CHECK (precio_unitario >= 0),
-    costo_unitario   NUMERIC(10,2),
+    costo_unitario   NUMERIC(14,4),
     total            NUMERIC(10,2) NOT NULL CHECK (total >= 0),
     metodo_pago      VARCHAR(20)   NOT NULL DEFAULT 'efectivo',         -- efectivo, yape, plin, transferencia
     token            UUID          NOT NULL DEFAULT gen_random_uuid(),
@@ -260,7 +260,7 @@ CREATE TABLE IF NOT EXISTS compras (
     id            SERIAL PRIMARY KEY,
     producto_id   INTEGER       NOT NULL REFERENCES productos(id) ON DELETE CASCADE,
     cantidad      INTEGER       NOT NULL CHECK (cantidad > 0),          -- en unidades
-    costo_total   NUMERIC(12,2) NOT NULL CHECK (costo_total >= 0),
+    costo_total   NUMERIC(16,4) NOT NULL CHECK (costo_total >= 0),
     proveedor     VARCHAR(120),
     fecha         DATE          NOT NULL,
     contabilizar  VARCHAR(12)   NOT NULL DEFAULT 'inversion',           -- inversion, gasto o ninguno

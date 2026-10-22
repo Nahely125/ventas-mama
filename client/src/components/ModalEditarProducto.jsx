@@ -27,7 +27,8 @@ export default function ModalEditarProducto({ producto, onCerrar, onGuardado, on
         precioDocenaInicial: producto.precioDocena,
         precioMinimoDocenaInicial: producto.precioMinimoDocena,
         // Sin costo registrado queda vacío (hay que escribirlo), no en S/ 0.
-        precioCompra: producto.precioCompra == null ? "" : (Number(producto.precioCompra) * unidades).toFixed(2),
+        // Hasta 4 decimales, sin ceros de más (S/ 48, S/ 0.0833).
+        precioCompra: producto.precioCompra == null ? "" : String(Number((Number(producto.precioCompra) * unidades).toFixed(4))),
         unidadesPorCaja: String(unidades),
         stock: String(producto.stock),
         usaColores: (producto.colores ?? []).length > 0,

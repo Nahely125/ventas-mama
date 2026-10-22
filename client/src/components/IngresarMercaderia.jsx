@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { moneda, pedir } from "../api.js";
+import { moneda, monedaCosto, pedir } from "../api.js";
 import { hoy } from "../fechas.js";
 import BuscadorProducto from "./BuscadorProducto.jsx";
 
@@ -56,7 +56,7 @@ export default function IngresarMercaderia({ productos, productoInicial = null, 
                 cuerpo: {
                     productoId: producto.id,
                     cantidad: unidades,
-                    costoTotal: Number(costoTotal.toFixed(2)),
+                    costoTotal: Number(costoTotal.toFixed(4)),
                     proveedor: proveedor.trim(),
                     fecha,
                     contabilizar,
@@ -128,7 +128,7 @@ export default function IngresarMercaderia({ productos, productoInicial = null, 
 
                     <div className="campo">
                         <label htmlFor="compra-costo">{costoPorUnidad ? "Costo por unidad (S/)" : "Costo total (S/)"}</label>
-                        <input id="compra-costo" type="number" min="0" step="0.01" inputMode="decimal" value={costo}
+                        <input id="compra-costo" type="number" min="0" step="0.0001" inputMode="decimal" value={costo}
                             onChange={(e) => setCosto(e.target.value)} required />
                         <button type="button" className="boton-enlace" onClick={() => setCostoPorUnidad((v) => !v)}>
                             {costoPorUnidad ? "Escribir el costo total" : "Escribir el costo por unidad"}
@@ -166,7 +166,7 @@ export default function IngresarMercaderia({ productos, productoInicial = null, 
                 {producto && unidades > 0 && (
                     <p className="costo-calculado">
                         Llegan <strong>{unidades} u.</strong> · Costo total <strong>{moneda(costoTotal)}</strong> ·{" "}
-                        {moneda(costoUnitario)} c/u → stock nuevo: <strong>{producto.stock + unidades} u.</strong>
+                        {monedaCosto(costoUnitario)} c/u → stock nuevo: <strong>{producto.stock + unidades} u.</strong>
                     </p>
                 )}
 

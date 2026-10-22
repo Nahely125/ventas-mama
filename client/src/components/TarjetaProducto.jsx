@@ -1,4 +1,4 @@
-import { moneda } from "../api.js";
+import { moneda, monedaCosto } from "../api.js";
 import { urlFoto } from "../fotos.js";
 
 export default function TarjetaProducto({ producto, esJefe, retraso, onEditar, onEliminar, onIngresar }) {
@@ -26,12 +26,12 @@ export default function TarjetaProducto({ producto, esJefe, retraso, onEditar, o
                     )}
                     <div>
                         <dt>Costo por caja</dt>
-                        <dd>{moneda(costoUnitario * unidadesPorCaja)}</dd>
+                        <dd>{monedaCosto(costoUnitario * unidadesPorCaja)}</dd>
                     </div>
                     <div>
                         <dt>Costo por unidad</dt>
                         <dd>
-                            {moneda(costoUnitario)}{" "}
+                            {monedaCosto(costoUnitario)}{" "}
                             <small>({unidadesPorCaja} por caja)</small>
                         </dd>
                     </div>

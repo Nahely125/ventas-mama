@@ -1,8 +1,8 @@
-import { moneda } from "../api.js";
+import { moneda, monedaCosto } from "../api.js";
 import { describirCantidad, formatearFecha, nombreMetodoPago, precioCobrado } from "../venta.js";
 
 function monedaOpcional(valor) {
-    return valor == null ? "No disponible" : moneda(valor);
+    return valor == null ? "No disponible" : monedaCosto(valor);
 }
 
 export default function HistorialVentas({ ventas, error, esJefe, textoVacio, onVerComprobante, onAnular, onDevolver }) {

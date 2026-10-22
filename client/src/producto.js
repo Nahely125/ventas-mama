@@ -1,3 +1,5 @@
+import { monedaCosto } from "./api.js";
+
 const CAMPOS_NUMERICOS = [
     "precio",
     "precioMinimo",
@@ -102,6 +104,10 @@ export function validarProducto(valoresFormulario) {
         return { error: "Ingresa el código del producto." };
     }
 
+    if (String(valores.precioCompra).trim() !== "" && !/^\d*\.?\d{0,4}$/.test(String(valores.precioCompra).trim())) {
+        return { error: "El costo puede tener hasta 4 decimales." };
+    }
+
     const vacio = CAMPOS_NUMERICOS.some((campo) => String(valores[campo]).trim() === "");
 
     if (
@@ -138,7 +144,7 @@ export function textoCostoUnitario(precioCompra, unidadesPorCaja) {
         return "Ingresa un precio y una cantidad válidos.";
     }
 
-    return `Costo por unidad: S/ ${(costo / unidades).toFixed(2)}`;
+    return `Costo por unidad: ${monedaCosto(costo / unidades)}`;
 }
 
 // Precio × 12 como texto con 2 decimales ("" si el precio no es válido).

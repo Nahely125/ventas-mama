@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { moneda, pedir } from "../api.js";
+import { moneda, monedaCosto, pedir } from "../api.js";
 import { METODOS_PAGO, UNIDADES_MODALIDAD, nombreModalidad } from "../venta.js";
 import BuscadorProducto from "./BuscadorProducto.jsx";
 import Comprobante from "./Comprobante.jsx";
@@ -646,8 +646,8 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                                         </span>
                                         {costoUnidad !== null && (
                                             <span className={`dato-costo ${gananciaPaquete !== null && gananciaPaquete < 0 ? "perdida" : ""}`}>
-                                                💰 Costo: <strong>{moneda(costoUnidad)}</strong> c/u
-                                                {esDePaquete && <> · {moneda(costoUnidad * porUnidades)} la {nombreModalidad(modalidad)}</>}
+                                                💰 Costo: <strong>{monedaCosto(costoUnidad)}</strong> c/u
+                                                {esDePaquete && <> · {monedaCosto(costoUnidad * porUnidades)} la {nombreModalidad(modalidad)}</>}
                                                 {gananciaPaquete !== null && (
                                                     <> · Ganas <strong>{moneda(gananciaPaquete)}</strong> por {nombreModalidad(modalidad)}</>
                                                 )}
@@ -708,8 +708,8 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
 
                         {esJefe && regaloActual?.precioCompra != null && (
                             <span className="dato-costo">
-                                💰 Costo: <strong>{moneda(regaloActual.precioCompra)}</strong> c/u
-                                {Number(cantidadRegalo) > 1 && <> · {moneda(Number(regaloActual.precioCompra) * Number(cantidadRegalo))} en total</>}
+                                💰 Costo: <strong>{monedaCosto(regaloActual.precioCompra)}</strong> c/u
+                                {Number(cantidadRegalo) > 1 && <> · {monedaCosto(Number(regaloActual.precioCompra) * Number(cantidadRegalo))} en total</>}
                             </span>
                         )}
 

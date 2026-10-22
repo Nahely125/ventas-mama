@@ -24,7 +24,7 @@ router.get("/", requiereJefe, async (req, res) => {
                 productos.codigo,
                 compras.cantidad,
                 compras.costo_total AS "costoTotal",
-                ROUND(compras.costo_total / compras.cantidad, 2) AS "costoUnitario",
+                ROUND(compras.costo_total / compras.cantidad, 4) AS "costoUnitario",
                 compras.proveedor,
                 TO_CHAR(compras.fecha, 'YYYY-MM-DD') AS fecha,
                 compras.contabilizar,
@@ -98,7 +98,7 @@ router.post("/", requiereJefe, async (req, res) => {
 
         await client.query(
             `UPDATE productos SET stock = stock + $1, precio_compra = $2 WHERE id = $3`,
-            [cantidad, Number(costoPromedio.toFixed(2)), producto.id]
+            [cantidad, Number(costoPromedio.toFixed(4)), producto.id]
         );
 
         // Se registra como inversión o gasto (si costó algo).
@@ -128,7 +128,7 @@ router.post("/", requiereJefe, async (req, res) => {
             `INSERT INTO compras (producto_id, cantidad, costo_total, proveedor, fecha, contabilizar,
                                   gasto_id, inversion_id, usuario_id, color_id, color)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
-            [producto.id, cantidad, Number(costoTotal.toFixed(2)), proveedor.trim() || null, fecha,
+            [producto.id, cantidad, Number(costoTotal.toFixed(4)), proveedor.trim() || null, fecha,
              contabilizar, gastoId, inversionId, req.session.usuario.id, color?.id ?? null, color?.nombre ?? null]
         );
 
@@ -138,7 +138,7 @@ router.post("/", requiereJefe, async (req, res) => {
             mensaje: `Se ingresaron ${cantidad} unidades de ${producto.nombre}${color ? ` (${color.nombre})` : ""}.`,
             id: compra.rows[0].id,
             stock: producto.stock + cantidad,
-            costoUnitario: costoPromedio.toFixed(2)
+            costoUnitario: costoPromedio.toFixed(4)
         });
     } catch (error) {
         if (client) await client.query("ROLLBACK").catch(() => {});
@@ -203,7 +203,7 @@ router.delete("/:id", requiereJefe, async (req, res) => {
 
         await client.query(
             `UPDATE productos SET stock = stock - $1, precio_compra = $2 WHERE id = $3`,
-            [compra.cantidad, Number(costo.toFixed(2)), compra.producto_id]
+            [compra.cantidad, Number(costo.toFixed(4)), compra.producto_id]
         );
 
         await client.query(`DELETE FROM compras WHERE id = $1`, [id]);

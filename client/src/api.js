@@ -29,6 +29,13 @@ export async function pedir(url, opciones = {}) {
     return datos;
 }
 
+// Costos: con 2 a 4 decimales según los tenga (S/ 1.25, S/ 0.0833, S/ 2.125).
+export function monedaCosto(valor) {
+    const numero = Number(valor ?? 0);
+    const texto = `S/ ${Math.abs(numero).toFixed(4).replace(/0{1,2}$/, "")}`;
+    return numero < 0 && Number(numero.toFixed(4)) !== 0 ? `-${texto}` : texto;
+}
+
 export function moneda(valor) {
     const numero = Number(valor ?? 0);
     const texto = `S/ ${Math.abs(numero).toFixed(2)}`;

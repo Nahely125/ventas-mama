@@ -101,6 +101,11 @@ function validarProducto(cuerpo) {
         };
     }
 
+    // El costo admite hasta 4 decimales (por ejemplo, S/ 0.0833).
+    if (Math.abs(precioCompra * 10000 - Math.round(precioCompra * 10000)) > 1e-6) {
+        return { error: "El costo puede tener hasta 4 decimales." };
+    }
+
     if (categoriaId !== null && (!Number.isInteger(categoriaId) || categoriaId <= 0)) {
         return { error: "La categoría elegida no es válida." };
     }
@@ -122,7 +127,7 @@ function validarProducto(cuerpo) {
             precioMinimo,
             precioMinimoDocena,
             // Se recibe el costo de la caja y se guarda el costo por unidad.
-            costoUnitario: Number((precioCompra / unidadesPorCaja).toFixed(2)),
+            costoUnitario: Number((precioCompra / unidadesPorCaja).toFixed(4)),
             unidadesPorCaja,
             stock: stockTotal,
             stock2025,

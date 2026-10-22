@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { moneda, pedir } from "../api.js";
+import { moneda, monedaCosto, pedir } from "../api.js";
 import { formatearDia } from "../fechas.js";
 import IngresarMercaderia from "./IngresarMercaderia.jsx";
 
@@ -74,7 +74,7 @@ export default function Compras({ productos, onCambio, onError }) {
                                     <strong>{c.producto} · {c.cantidad} u.</strong>
                                     <span>
                                         {formatearDia(c.fecha)}
-                                        {c.proveedor && ` · ${c.proveedor}`} · {moneda(c.costoUnitario)} c/u ·{" "}
+                                        {c.proveedor && ` · ${c.proveedor}`} · {monedaCosto(c.costoUnitario)} c/u ·{" "}
                                         <span className="etiqueta etiqueta-trabajador">{CONTABILIZAR[c.contabilizar]}</span>
                                     </span>
                                 </div>
@@ -95,7 +95,7 @@ export default function Compras({ productos, onCambio, onError }) {
                     onCerrar={() => setIngresando(false)}
                     onGuardado={async (resultado) => {
                         setIngresando(false);
-                        setMensaje({ tipo: "exito", texto: `${resultado.mensaje} Nuevo stock: ${resultado.stock} u. Costo por unidad: ${moneda(resultado.costoUnitario)}.` });
+                        setMensaje({ tipo: "exito", texto: `${resultado.mensaje} Nuevo stock: ${resultado.stock} u. Costo por unidad: ${monedaCosto(resultado.costoUnitario)}.` });
                         await Promise.all([cargar(), onCambio()]);
                     }}
                 />
