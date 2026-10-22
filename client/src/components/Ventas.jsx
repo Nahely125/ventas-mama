@@ -39,6 +39,34 @@ function centimos(valor) {
 
 let siguienteClave = 1;
 
+/* Botones para elegir el color de un producto que tiene colores. Muestra cuántas quedan de cada
+   uno (descontando lo que ya está en el carrito) y no deja elegir los que no tienen stock. */
+function SelectorColor({ producto, colorId, enCarrito, onElegir, id }) {
+    return (
+        <div className="campo">
+            <span className="etiqueta-campo" id={id}>Color</span>
+            <div className="selector-colores" role="radiogroup" aria-labelledby={id}>
+                {producto.colores.map((color) => {
+                    const quedan = color.stock - enCarrito(color.id);
+                    return (
+                        <button
+                            key={color.id}
+                            type="button"
+                            role="radio"
+                            aria-checked={colorId === color.id}
+                            className={colorId === color.id ? "activo" : ""}
+                            disabled={quedan <= 0}
+                            onClick={() => onElegir(color.id)}
+                        >
+                            {color.nombre} <small>{quedan > 0 ? `quedan ${quedan}` : "agotado"}</small>
+                        </button>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
+
 // Ventana para que el jefe escriba su contraseña y autorice precios bajo el mínimo.
 function ModalAutorizacion({ productos, minimoDescuento, error, enviando, onConfirmar, onCerrar }) {
     const dialogo = useRef(null);
@@ -116,11 +144,13 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
     const [modalidad, setModalidad] = useState("unidad");
     const [cantidad, setCantidad] = useState("1");
     const [precio, setPrecio] = useState("");
+    const [colorId, setColorId] = useState(null);
     const [errorItem, setErrorItem] = useState("");
 
     // Obsequio: casillero aparte, solo con productos de menos de S/ 5.
     const [regalo, setRegalo] = useState(null);
     const [cantidadRegalo, setCantidadRegalo] = useState("1");
+    const [colorRegaloId, setColorRegaloId] = useState(null);
     const [errorRegalo, setErrorRegalo] = useState("");
     const [revisandoRegalo, setRevisandoRegalo] = useState(false);
 
@@ -181,6 +211,13 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
             .filter((item) => item.producto.id === id)
             .reduce((suma, item) => suma + item.cantidad * unidadesDe(item.modalidad), 0);
 
+    // Unidades de un color ya puestas en el carrito.
+    const unidadesColorEnCarrito = (id) =>
+        carrito
+            .filter((item) => item.color?.id === id)
+            .reduce((suma, item) => suma + item.cantidad * unidadesDe(item.modalidad), 0);
+    const tieneColores = (p) => (p?.colores ?? []).length > 0;
+
     const subtotal = carrito.reduce((suma, item) => suma + item.precio * item.cantidad, 0);
     const montoAjuste = ajuste
         ? (ajuste.monto ?? (Number(montoPropio) > 0 ? Number(Number(montoPropio).toFixed(2)) : 0))
@@ -198,6 +235,7 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
 
     function seleccionarProducto(nuevo) {
         setProducto(nuevo);
+        setColorId(null);
         setPrecio(precioDeLista(nuevo, modalidad));
         setCantidad("1");
         setErrorItem("");
@@ -221,9 +259,20 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
 
         const unidades = cantidadValida * unidadesDe(modalidad);
         const disponibles = productoActual.stock - unidadesEnCarrito(productoActual.id);
+        const color = productoActual.colores?.find((c) => c.id === colorId) ?? null;
+
+        if (tieneColores(productoActual) && !color) {
+            setErrorItem("Elige el color.");
+            return;
+        }
 
         if (unidades > disponibles) {
             setErrorItem(`Stock insuficiente. Quedan ${Math.max(disponibles, 0)} unidades disponibles.`);
+            return;
+        }
+
+        if (color && unidades > color.stock - unidadesColorEnCarrito(color.id)) {
+            setErrorItem(`Stock insuficiente de ${color.nombre}. Quedan ${Math.max(color.stock - unidadesColorEnCarrito(color.id), 0)} unidades.`);
             return;
         }
 
@@ -234,10 +283,12 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                 producto: productoActual,
                 modalidad,
                 cantidad: cantidadValida,
-                precio: precioDelPaquete
+                precio: precioDelPaquete,
+                color: color ? { id: color.id, nombre: color.nombre } : null
             }
         ]);
         setProducto(null);
+        setColorId(null);
         setModalidad("unidad");
         setCantidad("1");
         setPrecio("");
@@ -259,9 +310,20 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
         }
 
         const disponibles = regaloActual.stock - unidadesEnCarrito(regaloActual.id);
+        const colorRegalo = regaloActual.colores?.find((c) => c.id === colorRegaloId) ?? null;
+
+        if (tieneColores(regaloActual) && !colorRegalo) {
+            setErrorRegalo("Elige el color.");
+            return;
+        }
 
         if (cantidadNum > disponibles) {
             setErrorRegalo(`Stock insuficiente. Quedan ${Math.max(disponibles, 0)} unidades disponibles.`);
+            return;
+        }
+
+        if (colorRegalo && cantidadNum > colorRegalo.stock - unidadesColorEnCarrito(colorRegalo.id)) {
+            setErrorRegalo(`Stock insuficiente de ${colorRegalo.nombre}. Quedan ${Math.max(colorRegalo.stock - unidadesColorEnCarrito(colorRegalo.id), 0)} unidades.`);
             return;
         }
 
@@ -291,9 +353,17 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
 
         setCarrito((anterior) => [
             ...anterior,
-            { clave: siguienteClave++, producto: regaloActual, modalidad: "obsequio", cantidad: cantidadNum, precio: 0 }
+            {
+                clave: siguienteClave++,
+                producto: regaloActual,
+                modalidad: "obsequio",
+                cantidad: cantidadNum,
+                precio: 0,
+                color: colorRegalo ? { id: colorRegalo.id, nombre: colorRegalo.nombre } : null
+            }
         ]);
         setRegalo(null);
+        setColorRegaloId(null);
         setCantidadRegalo("1");
         setErrorRegalo("");
         setMensaje(null);
@@ -308,6 +378,11 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
         for (const linea of lineas) {
             const actual = buscarActual(linea.producto.id) ?? linea.producto;
             const unidades = linea.cantidad * unidadesDe(linea.modalidad);
+
+            if (tieneColores(actual)) {
+                avisos.push(`${actual.nombre} (tiene colores: agrégalo a mano para elegir el color)`);
+                continue;
+            }
             const yaUsadas = unidadesEnCarrito(actual.id) + (usadas.get(actual.id) ?? 0);
 
             if (unidades > actual.stock - yaUsadas) {
@@ -384,6 +459,7 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                 cuerpo: {
                     items: carrito.map((item) => ({
                         productoId: item.producto.id,
+                        colorId: item.color?.id ?? null,
                         cantidad: item.cantidad,
                         modalidad: item.modalidad === "obsequio" ? "unidad" : item.modalidad,
                         precio: item.precio,
@@ -500,6 +576,16 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                                     </div>
                                 </div>
 
+                                {tieneColores(productoActual) && (
+                                    <SelectorColor
+                                        id="etiqueta-color-venta"
+                                        producto={productoActual}
+                                        colorId={colorId}
+                                        enCarrito={unidadesColorEnCarrito}
+                                        onElegir={setColorId}
+                                    />
+                                )}
+
                                 <div className="fila-campos fila-cantidad-precio">
                                     <div className="campo">
                                         <label htmlFor="cantidad-venta">
@@ -599,6 +685,7 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                                 value={regaloActual?.id ?? ""}
                                 onChange={(e) => {
                                     setRegalo(productosObsequio.find((p) => String(p.id) === e.target.value) ?? null);
+                                    setColorRegaloId(null);
                                     setCantidadRegalo("1");
                                     setErrorRegalo("");
                                 }}
@@ -624,6 +711,16 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                                 💰 Costo: <strong>{moneda(regaloActual.precioCompra)}</strong> c/u
                                 {Number(cantidadRegalo) > 1 && <> · {moneda(Number(regaloActual.precioCompra) * Number(cantidadRegalo))} en total</>}
                             </span>
+                        )}
+
+                        {regaloActual && tieneColores(regaloActual) && (
+                            <SelectorColor
+                                id="etiqueta-color-obsequio"
+                                producto={regaloActual}
+                                colorId={colorRegaloId}
+                                enCarrito={unidadesColorEnCarrito}
+                                onElegir={setColorRegaloId}
+                            />
                         )}
 
                         {regaloActual && (
@@ -670,7 +767,10 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                                     return (
                                         <li key={item.clave} className="item-carrito">
                                             <div className="item-carrito-datos">
-                                                <strong>{item.producto.nombre}</strong>
+                                                <strong>
+                                                    {item.producto.nombre}
+                                                    {item.color && <span className="color-item"> · {item.color.nombre}</span>}
+                                                </strong>
                                                 <span>
                                                     {item.cantidad} {nombreModalidad(item.modalidad, item.cantidad)}{" "}
                                                     {item.modalidad === "obsequio" ? (

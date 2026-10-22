@@ -552,6 +552,18 @@ function DetalleProducto({ producto, enPedido, onAgregar, onCerrar }) {
                     <p className={producto.disponible ? "cat-disponible" : "cat-no-disponible"}>
                         {producto.disponible ? "● Disponible" : "● Agotado por ahora"}
                     </p>
+                    {(producto.colores ?? []).length > 0 && (
+                        <div className="cat-colores">
+                            <span>Colores</span>
+                            <ul>
+                                {producto.colores.map((color) => (
+                                    <li key={color.nombre} className={color.disponible ? "" : "agotado"} title={color.disponible ? "Disponible" : "Agotado"}>
+                                        {color.nombre}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
                     <BotonAgregar producto={producto} enPedido={enPedido} onAgregar={onAgregar} grande />
                     <BotonPedir producto={producto} />
                 </div>

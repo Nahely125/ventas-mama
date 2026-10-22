@@ -154,6 +154,22 @@ CREATE INDEX IF NOT EXISTS ventas_grupo_idx ON ventas (grupo);
 CREATE INDEX IF NOT EXISTS ventas_cliente_idx ON ventas (cliente_id);
 
 -- ---------------------------------------------------------------------
+-- Colores de un producto (opcional): cada color con su stock; el stock del
+-- producto es la suma. Las ventas y compras guardan el color (id y nombre).
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS producto_colores (
+    id          SERIAL PRIMARY KEY,
+    producto_id INTEGER     NOT NULL REFERENCES productos(id) ON DELETE CASCADE,
+    nombre      VARCHAR(40) NOT NULL,
+    stock       INTEGER     NOT NULL DEFAULT 0 CHECK (stock >= 0),
+    orden       INTEGER     NOT NULL DEFAULT 0
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS producto_colores_nombre_unico ON producto_colores (producto_id, LOWER(nombre));
+ALTER TABLE ventas ADD COLUMN IF NOT EXISTS color_id INTEGER REFERENCES producto_colores(id) ON DELETE SET NULL;
+ALTER TABLE ventas ADD COLUMN IF NOT EXISTS color VARCHAR(40);
+
+-- ---------------------------------------------------------------------
 -- Devoluciones parciales: la fila de ventas se reduce (cantidad, total) y aquí
 -- queda lo devuelto, con su fecha (para el cierre de caja).
 -- ---------------------------------------------------------------------
@@ -253,5 +269,8 @@ CREATE TABLE IF NOT EXISTS compras (
     usuario_id    INTEGER       REFERENCES usuarios(id),
     creado_en     TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+ALTER TABLE compras ADD COLUMN IF NOT EXISTS color_id INTEGER REFERENCES producto_colores(id) ON DELETE SET NULL;
+ALTER TABLE compras ADD COLUMN IF NOT EXISTS color VARCHAR(40);
 
 COMMIT;

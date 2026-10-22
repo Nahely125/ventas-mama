@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { calcularGanancias, porDocena, textoCostoUnitario } from "../producto.js";
+import { calcularGanancias, porDocena, sumaColores, textoCostoUnitario } from "../producto.js";
 import { moneda } from "../api.js";
 import CampoFoto from "./CampoFoto.jsx";
 import Escaner from "./Escaner.jsx";
@@ -53,6 +53,91 @@ function ResumenGanancia({ ganancias, es2025 }) {
             )}
             {[...filas, ...filasCaja].some((f) => f.valor !== null && f.valor < 0) && (
                 <p className="texto-error">⚠️ Algún precio está por debajo del costo: venderías con pérdida.</p>
+            )}
+        </div>
+    );
+}
+
+/* Colores del producto (opcional): se activan con la casilla. Cada fila es un color y su
+   cantidad; el stock del producto pasa a ser la suma. */
+function CamposColores({ valores, onCambio, prefijo }) {
+    const colores = valores.colores ?? [];
+
+    const cambiarColores = (cambio) => onCambio((anteriores) => ({ ...anteriores, colores: cambio(anteriores.colores ?? []) }));
+
+    function activar(marcado) {
+        onCambio((anteriores) => ({
+            ...anteriores,
+            usaColores: marcado,
+            // Al activarlos, el stock que ya estaba escrito pasa al primer color.
+            colores: marcado && (anteriores.colores ?? []).length === 0
+                ? [{ nombre: "", stock: anteriores.stock ?? "" }]
+                : anteriores.colores ?? []
+        }));
+    }
+
+    return (
+        <div className={`campos-colores ${valores.usaColores ? "activos" : ""}`}>
+            <label className="casilla">
+                <input type="checkbox" checked={Boolean(valores.usaColores)} onChange={(e) => activar(e.target.checked)} />
+                <span>🎨 Este producto tiene colores</span>
+            </label>
+
+            {valores.usaColores && (
+                <>
+                    <ul className="lista-colores">
+                        {colores.map((color, indice) => (
+                            <li key={color.id ?? `nuevo-${indice}`} className="fila-color">
+                                <div className="campo">
+                                    <label htmlFor={`${prefijo}-color-${indice}`}>Color</label>
+                                    <input
+                                        type="text"
+                                        id={`${prefijo}-color-${indice}`}
+                                        maxLength={40}
+                                        placeholder="Ej. Rojo"
+                                        value={color.nombre}
+                                        onChange={(e) => {
+                                            const nombre = e.target.value;
+                                            cambiarColores((lista) => lista.map((c, i) => (i === indice ? { ...c, nombre } : c)));
+                                        }}
+                                    />
+                                </div>
+                                <div className="campo">
+                                    <label htmlFor={`${prefijo}-color-cantidad-${indice}`}>Cantidad</label>
+                                    <input
+                                        type="number"
+                                        id={`${prefijo}-color-cantidad-${indice}`}
+                                        min="0"
+                                        step="1"
+                                        inputMode="numeric"
+                                        placeholder="0"
+                                        value={color.stock}
+                                        onChange={(e) => {
+                                            const stock = e.target.value;
+                                            cambiarColores((lista) => lista.map((c, i) => (i === indice ? { ...c, stock } : c)));
+                                        }}
+                                    />
+                                </div>
+                                <button
+                                    type="button"
+                                    className="boton-icono"
+                                    onClick={() => cambiarColores((lista) => lista.filter((_, i) => i !== indice))}
+                                    aria-label={`Quitar el color ${color.nombre || indice + 1}`}
+                                    title="Quitar color"
+                                >
+                                    ✕
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
+                    <button
+                        type="button"
+                        className="boton-secundario boton-pequeno"
+                        onClick={() => cambiarColores((lista) => [...lista, { nombre: "", stock: "" }])}
+                    >
+                        ＋ Agregar color
+                    </button>
+                </>
             )}
         </div>
     );
@@ -236,24 +321,39 @@ export default function CamposProducto({ valores, onCambio, prefijo, etiquetaCom
 
                     <div className="campo">
                         <label htmlFor={id("stock")}>Stock (unidades)</label>
-                        <input
-                            type="number"
-                            id={id("stock")}
-                            name="stock"
-                            min="0"
-                            step="1"
-                            inputMode="numeric"
-                            placeholder="24"
-                            value={valores.stock}
-                            onChange={cambiar}
-                            required
-                        />
+                        {valores.usaColores ? (
+                            <input
+                                type="text"
+                                id={id("stock")}
+                                value={sumaColores(valores.colores) ?? "—"}
+                                readOnly
+                                aria-describedby={id("stock-colores")}
+                            />
+                        ) : (
+                            <input
+                                type="number"
+                                id={id("stock")}
+                                name="stock"
+                                min="0"
+                                step="1"
+                                inputMode="numeric"
+                                placeholder="24"
+                                value={valores.stock}
+                                onChange={cambiar}
+                                required
+                            />
+                        )}
+                        {valores.usaColores && (
+                            <span className="ayuda-campo" id={id("stock-colores")}>Es la suma de los colores.</span>
+                        )}
                     </div>
                 </div>
 
                 <p className="costo-calculado">
                     {textoCostoUnitario(valores.precioCompra, valores.unidadesPorCaja)}
                 </p>
+
+                <CamposColores valores={valores} onCambio={onCambio} prefijo={prefijo} />
 
                 <label className={`casilla casilla-2025 ${valores.es2025 ? "marcada" : ""}`}>
                     <input
@@ -339,7 +439,10 @@ export default function CamposProducto({ valores, onCambio, prefijo, etiquetaCom
                     </small>
                 </p>
 
-                <ResumenGanancia ganancias={calcularGanancias(valores)} es2025={Boolean(valores.es2025)} />
+                <ResumenGanancia
+                    ganancias={calcularGanancias(valores.usaColores ? { ...valores, stock: String(sumaColores(valores.colores) ?? "") } : valores)}
+                    es2025={Boolean(valores.es2025)}
+                />
             </fieldset>
 
             <CampoFoto

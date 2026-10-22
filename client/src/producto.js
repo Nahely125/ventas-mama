@@ -22,9 +22,58 @@ function calcularStock2025(valores) {
     return Math.min(valores.stock2025Inicial, stock);
 }
 
+// Stock total de los colores del formulario (vacío si alguna cantidad no es válida).
+export function sumaColores(colores) {
+    const cantidades = (colores ?? []).map((c) => Number(c.stock));
+    return cantidades.every((n) => String(n) !== "NaN" && Number.isInteger(n) && n >= 0)
+        ? cantidades.reduce((suma, n) => suma + n, 0)
+        : null;
+}
+
+// Revisa los colores del formulario. Devuelve { colores } o { error }.
+function validarColores(valores) {
+    if (!valores.usaColores) return { colores: null };
+
+    const colores = (valores.colores ?? []).map((c) => ({
+        ...(c.id ? { id: c.id } : {}),
+        nombre: String(c.nombre ?? "").trim(),
+        stock: String(c.stock ?? "").trim() === "" ? NaN : Number(c.stock)
+    }));
+
+    if (colores.length === 0) {
+        return { error: "Agrega al menos un color, o desmarca «Este producto tiene colores»." };
+    }
+
+    if (colores.some((c) => !c.nombre)) {
+        return { error: "Escribe el nombre de cada color." };
+    }
+
+    if (colores.some((c) => !Number.isInteger(c.stock) || c.stock < 0)) {
+        return { error: "La cantidad de cada color debe ser un número entero de 0 o más." };
+    }
+
+    const nombres = colores.map((c) => c.nombre.toLowerCase());
+    if (new Set(nombres).size !== nombres.length) {
+        return { error: "Hay dos colores con el mismo nombre." };
+    }
+
+    return { colores };
+}
+
 // Convierte los valores del formulario y valida un producto.
 // Devuelve { datos } si es válido o { error } si no lo es.
-export function validarProducto(valores) {
+export function validarProducto(valoresFormulario) {
+    // Con colores, el stock es la suma de sus cantidades.
+    const { colores, error: errorColores } = validarColores(valoresFormulario);
+
+    if (errorColores) {
+        return { error: errorColores };
+    }
+
+    const valores = colores
+        ? { ...valoresFormulario, stock: String(colores.reduce((suma, c) => suma + c.stock, 0)) }
+        : valoresFormulario;
+
     // Al editar sin tocar el precio por unidad en la docena, se conservan la docena y su mínimo
     // exactos (S/ 50 ÷ 12 = 4.17 y 4.17 × 12 daría 50.04).
     const sinCambioDocena = valores.precioDocenaInicial !== undefined
@@ -45,7 +94,8 @@ export function validarProducto(valores) {
         stock: Number(valores.stock),
         stock2025: calcularStock2025(valores),
         seccionId: valores.seccionId ? Number(valores.seccionId) : null,
-        categoriaId: valores.categoriaId ? Number(valores.categoriaId) : null
+        categoriaId: valores.categoriaId ? Number(valores.categoriaId) : null,
+        colores
     };
 
     if (!datos.codigo) {

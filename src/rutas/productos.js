@@ -2,6 +2,7 @@ const express = require("express");
 const pool = require("../db");
 const { requiereSesion, requiereJefe, leerId } = require("../autenticacion");
 const { OBSEQUIABLE } = require("./ajustes");
+const { COLORES_JSON, validarColores, guardarColores } = require("./colores");
 
 const router = express.Router();
 
@@ -23,6 +24,7 @@ const COLUMNAS_COMUNES = `
     (foto IS NOT NULL) AS "tieneFoto",
     -- Se puede regalar (el empleado solo ve si sí o no, nunca el costo).
     ${OBSEQUIABLE} AS "obsequiable",
+    ${COLORES_JSON} AS colores,
     COALESCE(EXTRACT(EPOCH FROM foto_actualizada)::BIGINT, 0)::INT AS "fotoVersion"
 `;
 
@@ -61,6 +63,14 @@ function validarProducto(cuerpo) {
         seccionId = null,
         categoriaId = null
     } = cuerpo;
+    const { colores, error: errorColores } = validarColores(cuerpo.colores);
+
+    if (errorColores) {
+        return { error: errorColores };
+    }
+
+    // Con colores, el stock del producto es la suma de sus colores.
+    const stockTotal = colores ? colores.reduce((suma, c) => suma + c.stock, 0) : stock;
 
     if (typeof codigo !== "string" || !codigo.trim() || codigo.trim().length > 50) {
         return { error: "El código del producto es obligatorio (máximo 50 caracteres)." };
@@ -77,14 +87,14 @@ function validarProducto(cuerpo) {
         !esNumero(precioMinimoDocena) ||
         !esNumero(precioCompra) ||
         !Number.isInteger(unidadesPorCaja) ||
-        !Number.isInteger(stock) ||
+        !Number.isInteger(stockTotal) ||
         precio < 0 ||
         precioDocena < 0 ||
         precioMinimo < 0 ||
         precioMinimoDocena < 0 ||
         precioCompra < 0 ||
         unidadesPorCaja < 1 ||
-        stock < 0
+        stockTotal < 0
     ) {
         return {
             error: "Datos inválidos. Verifica los precios, las unidades por caja y el stock."
@@ -99,7 +109,7 @@ function validarProducto(cuerpo) {
         return { error: "La sección elegida no es válida." };
     }
 
-    if (!Number.isInteger(stock2025) || stock2025 < 0 || stock2025 > stock) {
+    if (!Number.isInteger(stock2025) || stock2025 < 0 || stock2025 > stockTotal) {
         return { error: "Las unidades del 2025 deben estar entre 0 y el stock total." };
     }
 
@@ -114,10 +124,11 @@ function validarProducto(cuerpo) {
             // Se recibe el costo de la caja y se guarda el costo por unidad.
             costoUnitario: Number((precioCompra / unidadesPorCaja).toFixed(2)),
             unidadesPorCaja,
-            stock,
+            stock: stockTotal,
             stock2025,
             seccionId,
-            categoriaId
+            categoriaId,
+            colores
         }
     };
 }
@@ -125,6 +136,11 @@ function validarProducto(cuerpo) {
 function errorDuplicado(error, res) {
     if (error.code === "23503" && /seccion|categoria/.test(error.constraint ?? error.detail ?? "")) {
         res.status(400).json({ error: "La sección o categoría elegida ya no existe." });
+        return true;
+    }
+
+    if (error.code === "23505" && /colores/.test(error.constraint ?? "")) {
+        res.status(409).json({ error: "Hay dos colores con el mismo nombre." });
         return true;
     }
 
@@ -183,15 +199,20 @@ router.post("/", requiereJefe, async (req, res) => {
         return res.status(400).json({ error });
     }
 
+    let client;
+
     try {
-        const resultado = await pool.query(
+        client = await pool.connect();
+        await client.query("BEGIN");
+
+        const resultado = await client.query(
             `INSERT INTO productos
                 (codigo, nombre, precio, precio_docena, precio_minimo,
                  precio_compra, unidades_por_caja, stock, seccion_id, categoria_id,
                  precio_minimo_docena, stock_2025)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8,
                      COALESCE((SELECT seccion_id FROM categorias WHERE id = $10), $9), $10, $11, $12)
-             RETURNING ${COLUMNAS_JEFE}`,
+             RETURNING id`,
             [
                 datos.codigo,
                 datos.nombre,
@@ -208,14 +229,22 @@ router.post("/", requiereJefe, async (req, res) => {
             ]
         );
 
+        const id = resultado.rows[0].id;
+        await guardarColores(client, id, datos.colores);
+        const producto = await client.query(`SELECT ${COLUMNAS_JEFE} FROM productos WHERE id = $1`, [id]);
+        await client.query("COMMIT");
+
         res.status(201).json({
             mensaje: "Producto registrado correctamente",
-            producto: resultado.rows[0]
+            producto: producto.rows[0]
         });
     } catch (err) {
+        if (client) await client.query("ROLLBACK").catch(() => {});
         if (errorDuplicado(err, res)) return;
         console.error("Error al registrar el producto:", err.message);
         res.status(500).json({ error: "Error al registrar el producto" });
+    } finally {
+        client?.release();
     }
 });
 
@@ -233,8 +262,13 @@ router.put("/:id", requiereJefe, async (req, res) => {
         return res.status(400).json({ error });
     }
 
+    let client;
+
     try {
-        const resultado = await pool.query(
+        client = await pool.connect();
+        await client.query("BEGIN");
+
+        const resultado = await client.query(
             `UPDATE productos
              SET codigo = $1,
                  nombre = $2,
@@ -249,7 +283,7 @@ router.put("/:id", requiereJefe, async (req, res) => {
                  precio_minimo_docena = $12,
                  stock_2025 = $13
              WHERE id = $10
-             RETURNING ${COLUMNAS_JEFE}`,
+             RETURNING id`,
             [
                 datos.codigo,
                 datos.nombre,
@@ -268,17 +302,25 @@ router.put("/:id", requiereJefe, async (req, res) => {
         );
 
         if (resultado.rows.length === 0) {
+            await client.query("ROLLBACK");
             return res.status(404).json({ error: "Producto no encontrado" });
         }
 
+        await guardarColores(client, id, datos.colores);
+        const producto = await client.query(`SELECT ${COLUMNAS_JEFE} FROM productos WHERE id = $1`, [id]);
+        await client.query("COMMIT");
+
         res.json({
             mensaje: "Producto actualizado correctamente",
-            producto: resultado.rows[0]
+            producto: producto.rows[0]
         });
     } catch (err) {
+        if (client) await client.query("ROLLBACK").catch(() => {});
         if (errorDuplicado(err, res)) return;
         console.error("Error al actualizar el producto:", err.message);
         res.status(500).json({ error: "Error al actualizar el producto" });
+    } finally {
+        client?.release();
     }
 });
 

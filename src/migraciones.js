@@ -147,6 +147,18 @@ const MIGRACIONES = `
     CREATE INDEX IF NOT EXISTS devoluciones_fecha_idx ON devoluciones (fecha);
     CREATE INDEX IF NOT EXISTS devoluciones_venta_idx ON devoluciones (venta_id);
 
+    -- Colores de un producto (opcional): cada color con su stock; el del producto es la suma.
+    CREATE TABLE IF NOT EXISTS producto_colores (
+        id SERIAL PRIMARY KEY,
+        producto_id INTEGER NOT NULL REFERENCES productos(id) ON DELETE CASCADE,
+        nombre VARCHAR(40) NOT NULL,
+        stock INTEGER NOT NULL DEFAULT 0 CHECK (stock >= 0),
+        orden INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS producto_colores_nombre_unico ON producto_colores (producto_id, LOWER(nombre));
+    ALTER TABLE ventas ADD COLUMN IF NOT EXISTS color_id INTEGER REFERENCES producto_colores(id) ON DELETE SET NULL;
+    ALTER TABLE ventas ADD COLUMN IF NOT EXISTS color VARCHAR(40);
+
     -- Cierre de caja: lo que se contó al final del día frente a lo que debía haber.
     CREATE TABLE IF NOT EXISTS cierres_caja (
         id SERIAL PRIMARY KEY,
@@ -194,6 +206,8 @@ const MIGRACIONES = `
         usuario_id INTEGER REFERENCES usuarios(id),
         creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
+    ALTER TABLE compras ADD COLUMN IF NOT EXISTS color_id INTEGER REFERENCES producto_colores(id) ON DELETE SET NULL;
+    ALTER TABLE compras ADD COLUMN IF NOT EXISTS color VARCHAR(40);
 
     -- El precio mínimo solo limita a los empleados al vender: el jefe puede fijar cualquier precio.
     ALTER TABLE productos DROP CONSTRAINT IF EXISTS productos_check;

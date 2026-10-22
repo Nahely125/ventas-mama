@@ -5228,3 +5228,122 @@ body.sin-desplazamiento {
     border-color: #bae6fd;
     color: #075985;
 }
+
+/* ========================================
+   COLORES DE UN PRODUCTO
+======================================== */
+
+.campos-colores {
+    display: grid;
+    gap: 10px;
+    margin-top: 6px;
+    padding: 12px;
+    border: 1px dashed var(--morado-200);
+    border-radius: 12px;
+    background: #ffffff;
+}
+
+.campos-colores.activos {
+    border-style: solid;
+}
+
+.campos-colores > .boton-pequeno {
+    justify-self: start;
+}
+
+.lista-colores {
+    display: grid;
+    gap: 8px;
+    list-style: none;
+}
+
+.fila-color {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 110px auto;
+    gap: 8px;
+    align-items: end;
+}
+
+.selector-colores,
+.colores-producto,
+.cat-colores ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    list-style: none;
+}
+
+.selector-colores button {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-start;
+    min-height: 44px;
+    padding: 6px 12px;
+    border: 1px solid var(--morado-200);
+    border-radius: 12px;
+    background: #ffffff;
+    color: var(--morado-900);
+    font-weight: 700;
+}
+
+.selector-colores button small {
+    color: var(--texto-suave);
+    font-size: 0.72rem;
+    font-weight: 500;
+}
+
+.selector-colores button.activo {
+    border-color: var(--morado-600);
+    background: var(--morado-600);
+    color: #ffffff;
+}
+
+.selector-colores button.activo small {
+    color: #ede9fe;
+}
+
+.selector-colores button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.colores-producto {
+    margin-top: 8px;
+}
+
+.colores-producto li,
+.cat-colores li {
+    padding: 3px 10px;
+    border: 1px solid var(--morado-200);
+    border-radius: 999px;
+    background: #ffffff;
+    font-size: 0.8rem;
+}
+
+.colores-producto li.bajo {
+    border-color: #fde68a;
+    background: #fffbeb;
+}
+
+.colores-producto li.agotado,
+.cat-colores li.agotado {
+    opacity: 0.5;
+    text-decoration: line-through;
+}
+
+.cat-colores {
+    display: grid;
+    gap: 6px;
+}
+
+.cat-colores > span {
+    color: var(--texto-suave);
+    font-size: 0.8rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.color-item {
+    color: var(--morado-600);
+    font-weight: 600;
+}

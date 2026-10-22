@@ -111,6 +111,16 @@ export default function TarjetaProducto({ producto, esJefe, retraso, onEditar, o
                 </div>
             </dl>
 
+            {(producto.colores ?? []).length > 0 && (
+                <ul className="colores-producto" aria-label="Stock por color">
+                    {producto.colores.map((color) => (
+                        <li key={color.id} className={color.stock === 0 ? "agotado" : color.stock <= 5 ? "bajo" : ""}>
+                            {color.nombre} <strong>{color.stock}</strong>
+                        </li>
+                    ))}
+                </ul>
+            )}
+
             {detallesJefe}
         </article>
     );

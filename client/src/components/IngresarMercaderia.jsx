@@ -15,6 +15,7 @@ export default function IngresarMercaderia({ productos, productoInicial = null, 
     const [proveedor, setProveedor] = useState("");
     const [fecha, setFecha] = useState(hoy());
     const [contabilizar, setContabilizar] = useState("inversion");
+    const [colorId, setColorId] = useState("");
     const [error, setError] = useState("");
     const [enviando, setEnviando] = useState(false);
 
@@ -42,6 +43,11 @@ export default function IngresarMercaderia({ productos, productoInicial = null, 
             return;
         }
 
+        if ((producto.colores ?? []).length > 0 && !colorId) {
+            setError("Elige de qué color es la mercadería que llegó.");
+            return;
+        }
+
         setEnviando(true);
 
         try {
@@ -53,7 +59,8 @@ export default function IngresarMercaderia({ productos, productoInicial = null, 
                     costoTotal: Number(costoTotal.toFixed(2)),
                     proveedor: proveedor.trim(),
                     fecha,
-                    contabilizar
+                    contabilizar,
+                    colorId: colorId ? Number(colorId) : null
                 }
             });
             await onGuardado(resultado);
@@ -79,9 +86,32 @@ export default function IngresarMercaderia({ productos, productoInicial = null, 
                             <span>Stock actual: {producto.stock} u.</span>
                         </p>
                     ) : (
-                        <BuscadorProducto productos={productos} seleccionado={producto} onSeleccionar={setProducto} permitirAgotados />
+                        <BuscadorProducto
+                            productos={productos}
+                            seleccionado={producto}
+                            onSeleccionar={(nuevo) => {
+                                setProducto(nuevo);
+                                setColorId("");
+                            }}
+                            permitirAgotados
+                        />
                     )}
                 </div>
+
+                {(producto?.colores ?? []).length > 0 && (
+                    <div className="campo">
+                        <label htmlFor="compra-color">Color</label>
+                        <select id="compra-color" value={colorId} onChange={(e) => setColorId(e.target.value)} required>
+                            <option value="">Elige el color</option>
+                            {producto.colores.map((color) => (
+                                <option key={color.id} value={color.id}>
+                                    {color.nombre} (hay {color.stock})
+                                </option>
+                            ))}
+                        </select>
+                        <span className="ayuda-campo">¿Llegó otro color nuevo? Agrégalo primero editando el producto.</span>
+                    </div>
+                )}
 
                 <div className="fila-campos fila-dos">
                     <div className="campo">

@@ -13,6 +13,9 @@ const VALORES_INICIALES = {
     precioCompra: "",
     unidadesPorCaja: "1",
     stock: "",
+    // Colores (opcional): [{ nombre, stock }]; el stock del producto es la suma.
+    usaColores: false,
+    colores: [],
     es2025: false,
     seccionId: "",
     categoriaId: "",

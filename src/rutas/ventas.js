@@ -52,6 +52,10 @@ function validarItems(items) {
         if (item.obsequio === true && (item.modalidad ?? "unidad") !== "unidad") {
             return "Los obsequios se registran por unidad.";
         }
+
+        if (item.colorId !== undefined && item.colorId !== null && (!Number.isInteger(item.colorId) || item.colorId <= 0)) {
+            return "El color elegido no es válido.";
+        }
     }
 
     return null;
@@ -282,6 +286,18 @@ router.post("/", requiereSesion, async (req, res) => {
         const productos = new Map(resultado.rows.map((p) => [p.id, p]));
         const unidadesPorProducto = new Map();
         const bajoMinimo = [];
+
+        // Colores de los productos de la venta (si los tienen, hay que elegir uno).
+        const filasColores = await client.query(
+            `SELECT id, producto_id, nombre, stock FROM producto_colores
+             WHERE producto_id = ANY($1::int[])
+             ORDER BY id
+             FOR UPDATE`,
+            [ids]
+        );
+        const colores = new Map(filasColores.rows.map((c) => [c.id, c]));
+        const conColores = new Set(filasColores.rows.map((c) => c.producto_id));
+        const unidadesPorColor = new Map();
         // Lo que se regala en esta venta (un empleado tiene límites).
         const regalos = [];
 
@@ -296,6 +312,17 @@ router.post("/", requiereSesion, async (req, res) => {
             const modalidad = item.modalidad ?? "unidad";
             const unidades = item.cantidad * UNIDADES_MODALIDAD[modalidad];
             unidadesPorProducto.set(producto.id, (unidadesPorProducto.get(producto.id) ?? 0) + unidades);
+
+            if (conColores.has(producto.id)) {
+                const color = colores.get(item.colorId);
+
+                if (!color || color.producto_id !== producto.id) {
+                    await client.query("ROLLBACK");
+                    return res.status(400).json({ error: `Elige el color de ${producto.nombre}.` });
+                }
+
+                unidadesPorColor.set(color.id, (unidadesPorColor.get(color.id) ?? 0) + unidades);
+            }
 
             if (item.obsequio === true) {
                 regalos.push({ producto, unidades });
@@ -347,6 +374,17 @@ router.post("/", requiereSesion, async (req, res) => {
                 await client.query("ROLLBACK");
                 return res.status(400).json({
                     error: `Stock insuficiente de ${producto.nombre}. Solo quedan ${producto.stock} unidades.`
+                });
+            }
+        }
+
+        for (const [id, unidades] of unidadesPorColor) {
+            const color = colores.get(id);
+
+            if (color.stock < unidades) {
+                await client.query("ROLLBACK");
+                return res.status(400).json({
+                    error: `Stock insuficiente de ${productos.get(color.producto_id).nombre} (${color.nombre}). Solo quedan ${color.stock} unidades.`
                 });
             }
         }
@@ -421,13 +459,14 @@ router.post("/", requiereSesion, async (req, res) => {
             const total = Number((importes[indice] - descuento).toFixed(2));
             const precioUnitario = Number((precioVenta / UNIDADES_MODALIDAD[modalidad]).toFixed(2));
             const unidades2025 = unidades2025Por.get(indice);
+            const color = conColores.has(producto.id) ? colores.get(item.colorId) : null;
 
             await client.query(
                 `INSERT INTO ventas
                     (producto_id, cantidad, precio_unitario, costo_unitario, total,
                      usuario_id, metodo_pago, modalidad, grupo, autorizado_por, unidades_2025, cliente_id,
-                     descuento, codigo_ajuste, obsequio, fecha)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
+                     descuento, codigo_ajuste, obsequio, color_id, color, fecha)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17,
                          CURRENT_TIMESTAMP AT TIME ZONE 'America/Lima')`,
                 [
                     producto.id,
@@ -444,7 +483,9 @@ router.post("/", requiereSesion, async (req, res) => {
                     clienteId,
                     descuento,
                     ajusteVenta?.codigo ?? null,
-                    item.obsequio === true
+                    item.obsequio === true,
+                    color?.id ?? null,
+                    color?.nombre ?? null
                 ]
             );
         }
@@ -454,6 +495,10 @@ router.post("/", requiereSesion, async (req, res) => {
                 `UPDATE productos SET stock = stock - $1, stock_2025 = $2 WHERE id = $3`,
                 [unidades, quedan2025.get(id), id]
             );
+        }
+
+        for (const [id, unidades] of unidadesPorColor) {
+            await client.query(`UPDATE producto_colores SET stock = stock - $1 WHERE id = $2`, [unidades, id]);
         }
 
         await client.query("COMMIT");
@@ -545,7 +590,7 @@ router.post("/:grupo/anular", requiereJefe, async (req, res) => {
         await client.query("BEGIN");
 
         const filas = await client.query(
-            `SELECT id, producto_id, cantidad, unidades_2025, anulada_en, total, metodo_pago, cliente_id
+            `SELECT id, producto_id, cantidad, unidades_2025, anulada_en, total, metodo_pago, cliente_id, color_id
              FROM ventas WHERE grupo = $1
              ORDER BY producto_id
              FOR UPDATE`,
@@ -579,6 +624,10 @@ router.post("/:grupo/anular", requiereJefe, async (req, res) => {
                  WHERE id = $3`,
                 [fila.cantidad, fila.unidades_2025, fila.producto_id]
             );
+
+            if (fila.color_id) {
+                await client.query(`UPDATE producto_colores SET stock = stock + $1 WHERE id = $2`, [fila.cantidad, fila.color_id]);
+            }
         }
 
         await client.query(
@@ -630,7 +679,7 @@ router.post("/:grupo/devolver", requiereJefe, async (req, res) => {
 
         const filas = await client.query(
             `SELECT id, producto_id, cantidad, modalidad, total, descuento, unidades_2025, anulada_en,
-                    metodo_pago, cliente_id
+                    metodo_pago, cliente_id, color_id
              FROM ventas WHERE grupo = $1
              ORDER BY id
              FOR UPDATE`,
@@ -702,6 +751,10 @@ router.post("/:grupo/devolver", requiereJefe, async (req, res) => {
             `UPDATE productos SET stock = stock + $1, stock_2025 = stock_2025 + $2 WHERE id = $3`,
             [unidades, devueltas2025, fila.producto_id]
         );
+
+        if (fila.color_id) {
+            await client.query(`UPDATE producto_colores SET stock = stock + $1 WHERE id = $2`, [unidades, fila.color_id]);
+        }
 
         await client.query(
             `INSERT INTO devoluciones

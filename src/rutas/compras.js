@@ -20,7 +20,7 @@ router.get("/", requiereJefe, async (req, res) => {
             `SELECT
                 compras.id,
                 compras.producto_id AS "productoId",
-                productos.nombre AS producto,
+                productos.nombre || COALESCE(' · ' || compras.color, '') AS producto,
                 productos.codigo,
                 compras.cantidad,
                 compras.costo_total AS "costoTotal",
@@ -43,7 +43,7 @@ router.get("/", requiereJefe, async (req, res) => {
 });
 
 router.post("/", requiereJefe, async (req, res) => {
-    const { productoId, cantidad, costoTotal, proveedor = "", fecha, contabilizar = "inversion" } = req.body ?? {};
+    const { productoId, cantidad, costoTotal, proveedor = "", fecha, contabilizar = "inversion", colorId = null } = req.body ?? {};
 
     if (
         !Number.isInteger(productoId) || productoId <= 0 ||
@@ -51,7 +51,8 @@ router.post("/", requiereJefe, async (req, res) => {
         typeof costoTotal !== "number" || !Number.isFinite(costoTotal) || costoTotal < 0 ||
         typeof proveedor !== "string" || proveedor.length > 120 ||
         typeof fecha !== "string" || !FECHA.test(fecha) || Number.isNaN(Date.parse(fecha)) ||
-        !CONTABILIZAR.includes(contabilizar)
+        !CONTABILIZAR.includes(contabilizar) ||
+        (colorId !== null && (!Number.isInteger(colorId) || colorId <= 0))
     ) {
         return res.status(400).json({ error: "Revisa el producto, la cantidad, el costo, la fecha y cómo contabilizarlo." });
     }
@@ -73,6 +74,22 @@ router.post("/", requiereJefe, async (req, res) => {
             return res.status(404).json({ error: "El producto no existe." });
         }
 
+        // Si el producto tiene colores, la mercadería entra a uno de ellos.
+        const filasColores = await client.query(
+            `SELECT id, nombre FROM producto_colores WHERE producto_id = $1 FOR UPDATE`,
+            [producto.id]
+        );
+        const color = filasColores.rows.find((c) => c.id === colorId) ?? null;
+
+        if (filasColores.rows.length > 0 && !color) {
+            await client.query("ROLLBACK");
+            return res.status(400).json({ error: `Elige a qué color de ${producto.nombre} entra la mercadería.` });
+        }
+
+        if (color) {
+            await client.query(`UPDATE producto_colores SET stock = stock + $1 WHERE id = $2`, [cantidad, color.id]);
+        }
+
         // Costo promedio de la mercadería de este año (lo del 2025 no entra en el cálculo).
         // Si no tenía costo registrado, no se mezcla un S/ 0 inventado: vale el de esta compra.
         const nuevas = producto.precio_compra === null ? 0 : Math.max(producto.stock - producto.stock_2025, 0);
@@ -87,7 +104,7 @@ router.post("/", requiereJefe, async (req, res) => {
         // Se registra como inversión o gasto (si costó algo).
         let gastoId = null;
         let inversionId = null;
-        const texto = descripcion(producto.nombre, cantidad, proveedor.trim());
+        const texto = descripcion(color ? `${producto.nombre} · ${color.nombre}` : producto.nombre, cantidad, proveedor.trim());
 
         if (costoTotal > 0 && contabilizar === "gasto") {
             const gasto = await client.query(
@@ -109,16 +126,16 @@ router.post("/", requiereJefe, async (req, res) => {
 
         const compra = await client.query(
             `INSERT INTO compras (producto_id, cantidad, costo_total, proveedor, fecha, contabilizar,
-                                  gasto_id, inversion_id, usuario_id)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+                                  gasto_id, inversion_id, usuario_id, color_id, color)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
             [producto.id, cantidad, Number(costoTotal.toFixed(2)), proveedor.trim() || null, fecha,
-             contabilizar, gastoId, inversionId, req.session.usuario.id]
+             contabilizar, gastoId, inversionId, req.session.usuario.id, color?.id ?? null, color?.nombre ?? null]
         );
 
         await client.query("COMMIT");
 
         res.status(201).json({
-            mensaje: `Se ingresaron ${cantidad} unidades de ${producto.nombre}.`,
+            mensaje: `Se ingresaron ${cantidad} unidades de ${producto.nombre}${color ? ` (${color.nombre})` : ""}.`,
             id: compra.rows[0].id,
             stock: producto.stock + cantidad,
             costoUnitario: costoPromedio.toFixed(2)
@@ -163,6 +180,19 @@ router.delete("/:id", requiereJefe, async (req, res) => {
             return res.status(409).json({
                 error: `No se puede deshacer: ya se vendió parte de esa mercadería (quedan ${Math.max(nuevas, 0)} u. nuevas).`
             });
+        }
+
+        if (compra.color_id) {
+            const color = await client.query(`SELECT stock FROM producto_colores WHERE id = $1 FOR UPDATE`, [compra.color_id]);
+
+            if (color.rows.length > 0 && color.rows[0].stock < compra.cantidad) {
+                await client.query("ROLLBACK");
+                return res.status(409).json({
+                    error: `No se puede deshacer: ya se vendió parte de ese color (quedan ${color.rows[0].stock} u.).`
+                });
+            }
+
+            await client.query(`UPDATE producto_colores SET stock = stock - $1 WHERE id = $2`, [compra.cantidad, compra.color_id]);
         }
 
         // Se quita la compra del costo promedio.

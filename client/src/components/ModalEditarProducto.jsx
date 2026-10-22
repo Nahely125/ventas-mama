@@ -30,6 +30,8 @@ export default function ModalEditarProducto({ producto, onCerrar, onGuardado, on
         precioCompra: producto.precioCompra == null ? "" : (Number(producto.precioCompra) * unidades).toFixed(2),
         unidadesPorCaja: String(unidades),
         stock: String(producto.stock),
+        usaColores: (producto.colores ?? []).length > 0,
+        colores: (producto.colores ?? []).map((c) => ({ id: c.id, nombre: c.nombre, stock: String(c.stock) })),
         seccionId: producto.seccionId ? String(producto.seccionId) : "",
         categoriaId: producto.categoriaId ? String(producto.categoriaId) : "",
         // Al editar no se cambia la ubicación sola: ya fue elegida.

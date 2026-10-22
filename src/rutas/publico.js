@@ -35,6 +35,10 @@ router.get("/catalogo", async (req, res) => {
                 productos.seccion_id AS "seccionId",
                 productos.categoria_id AS "categoriaId",
                 (productos.stock > 0) AS disponible,
+                COALESCE((
+                    SELECT JSON_AGG(JSON_BUILD_OBJECT('nombre', pc.nombre, 'disponible', pc.stock > 0) ORDER BY pc.orden, pc.id)
+                    FROM producto_colores pc WHERE pc.producto_id = productos.id
+                ), '[]') AS colores,
                 (productos.foto IS NOT NULL) AS "tieneFoto",
                 COALESCE(EXTRACT(EPOCH FROM productos.foto_actualizada)::BIGINT, 0)::INT AS "fotoVersion"
              FROM productos
