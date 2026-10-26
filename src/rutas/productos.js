@@ -401,31 +401,84 @@ router.get("/:id/foto", async (req, res) => {
     }
 });
 
+// Lee una imagen enviada como data URL: { tipo, datos } o { error }.
+function leerImagen(texto) {
+    const coincidencia = /^data:(image\/[a-z]+);base64,([A-Za-z0-9+/=]+)$/.exec(texto ?? "");
+
+    if (!coincidencia || !TIPOS_FOTO.includes(coincidencia[1])) {
+        return { error: "La foto debe ser JPG, PNG o WEBP." };
+    }
+
+    const datos = Buffer.from(coincidencia[2], "base64");
+
+    if (datos.length > TAMANO_MAXIMO_FOTO) {
+        return { error: "La foto es demasiado grande." };
+    }
+
+    return { tipo: coincidencia[1], datos };
+}
+
+// Foto sin editar: la usa el jefe para cambiar de escena. Si no hay, se envía la foto guardada.
+router.get("/:id/foto-original", requiereJefe, async (req, res) => {
+    const id = leerId(req);
+
+    if (!id) {
+        return res.status(404).end();
+    }
+
+    try {
+        const resultado = await pool.query(
+            `SELECT COALESCE(foto_original, foto) AS foto,
+                    CASE WHEN foto_original IS NULL THEN foto_tipo ELSE foto_original_tipo END AS tipo
+             FROM productos WHERE id = $1 AND foto IS NOT NULL`,
+            [id]
+        );
+        const fila = resultado.rows[0];
+
+        if (!fila) {
+            return res.status(404).end();
+        }
+
+        res.set("Cache-Control", "private, no-cache");
+        res.type(fila.tipo).send(fila.foto);
+    } catch (error) {
+        console.error("Error al enviar la foto original:", error.message);
+        res.status(500).end();
+    }
+});
+
+/* Guarda la foto. editada: tiene una escena del catálogo. original (opcional): la foto sin editar.
+   Si se sube sin editar, ella misma es la original; si es editada sin original, se conserva la anterior. */
 router.put("/:id/foto", requiereJefe, async (req, res) => {
     const id = leerId(req);
-    const coincidencia = /^data:(image\/[a-z]+);base64,([A-Za-z0-9+/=]+)$/.exec(req.body?.foto ?? "");
 
     if (!id) {
         return res.status(400).json({ error: "ID de producto inválido" });
     }
 
-    if (!coincidencia || !TIPOS_FOTO.includes(coincidencia[1])) {
-        return res.status(400).json({ error: "La foto debe ser JPG, PNG o WEBP." });
+    const foto = leerImagen(req.body?.foto);
+
+    if (foto.error) {
+        return res.status(400).json({ error: foto.error });
     }
 
-    const foto = Buffer.from(coincidencia[2], "base64");
+    const editada = req.body.editada === true;
+    const original = req.body.original ? leerImagen(req.body.original) : null;
 
-    if (foto.length > TAMANO_MAXIMO_FOTO) {
-        return res.status(400).json({ error: "La foto es demasiado grande." });
+    if (original?.error) {
+        return res.status(400).json({ error: `Foto original: ${original.error}` });
     }
 
     try {
         const resultado = await pool.query(
             `UPDATE productos
-             SET foto = $1, foto_tipo = $2, foto_editada = $4, foto_actualizada = CURRENT_TIMESTAMP
+             SET foto = $1, foto_tipo = $2, foto_editada = $4,
+                 foto_original = CASE WHEN $5::BYTEA IS NOT NULL THEN $5 WHEN $4 THEN foto_original END,
+                 foto_original_tipo = CASE WHEN $5::BYTEA IS NOT NULL THEN $6 WHEN $4 THEN foto_original_tipo END,
+                 foto_actualizada = CURRENT_TIMESTAMP
              WHERE id = $3
              RETURNING id`,
-            [foto, coincidencia[1], id, req.body.editada === true]
+            [foto.datos, foto.tipo, id, editada, original?.datos ?? null, original?.tipo ?? null]
         );
 
         if (resultado.rows.length === 0) {
@@ -449,7 +502,8 @@ router.delete("/:id/foto", requiereJefe, async (req, res) => {
     try {
         await pool.query(
             `UPDATE productos
-             SET foto = NULL, foto_tipo = NULL, foto_editada = FALSE, foto_actualizada = CURRENT_TIMESTAMP
+             SET foto = NULL, foto_tipo = NULL, foto_editada = FALSE,
+                 foto_original = NULL, foto_original_tipo = NULL, foto_actualizada = CURRENT_TIMESTAMP
              WHERE id = $1`,
             [id]
         );

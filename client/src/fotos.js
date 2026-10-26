@@ -1,4 +1,5 @@
 import { pedir } from "./api.js";
+import { pintarEscena } from "./escenas.js";
 
 const LADO_MAXIMO = 800;
 // Lado mayor de la foto con la que se trabaja al editarla.
@@ -113,111 +114,6 @@ function rectanguloRedondeado(ctx, x, y, ancho, alto, radio) {
     ctx.closePath();
 }
 
-function lienzoBlanco() {
-    const lienzo = document.createElement("canvas");
-    lienzo.width = ANCHO_CATALOGO;
-    lienzo.height = ALTO_CATALOGO;
-    const ctx = lienzo.getContext("2d");
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, ANCHO_CATALOGO, ALTO_CATALOGO);
-    ctx.imageSmoothingQuality = "high";
-    return { lienzo, ctx };
-}
-
-/* Producto recortado sobre blanco: se quita el fondo, el producto se centra y se agranda
-   para llenar la foto, y se le pone una sombra suave debajo (como en las tiendas en línea). */
-function productoSobreBlanco(base, mascara) {
-    const ctxBase = base.getContext("2d", { willReadFrequently: true });
-    const datos = ctxBase.getImageData(0, 0, base.width, base.height);
-    const p = datos.data;
-    let izquierda = base.width, derecha = -1, arriba = base.height, abajo = -1;
-
-    mejorarColor(datos, mascara);
-
-    for (let y = 0; y < base.height; y++) {
-        for (let x = 0; x < base.width; x++) {
-            const i = (y * base.width + x) * 4;
-            // Bordes más definidos: lo dudoso se vuelve fondo o producto.
-            const certeza = Math.min(1, Math.max(0, (mascara[i + 3] - 70) / 115));
-            p[i + 3] = Math.round(255 * certeza * certeza * (3 - 2 * certeza));
-
-            if (p[i + 3] > 128) {
-                if (x < izquierda) izquierda = x;
-                if (x > derecha) derecha = x;
-                if (y < arriba) arriba = y;
-                if (y > abajo) abajo = y;
-            }
-        }
-    }
-
-    ctxBase.putImageData(datos, 0, 0);
-
-    const anchoProducto = derecha - izquierda + 1;
-    const altoProducto = abajo - arriba + 1;
-    const escala = Math.min((ANCHO_CATALOGO * 0.8) / anchoProducto, (ALTO_CATALOGO * 0.74) / altoProducto, 3);
-    const ancho = anchoProducto * escala;
-    const alto = altoProducto * escala;
-    const x = (ANCHO_CATALOGO - ancho) / 2;
-    const y = (ALTO_CATALOGO - alto) / 2 - ALTO_CATALOGO * 0.02;
-
-    const { lienzo, ctx } = lienzoBlanco();
-
-    // Sombra suave (una elipse difuminada) apoyada bajo el producto.
-    ctx.save();
-    ctx.translate(ANCHO_CATALOGO / 2, y + alto);
-    ctx.scale(1, 0.14);
-    const radio = ancho * 0.48;
-    const sombra = ctx.createRadialGradient(0, 0, 0, 0, 0, radio);
-    sombra.addColorStop(0, "rgba(40, 30, 50, 0.24)");
-    sombra.addColorStop(0.6, "rgba(40, 30, 50, 0.08)");
-    sombra.addColorStop(1, "rgba(40, 30, 50, 0)");
-    ctx.fillStyle = sombra;
-    ctx.beginPath();
-    ctx.arc(0, 0, radio, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-
-    ctx.drawImage(base, izquierda, arriba, anchoProducto, altoProducto, x, y, ancho, alto);
-    return lienzo;
-}
-
-/* Si no se pudo separar el producto: la foto completa (luz y color corregidos), centrada en
-   blanco con esquinas redondeadas y sombra suave. Las horizontales se recortan a cuadradas. */
-function fotoSobreBlanco(base) {
-    const ctxBase = base.getContext("2d", { willReadFrequently: true });
-    const datos = ctxBase.getImageData(0, 0, base.width, base.height);
-    mejorarColor(datos);
-    ctxBase.putImageData(datos, 0, 0);
-
-    const margen = ANCHO_CATALOGO * 0.07;
-    const anchoVisible = Math.min(base.width, base.height);
-    const escala = Math.min((ANCHO_CATALOGO - margen * 2) / anchoVisible, (ALTO_CATALOGO - margen * 2) / base.height, 2);
-    const ancho = Math.round(anchoVisible * escala);
-    const alto = Math.round(base.height * escala);
-    const x = Math.round((ANCHO_CATALOGO - ancho) / 2);
-    const y = Math.round((ALTO_CATALOGO - alto) / 2);
-    const recorteX = (base.width - anchoVisible) / 2;
-
-    const { lienzo, ctx } = lienzoBlanco();
-
-    ctx.save();
-    ctx.shadowColor = "rgba(60, 30, 80, 0.18)";
-    ctx.shadowBlur = 26;
-    ctx.shadowOffsetY = 10;
-    ctx.fillStyle = "#ffffff";
-    rectanguloRedondeado(ctx, x, y, ancho, alto, 20);
-    ctx.fill();
-    ctx.restore();
-
-    ctx.save();
-    rectanguloRedondeado(ctx, x, y, ancho, alto, 20);
-    ctx.clip();
-    ctx.drawImage(base, recorteX, 0, anchoVisible, base.height, x, y, ancho, alto);
-    ctx.restore();
-
-    return lienzo;
-}
-
 /* ¿Se puede confiar en el recorte? No, si casi todo o casi nada parece producto, si quedó
    en pedazos sueltos (varias cosas amontonadas), si hay mucha zona dudosa o si el producto
    se sale por los bordes de la foto. En esos casos se usa la foto completa. */
@@ -250,9 +146,14 @@ function recorteConfiable(mascara, ancho, alto) {
         medidas.relleno >= 0.3 && medidas.dudosos <= 0.3 && medidas.borde <= 0.2;
 }
 
-async function estilizar(imagen, giro) {
+/* Separa el producto: devuelve { tipo: "producto", lienzo } con el producto recortado (fondo
+   transparente, ajustado a su tamaño) y la luz corregida; o, si el recorte no es confiable,
+   { tipo: "foto", lienzo } con la foto completa corregida (las horizontales, cuadradas). */
+async function recortar(imagen, giro) {
     const escala = Math.min(1, LADO_TRABAJO / Math.max(imagen.width, imagen.height));
     const base = girar(imagen, giro, escala);
+    const ctxBase = base.getContext("2d", { willReadFrequently: true });
+    const datos = ctxBase.getImageData(0, 0, base.width, base.height);
 
     let mascara = null;
     try {
@@ -263,28 +164,183 @@ async function estilizar(imagen, giro) {
         console.error("No se pudo quitar el fondo:", error);
     }
 
-    return mascara ? productoSobreBlanco(base, mascara) : fotoSobreBlanco(base);
+    mejorarColor(datos, mascara);
+
+    if (!mascara) {
+        ctxBase.putImageData(datos, 0, 0);
+        const lado = Math.min(base.width, base.height);
+        const ancho = base.width > base.height ? lado : base.width;
+        const lienzo = document.createElement("canvas");
+        lienzo.width = ancho;
+        lienzo.height = base.height;
+        lienzo.getContext("2d").drawImage(base, (base.width - ancho) / 2, 0, ancho, base.height, 0, 0, ancho, base.height);
+        return { tipo: "foto", lienzo };
+    }
+
+    const p = datos.data;
+    let izquierda = base.width, derecha = -1, arriba = base.height, abajo = -1;
+
+    for (let y = 0; y < base.height; y++) {
+        for (let x = 0; x < base.width; x++) {
+            const i = (y * base.width + x) * 4;
+            // Bordes más definidos: lo dudoso se vuelve fondo o producto.
+            const certeza = Math.min(1, Math.max(0, (mascara[i + 3] - 70) / 115));
+            p[i + 3] = Math.round(255 * certeza * certeza * (3 - 2 * certeza));
+
+            if (p[i + 3] > 128) {
+                if (x < izquierda) izquierda = x;
+                if (x > derecha) derecha = x;
+                if (y < arriba) arriba = y;
+                if (y > abajo) abajo = y;
+            }
+        }
+    }
+
+    ctxBase.putImageData(datos, 0, 0);
+
+    const lienzo = document.createElement("canvas");
+    lienzo.width = derecha - izquierda + 1;
+    lienzo.height = abajo - arriba + 1;
+    lienzo.getContext("2d").drawImage(base, -izquierda, -arriba);
+    return { tipo: "producto", lienzo };
+}
+
+// El recorte de cada foto (y giro) se calcula una sola vez: cambiar de escena es rápido.
+const recortes = new WeakMap();
+
+function recorteDe(imagen, giro) {
+    if (!recortes.has(imagen)) recortes.set(imagen, new Map());
+    const porGiro = recortes.get(imagen);
+
+    if (!porGiro.has(giro)) {
+        porGiro.set(giro, recortar(imagen, giro));
+    }
+
+    return porGiro.get(giro);
+}
+
+// Sombra suave (una elipse difuminada) apoyada bajo el producto.
+function sombraBajo(ctx, centroX, pisoY, ancho, opacidad) {
+    ctx.save();
+    ctx.translate(centroX, pisoY);
+    ctx.scale(1, 0.14);
+    const radio = ancho * 0.5;
+    const sombra = ctx.createRadialGradient(0, 0, 0, 0, 0, radio);
+    sombra.addColorStop(0, `rgba(30, 20, 40, ${opacidad})`);
+    sombra.addColorStop(0.6, `rgba(30, 20, 40, ${opacidad * 0.35})`);
+    sombra.addColorStop(1, "rgba(30, 20, 40, 0)");
+    ctx.fillStyle = sombra;
+    ctx.beginPath();
+    ctx.arc(0, 0, radio, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+}
+
+// Reflejo del producto en el piso, que se desvanece hacia abajo.
+function reflejoBajo(ctx, producto, x, pisoY, ancho, alto, opacidad) {
+    const largo = Math.min(alto * 0.45, ALTO_CATALOGO - pisoY);
+    if (largo <= 0) return;
+
+    const capa = document.createElement("canvas");
+    capa.width = Math.ceil(ancho);
+    capa.height = Math.ceil(largo);
+    const c = capa.getContext("2d");
+    c.translate(0, alto);
+    c.scale(1, -1);
+    c.drawImage(producto, 0, 0, ancho, alto);
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.globalCompositeOperation = "destination-in";
+    const desvanecer = c.createLinearGradient(0, 0, 0, largo);
+    desvanecer.addColorStop(0, `rgba(0, 0, 0, ${opacidad})`);
+    desvanecer.addColorStop(1, "rgba(0, 0, 0, 0)");
+    c.fillStyle = desvanecer;
+    c.fillRect(0, 0, capa.width, capa.height);
+
+    ctx.drawImage(capa, x, pisoY);
+}
+
+// Coloca el producto (o la foto, si no se pudo recortar) en la escena elegida.
+function componer(recorte, estilo, semilla) {
+    const lienzo = document.createElement("canvas");
+    lienzo.width = ANCHO_CATALOGO;
+    lienzo.height = ALTO_CATALOGO;
+    const ctx = lienzo.getContext("2d");
+    ctx.imageSmoothingQuality = "high";
+
+    const escena = pintarEscena(ctx, ANCHO_CATALOGO, ALTO_CATALOGO, estilo, semilla);
+    const pisoY = ALTO_CATALOGO * escena.piso;
+    const fuente = recorte.lienzo;
+
+    if (recorte.tipo === "foto") {
+        // La foto completa como un cuadro centrado, con esquinas redondeadas y sombra.
+        const escala = Math.min((ANCHO_CATALOGO * 0.84) / fuente.width, (ALTO_CATALOGO * 0.86) / fuente.height, 2);
+        const ancho = Math.round(fuente.width * escala);
+        const alto = Math.round(fuente.height * escala);
+        const x = Math.round((ANCHO_CATALOGO - ancho) / 2);
+        const y = Math.round((ALTO_CATALOGO - alto) / 2);
+
+        ctx.save();
+        ctx.shadowColor = "rgba(40, 20, 60, 0.3)";
+        ctx.shadowBlur = 28;
+        ctx.shadowOffsetY = 12;
+        ctx.fillStyle = "#ffffff";
+        rectanguloRedondeado(ctx, x, y, ancho, alto, 20);
+        ctx.fill();
+        ctx.restore();
+
+        ctx.save();
+        rectanguloRedondeado(ctx, x, y, ancho, alto, 20);
+        ctx.clip();
+        ctx.drawImage(fuente, x, y, ancho, alto);
+        ctx.restore();
+        return lienzo;
+    }
+
+    const maximoAncho = ANCHO_CATALOGO * Math.min(0.8, escena.anchoMaximo ?? 0.8);
+    const maximoAlto = Math.min(ALTO_CATALOGO * 0.72, pisoY - ALTO_CATALOGO * 0.07);
+    const escala = Math.min(maximoAncho / fuente.width, maximoAlto / fuente.height, 3);
+    const ancho = fuente.width * escala;
+    const alto = fuente.height * escala;
+    const x = (ANCHO_CATALOGO - ancho) / 2;
+    const y = pisoY - alto;
+
+    if (escena.reflejo > 0) reflejoBajo(ctx, fuente, x, pisoY, ancho, alto, escena.reflejo);
+    sombraBajo(ctx, ANCHO_CATALOGO / 2, pisoY, ancho, escena.sombra);
+    ctx.drawImage(fuente, x, y, ancho, alto);
+    return lienzo;
 }
 
 /* Prepara la foto para guardarla (JPEG liviano; las del celular pesan varios MB).
-   estilo: true = editada para el catálogo (fondo blanco); false = la foto tal cual, solo reducida. */
-export async function prepararFoto(imagen, { giro = 0, estilo = true } = {}) {
-    const lienzo = estilo
-        ? await estilizar(imagen, giro)
-        : girar(imagen, giro, Math.min(1, LADO_MAXIMO / Math.max(imagen.width, imagen.height)));
+   estilo: una escena de escenas.js ("blanco", "estudio", "navidad", "madera", "lila")
+   o "original" (la foto tal cual, solo reducida). */
+export async function prepararFoto(imagen, { giro = 0, estilo = "blanco" } = {}) {
+    if (estilo === "original") {
+        return girar(imagen, giro, Math.min(1, LADO_MAXIMO / Math.max(imagen.width, imagen.height))).toDataURL("image/jpeg", 0.86);
+    }
 
-    return lienzo.toDataURL("image/jpeg", 0.88);
+    const recorte = await recorteDe(imagen, giro);
+    return componer(recorte, estilo, imagen.width * 31 + imagen.height).toDataURL("image/jpeg", 0.88);
+}
+
+// Foto original (girada y reducida) que se guarda para poder cambiar de escena después.
+export function prepararOriginal(imagen, giro = 0) {
+    return girar(imagen, giro, Math.min(1, LADO_TRABAJO / Math.max(imagen.width, imagen.height))).toDataURL("image/jpeg", 0.88);
 }
 
 // Guarda o quita la foto según lo elegido en el formulario.
 // foto: data URL nueva, null para quitarla, undefined para dejarla igual.
-// editada: true si ya tiene el estilo del catálogo (para no volver a editarla).
-export async function guardarFoto(productoId, foto, editada = false) {
+// editada: ya tiene una escena del catálogo; original: la foto sin editar (para cambiar de escena).
+export async function guardarFoto(productoId, foto, { editada = false, original = null } = {}) {
     if (foto === undefined) return;
 
     if (foto === null) {
         await pedir(`/api/productos/${productoId}/foto`, { method: "DELETE" });
     } else {
-        await pedir(`/api/productos/${productoId}/foto`, { method: "PUT", cuerpo: { foto, editada } });
+        await pedir(`/api/productos/${productoId}/foto`, { method: "PUT", cuerpo: { foto, editada, original } });
     }
+}
+
+// Dirección de la foto sin editar (o la foto guardada, si no hay original). Solo el jefe.
+export function urlFotoOriginal(producto) {
+    return `/api/productos/${producto.id}/foto-original?v=${producto.fotoVersion}`;
 }

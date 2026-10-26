@@ -1835,15 +1835,42 @@ input[aria-invalid="true"] {
     accent-color: var(--morado-600);
 }
 
-.foto-edicion {
+/* Escenas para la foto (estudio, navidad, madera...) */
+.estilos-foto {
     display: flex;
     flex-wrap: wrap;
-    align-items: center;
-    gap: 8px 14px;
+    gap: 6px;
+    margin: 12px 0 6px;
 }
 
-.foto-edicion .casilla {
-    font-size: 0.9rem;
+.estilos-foto button {
+    padding: 6px 12px;
+    border: 1px solid var(--morado-200);
+    border-radius: 999px;
+    background: #ffffff;
+    color: var(--morado-900);
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.estilos-foto button.activo {
+    border-color: var(--morado-600);
+    background: var(--morado-600);
+    color: #ffffff;
+}
+
+.estilos-foto button:disabled {
+    opacity: 0.6;
+    cursor: wait;
+}
+
+.acciones-fotos {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 12px;
 }
 
 .foto-acciones {

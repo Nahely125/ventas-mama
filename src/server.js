@@ -28,7 +28,7 @@ if (enProduccion) {
 // 3 MB: alcanza para la foto de un producto ya reducida por el navegador.
 // Respuestas comprimidas (el motor que edita las fotos pesa ~14 MB; comprimido, ~4 MB).
 app.use(compression());
-app.use(express.json({ limit: "3mb" }));
+app.use(express.json({ limit: "5mb" }));
 
 // Revisión de estado para el hosting: responde 200 si el servidor y la base de datos funcionan.
 // Va antes de las sesiones para no crear ni leer sesiones en cada revisión.

@@ -43,7 +43,10 @@ export default function FormularioProducto({ onCreado, onError }) {
             const resultado = await pedir("/api/productos", { method: "POST", cuerpo: datos });
 
             try {
-                await guardarFoto(resultado.producto.id, valores.foto ?? undefined, valores.fotoEditada);
+                await guardarFoto(resultado.producto.id, valores.foto ?? undefined, {
+                    editada: valores.fotoEditada,
+                    original: valores.fotoOriginalNueva
+                });
                 setMensaje({ tipo: "exito", texto: "¡Producto registrado correctamente!" });
             } catch (errorFoto) {
                 setMensaje({

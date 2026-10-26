@@ -149,6 +149,9 @@ const MIGRACIONES = `
 
     -- La foto ya tiene el estilo del catálogo (fondo blanco): no se vuelve a editar.
     ALTER TABLE productos ADD COLUMN IF NOT EXISTS foto_editada BOOLEAN NOT NULL DEFAULT FALSE;
+    -- Foto sin editar (para poder cambiar de escena sin perder calidad).
+    ALTER TABLE productos ADD COLUMN IF NOT EXISTS foto_original BYTEA;
+    ALTER TABLE productos ADD COLUMN IF NOT EXISTS foto_original_tipo VARCHAR(30);
 
     -- Costos con hasta 4 decimales (por ejemplo, S/ 0.0833 por unidad). Solo se cambia una vez.
     DO $$
