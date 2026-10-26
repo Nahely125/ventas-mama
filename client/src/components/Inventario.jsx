@@ -1,6 +1,8 @@
 import { useCallback, useState } from "react";
 import { pedir } from "../api.js";
-import TarjetaProducto from "./TarjetaProducto.jsx";
+import { moneda } from "../api.js";
+import { urlFoto } from "../fotos.js";
+import TarjetaProducto, { stockDeLaParte } from "./TarjetaProducto.jsx";
 import ModalEditarProducto from "./ModalEditarProducto.jsx";
 import Escaner from "./Escaner.jsx";
 import IngresarMercaderia from "./IngresarMercaderia.jsx";
@@ -30,6 +32,8 @@ export default function Inventario({
 }) {
     const [parte, setParte] = useState("nuevo");
     const [busqueda, setBusqueda] = useState("");
+    // Producto abierto en la lista (se ve su tarjeta completa debajo de la fila).
+    const [abiertoId, setAbiertoId] = useState(null);
     const [productoEditando, setProductoEditando] = useState(null);
     const [escaneando, setEscaneando] = useState(false);
     const [ingresando, setIngresando] = useState(null);
@@ -47,6 +51,21 @@ export default function Inventario({
         producto.nombre.toLowerCase().includes(texto) ||
         (producto.codigo ?? "").toLowerCase().includes(texto)
     );
+
+    function tarjeta(producto, retraso) {
+        return (
+            <TarjetaProducto
+                key={producto.id}
+                producto={producto}
+                parte={parte}
+                esJefe={esJefe}
+                retraso={retraso}
+                onEditar={() => setProductoEditando(producto)}
+                onIngresar={() => setIngresando(producto)}
+                onEliminar={() => eliminar(producto)}
+            />
+        );
+    }
 
     async function eliminar(producto) {
         if (!confirm(`¿Seguro que deseas eliminar "${producto.nombre}"?`)) {
@@ -92,7 +111,7 @@ export default function Inventario({
                 {parte === "2025" && esJefe && (
                     <p className="ayuda-campo aviso-2025">Mercadería sobrante del año pasado: lo que se vende de aquí es ganancia del inventario 2025.</p>
                 )}
-                <p>Aquí están todos los productos. Para encontrar uno rápido, búscalo por código o nombre, o escanea su código.</p>
+                <p>Toca un producto de la lista para ver todos sus datos. Para encontrar uno rápido, búscalo por código o nombre, o escanea su código.</p>
                 {aviso && <p className="mensaje mensaje-exito" role="status">✅ {aviso}</p>}
 
                 <div className="buscador">
@@ -144,20 +163,49 @@ export default function Inventario({
                                 ? `${filtrados.length} de ${deLaParte.length} ${deLaParte.length === 1 ? "producto" : "productos"}`
                                 : `${deLaParte.length} ${deLaParte.length === 1 ? "producto" : "productos"}`}
                         </p>
-                        <div className="lista-productos">
-                            {filtrados.map((producto, indice) => (
-                                <TarjetaProducto
-                                    key={producto.id}
-                                    producto={producto}
-                                    parte={parte}
-                                    esJefe={esJefe}
-                                    retraso={Math.min(indice * 70, 490)}
-                                    onEditar={() => setProductoEditando(producto)}
-                                    onIngresar={() => setIngresando(producto)}
-                                    onEliminar={() => eliminar(producto)}
-                                />
-                            ))}
-                        </div>
+                        {texto ? (
+                            <div className="lista-productos">
+                                {filtrados.map((producto, indice) => tarjeta(producto, Math.min(indice * 70, 490)))}
+                            </div>
+                        ) : (
+                            // Sin búsqueda: lista compacta; al tocar una fila se ve su tarjeta.
+                            <ul className="lista-inventario">
+                                {filtrados.map((producto) => {
+                                    const { stock } = stockDeLaParte(producto, parte);
+                                    const abierto = abiertoId === producto.id;
+                                    const foto = urlFoto(producto);
+
+                                    return (
+                                        <li key={producto.id} className={abierto ? "abierta" : ""}>
+                                            <button
+                                                type="button"
+                                                className="fila-inventario"
+                                                aria-expanded={abierto}
+                                                onClick={() => setAbiertoId(abierto ? null : producto.id)}
+                                            >
+                                                <span className="fila-foto">
+                                                    {foto ? <img src={foto} alt="" loading="lazy" /> : <span aria-hidden="true">📦</span>}
+                                                </span>
+                                                <span className="fila-nombre">
+                                                    <strong>{producto.nombre}</strong>
+                                                    <small>{producto.codigo || "Sin código"}</small>
+                                                </span>
+                                                <span className="fila-precio">
+                                                    {moneda(producto.precio)}
+                                                    <small>Doc. {moneda(producto.precioDocena)}</small>
+                                                </span>
+                                                <span className={`fila-stock ${stock === 0 ? "agotado" : stock <= 5 ? "bajo" : ""}`}>
+                                                    {stock}
+                                                    <small>u.</small>
+                                                </span>
+                                                <span className="fila-flecha" aria-hidden="true">{abierto ? "▴" : "▾"}</span>
+                                            </button>
+                                            {abierto && tarjeta(producto, 0)}
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        )}
                     </>
                 )}
             </section>

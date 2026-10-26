@@ -508,6 +508,122 @@ p {
     gap: 12px;
 }
 
+/* Inventario en lista (sin búsqueda) */
+.lista-inventario {
+    list-style: none;
+    display: grid;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+}
+
+.lista-inventario > li.abierta {
+    display: grid;
+    gap: 8px;
+    padding-bottom: 6px;
+}
+
+.fila-inventario {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr) auto auto 14px;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--morado-150);
+    border-radius: 12px;
+    background: #ffffff;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.fila-inventario:hover,
+.abierta > .fila-inventario {
+    border-color: var(--morado-300);
+    background: var(--morado-50);
+}
+
+.fila-foto {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    overflow: hidden;
+    border-radius: 8px;
+    background: var(--morado-50);
+    font-size: 1.2rem;
+}
+
+.fila-foto img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.fila-nombre,
+.fila-precio,
+.fila-stock {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+/* Nombre en hasta 2 líneas. */
+.fila-nombre strong {
+    display: -webkit-box;
+    overflow: hidden;
+    color: var(--morado-900);
+    font-size: 0.9rem;
+    line-height: 1.25;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+}
+
+.fila-nombre small,
+.fila-precio small,
+.fila-stock small {
+    color: var(--texto-suave);
+    font-size: 0.72rem;
+    font-weight: 500;
+}
+
+.fila-precio {
+    align-items: flex-end;
+    font-size: 0.88rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.fila-stock {
+    align-items: center;
+    min-width: 36px;
+    padding: 3px 6px;
+    border-radius: 8px;
+    background: #ecfdf5;
+    color: #047857;
+    font-weight: 700;
+    line-height: 1.1;
+}
+
+.fila-stock.bajo {
+    background: #fffbeb;
+    color: #b45309;
+}
+
+.fila-stock.agotado {
+    background: #fff1f2;
+    color: #be123c;
+}
+
+.fila-flecha {
+    color: var(--morado-500);
+    font-size: 0.8rem;
+}
+
 .producto {
     display: flex;
     flex-direction: column;
