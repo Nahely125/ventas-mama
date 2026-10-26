@@ -360,6 +360,20 @@ const MIGRACIONES_UNICAS = [
                 await asignarPorNombre(client, "seccion_id = $1", [escolar.id], CATEGORIAS_ESCOLAR, ids);
             }
         }
+    },
+    {
+        // Los productos que empiezan con "Luces" pasan a "Luces lineales" (de su misma feria).
+        nombre: "2026-10-luces-son-lineales",
+        async aplicar(client) {
+            await client.query(
+                `UPDATE productos
+                 SET categoria_id = categorias.id, seccion_id = categorias.seccion_id
+                 FROM categorias
+                 WHERE categorias.nombre = 'Luces lineales'
+                   AND (categorias.seccion_id = productos.seccion_id OR productos.seccion_id IS NULL)
+                   AND productos.nombre ~* '^\\s*luces'`
+            );
+        }
     }
 ];
 

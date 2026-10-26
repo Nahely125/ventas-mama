@@ -1,6 +1,6 @@
 // Categorías iniciales de cada feria y reglas para reconocerlas por el nombre del producto.
 // Las reglas se revisan en orden: gana la primera que coincide (por eso "Reno de luces"
-// va antes que "Luces decorativas" y "Muñecos").
+// va antes que "Luces decorativas" y "Muñecos"; lo que empieza con "Luces" es siempre luz lineal).
 // IMPORTANTE: client/src/categoriasAuto.js tiene una copia de las reglas para el formulario.
 
 const CATEGORIAS_NAVIDAD = [
@@ -10,7 +10,7 @@ const CATEGORIAS_NAVIDAD = [
     { nombre: "Pisos de árbol", icono: "🎁", patron: "^\\s*piso|falda (de|para) [aá]rbol|cubre ?pie|pie de [aá]rbol" },
     { nombre: "Muñecos", icono: "🎅", patron: "mu[ñn]ec|pap[aá] noel|santa|duende|elfo|mu[ñn]eco de nieve|reno|figura" },
     { nombre: "Cascanueces", icono: "💂", patron: "cascanueces" },
-    { nombre: "Luces lineales", icono: "💡", patron: "lineal|manguera|cortina de luces|tira (de )?led|serie (de )?luces|cable de luces" },
+    { nombre: "Luces lineales", icono: "💡", patron: "^\\s*luces|lineal|manguera|cortina de luces|tira (de )?led|serie (de )?luces|cable de luces" },
     { nombre: "Luces decorativas", icono: "✨", patron: "(^|\\s)(luz|luces|led|foco|focos|farol|faroles)(\\s|$)" },
     { nombre: "Renos de luces", icono: "🦌", patron: "reno.*(luz|luces|led)|(luz|luces|led).*reno" },
     { nombre: "Coronas y guirnaldas", icono: "🌿", patron: "corona|guirnalda" },
@@ -29,6 +29,7 @@ const CATEGORIAS_ESCOLAR = [
 // Orden en que se prueban las reglas (más específicas primero). El índice decide el orden
 // de las pestañas en el catálogo; esta lista solo decide qué regla gana.
 const PRIORIDAD_NAVIDAD = [
+    "Luces lineales", // todo lo que empieza con "Luces" va aquí
     "Renos de luces",
     "Cascanueces",
     "Puntas de árbol",

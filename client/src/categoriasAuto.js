@@ -2,12 +2,13 @@
 // Copia de las reglas de src/categoriasIniciales.js (servidor): si cambias una, cambia la otra.
 // Se prueban en orden: gana la primera que coincide.
 const REGLAS = [
+    // Todo lo que empieza con "Luces" es luz lineal.
+    { nombre: "Luces lineales", patron: "^\\s*luces|lineal|manguera|cortina de luces|tira (de )?led|serie (de )?luces|cable de luces" },
     { nombre: "Renos de luces", patron: "reno.*(luz|luces|led)|(luz|luces|led).*reno" },
     { nombre: "Cascanueces", patron: "cascanueces" },
     { nombre: "Puntas de árbol", patron: "^\\s*punta|punta (de|para) [aá]rbol|estrella (de|para) (la )?punta" },
     { nombre: "Pisos de árbol", patron: "^\\s*piso|falda (de|para) [aá]rbol|cubre ?pie|pie de [aá]rbol" },
     { nombre: "Árboles y pinos", patron: "^\\s*([aá]rbol|arbolito|pino)" },
-    { nombre: "Luces lineales", patron: "lineal|manguera|cortina de luces|tira (de )?led|serie (de )?luces|cable de luces" },
     { nombre: "Luces decorativas", patron: "(^|\\s)(luz|luces|led|foco|focos|farol|faroles)(\\s|$)" },
     { nombre: "Coronas y guirnaldas", patron: "corona|guirnalda" },
     { nombre: "Nacimientos", patron: "nacimiento|pesebre|bel[eé]n" },

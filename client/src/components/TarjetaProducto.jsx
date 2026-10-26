@@ -1,12 +1,16 @@
 import { moneda, monedaCosto } from "../api.js";
 import { urlFoto } from "../fotos.js";
 
-export default function TarjetaProducto({ producto, esJefe, retraso, onEditar, onEliminar, onIngresar }) {
+export default function TarjetaProducto({ producto, parte, esJefe, retraso, onEditar, onEliminar, onIngresar }) {
     const precio = Number(producto.precio);
     // Media docena: la mitad de la docena (igual que al vender), y su mínimo, la mitad del de la docena.
     const mediaDocena = Number((Number(producto.precioDocena) / 2).toFixed(2));
     const minimoMediaDocena = Number((Number(producto.precioMinimoDocena) / 2).toFixed(2));
     const stockBajo = producto.stock <= 5;
+    // Si tiene mercadería nueva y del 2025, cada pestaña muestra su parte.
+    const stock2025 = Number(producto.stock2025 ?? 0);
+    const esMixto = stock2025 > 0 && producto.stock > stock2025;
+    const stockParte = !esMixto ? producto.stock : parte === "2025" ? stock2025 : producto.stock - stock2025;
 
     let detallesJefe = null;
 
@@ -106,7 +110,8 @@ export default function TarjetaProducto({ producto, esJefe, retraso, onEditar, o
                 <div>
                     <dt>Stock disponible</dt>
                     <dd className={stockBajo ? "stock-bajo" : undefined}>
-                        {producto.stock} unidades
+                        {stockParte} unidades
+                        {esMixto && <small> (de {producto.stock} en total)</small>}
                     </dd>
                 </div>
             </dl>

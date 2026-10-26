@@ -25,14 +25,16 @@ const COLUMNAS_COMUNES = `
     -- Se puede regalar (el empleado solo ve si sí o no, nunca el costo).
     ${OBSEQUIABLE} AS "obsequiable",
     ${COLORES_JSON} AS colores,
+    -- Inventario nuevo / 2025 (todos lo ven; no muestra montos).
+    stock_2025 AS "stock2025",
+    EXISTS (SELECT 1 FROM ventas WHERE ventas.producto_id = productos.id AND ventas.unidades_2025 > 0) AS "fue2025",
     COALESCE(EXTRACT(EPOCH FROM foto_actualizada)::BIGINT, 0)::INT AS "fotoVersion"
 `;
 
 const COLUMNAS_JEFE = `
     ${COLUMNAS_COMUNES},
     precio_compra AS "precioCompra",
-    unidades_por_caja AS "unidadesPorCaja",
-    stock_2025 AS "stock2025"
+    unidades_por_caja AS "unidadesPorCaja"
 `;
 
 function columnasSegunRol(req) {

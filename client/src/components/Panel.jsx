@@ -5,6 +5,7 @@ import Cajonera from "./Cajonera.jsx";
 import PanelControl from "./PanelControl.jsx";
 import Historial from "./Historial.jsx";
 import Inventario from "./Inventario.jsx";
+import FormularioProducto from "./FormularioProducto.jsx";
 import Ventas from "./Ventas.jsx";
 import Gastos from "./Gastos.jsx";
 import Clientes from "./Clientes.jsx";
@@ -26,7 +27,14 @@ const VISTAS = [
         clave: "inventario",
         icono: "📦",
         nombre: "Inventario",
-        descripcion: "Consulta tus productos, precios y stock."
+        descripcion: "Consulta tus productos, precios y stock: la mercadería nueva y la del 2025 por separado."
+    },
+    {
+        clave: "registrar",
+        icono: "➕",
+        nombre: "Registrar producto",
+        descripcion: "Agrega un producto nuevo con sus precios, stock, colores y foto.",
+        soloJefe: true
     },
     {
         clave: "ventas",
@@ -222,8 +230,15 @@ export default function Panel({ usuario, onSalir, onActualizarUsuario }) {
                             productos={productos}
                             errorProductos={errorProductos}
                             onCambio={recargarInventario}
+                            onRegistrar={() => cambiarVista("registrar")}
                             onError={manejarError}
                         />
+                    )}
+
+                    {vistaActual.clave === "registrar" && (
+                        <div className="contenido-vista">
+                            <FormularioProducto onCreado={recargarInventario} onError={manejarError} />
+                        </div>
                     )}
 
                     {vistaActual.clave === "ventas" && (

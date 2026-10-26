@@ -1,18 +1,34 @@
 import { useCallback, useState } from "react";
 import { pedir } from "../api.js";
 import TarjetaProducto from "./TarjetaProducto.jsx";
-import FormularioProducto from "./FormularioProducto.jsx";
 import ModalEditarProducto from "./ModalEditarProducto.jsx";
 import Escaner from "./Escaner.jsx";
 import IngresarMercaderia from "./IngresarMercaderia.jsx";
+
+// Un producto es del inventario 2025 si le quedan unidades del 2025, o si ya se agotó
+// y lo último que se vendió de él era del 2025. Si tiene de los dos, sale en ambas pestañas.
+function es2025(producto) {
+    return Number(producto.stock2025 ?? 0) > 0 || (producto.stock === 0 && Boolean(producto.fue2025));
+}
+
+function esNuevo(producto) {
+    return !es2025(producto) || producto.stock > Number(producto.stock2025 ?? 0);
+}
+
+const PARTES = [
+    { valor: "nuevo", texto: "🆕 Nuevo", incluye: esNuevo },
+    { valor: "2025", texto: "📦 Del 2025", incluye: es2025 }
+];
 
 export default function Inventario({
     esJefe,
     productos,
     errorProductos,
     onCambio,
+    onRegistrar,
     onError
 }) {
+    const [parte, setParte] = useState("nuevo");
     const [busqueda, setBusqueda] = useState("");
     const [productoEditando, setProductoEditando] = useState(null);
     const [escaneando, setEscaneando] = useState(false);
@@ -24,8 +40,10 @@ export default function Inventario({
         setBusqueda(codigo);
     }, []);
 
+    const parteActual = PARTES.find((p) => p.valor === parte);
+    const deLaParte = (productos ?? []).filter(parteActual.incluye);
     const texto = busqueda.trim().toLowerCase();
-    const filtrados = (productos ?? []).filter((producto) =>
+    const filtrados = deLaParte.filter((producto) =>
         producto.nombre.toLowerCase().includes(texto) ||
         (producto.codigo ?? "").toLowerCase().includes(texto)
     );
@@ -46,8 +64,34 @@ export default function Inventario({
 
     return (
         <div className="contenido-vista">
-            <section className="tarjeta inventario">
-                <h2>Inventario de productos</h2>
+            <div className="selector-modalidad selector-filtro pestanas-inventario" role="tablist" aria-label="Inventario">
+                {PARTES.map((p) => (
+                    <button
+                        key={p.valor}
+                        type="button"
+                        role="tab"
+                        aria-selected={parte === p.valor}
+                        className={parte === p.valor ? "activo" : ""}
+                        onClick={() => setParte(p.valor)}
+                    >
+                        {p.texto}
+                        {productos && <span className="conteo-pestana">{productos.filter(p.incluye).length}</span>}
+                    </button>
+                ))}
+            </div>
+
+            <section className={`tarjeta inventario ${parte === "2025" ? "inventario-2025" : ""}`}>
+                <div className="encabezado-inventario">
+                    <h2>{parte === "2025" ? "Inventario 2025" : "Inventario nuevo"}</h2>
+                    {esJefe && onRegistrar && (
+                        <button type="button" className="boton-secundario boton-pequeno" onClick={onRegistrar}>
+                            ➕ Registrar producto
+                        </button>
+                    )}
+                </div>
+                {parte === "2025" && (
+                    <p className="ayuda-campo aviso-2025">Mercadería sobrante del año pasado: lo que se vende de aquí es ganancia del inventario 2025.</p>
+                )}
                 <p>Busca un producto por su código o nombre, o escanea su código.</p>
                 {aviso && <p className="mensaje mensaje-exito" role="status">✅ {aviso}</p>}
 
@@ -80,18 +124,29 @@ export default function Inventario({
                 ) : !texto ? (
                     <p className="aviso-busqueda">
                         <span aria-hidden="true">🔎</span>{" "}
-                        {productos.length === 0
-                            ? "Todavía no hay productos registrados."
-                            : `Hay ${productos.length} ${productos.length === 1 ? "producto registrado" : "productos registrados"}. Escribe o escanea para ver uno.`}
+                        {deLaParte.length === 0
+                            ? (parte === "2025" ? "No hay productos del inventario 2025." : "Todavía no hay productos nuevos registrados.")
+                            : `Hay ${deLaParte.length} ${deLaParte.length === 1 ? "producto" : "productos"} en este inventario. Escribe o escanea para ver uno.`}
                     </p>
                 ) : filtrados.length === 0 ? (
-                    <p>No se encontraron productos con ese código o nombre.</p>
+                    <p>
+                        No se encontraron productos con ese código o nombre en el {parte === "2025" ? "inventario 2025" : "inventario nuevo"}.
+                        {(productos ?? []).some((p) => !parteActual.incluye(p) && (p.nombre.toLowerCase().includes(texto) || (p.codigo ?? "").toLowerCase().includes(texto))) && (
+                            <>
+                                {" "}
+                                <button type="button" className="boton-enlace" onClick={() => setParte(parte === "2025" ? "nuevo" : "2025")}>
+                                    Buscar en el {parte === "2025" ? "inventario nuevo" : "inventario 2025"}
+                                </button>
+                            </>
+                        )}
+                    </p>
                 ) : (
                     <div className="lista-productos">
                         {filtrados.map((producto, indice) => (
                             <TarjetaProducto
                                 key={producto.id}
                                 producto={producto}
+                                parte={parte}
                                 esJefe={esJefe}
                                 retraso={Math.min(indice * 70, 490)}
                                 onEditar={() => setProductoEditando(producto)}
@@ -102,10 +157,6 @@ export default function Inventario({
                     </div>
                 )}
             </section>
-
-            {esJefe && (
-                <FormularioProducto onCreado={onCambio} onError={onError} />
-            )}
 
             {ingresando && (
                 <IngresarMercaderia

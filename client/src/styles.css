@@ -1776,9 +1776,10 @@ input[aria-invalid="true"] {
     max-width: none;
     margin: -16px -16px 12px;
     aspect-ratio: 4 / 3;
-    object-fit: cover;
+    /* Se ve entera (las fotos con estilo de catálogo son verticales). */
+    object-fit: contain;
     border-radius: 12px 12px 0 0;
-    background: var(--morado-100);
+    background: linear-gradient(160deg, var(--morado-50), var(--morado-150));
 }
 
 .foto-producto-editor {
@@ -1793,7 +1794,7 @@ input[aria-invalid="true"] {
     justify-content: center;
     flex-shrink: 0;
     width: 96px;
-    height: 96px;
+    height: 128px;
     overflow: hidden;
     border: 1px dashed var(--morado-300);
     border-radius: 12px;
@@ -1804,7 +1805,18 @@ input[aria-invalid="true"] {
 .foto-previa img {
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: contain;
+}
+
+.foto-edicion {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 14px;
+}
+
+.foto-edicion .casilla {
+    font-size: 0.9rem;
 }
 
 .foto-acciones {
@@ -3764,7 +3776,7 @@ textarea {
 .cat-detalle-foto img {
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: contain;
 }
 
 .cat-detalle-datos {
@@ -5124,6 +5136,43 @@ body.sin-desplazamiento {
 
 .pestanas-reportes {
     margin-bottom: 16px;
+}
+
+/* Inventario nuevo / 2025 */
+.selector-filtro.pestanas-inventario {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-bottom: 16px;
+}
+
+.conteo-pestana {
+    display: inline-block;
+    min-width: 22px;
+    margin-left: 6px;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.08);
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.encabezado-inventario {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 12px;
+}
+
+.inventario-2025 {
+    border-top: 4px solid #fcd34d;
+}
+
+.aviso-2025 {
+    margin: 10px 0 0;
+    padding: 8px 12px;
+    border-radius: 10px;
+    background: #fffbeb;
+    color: #92400e;
 }
 
 .reporte {
