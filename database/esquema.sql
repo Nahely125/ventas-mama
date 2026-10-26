@@ -80,6 +80,7 @@ CREATE TABLE IF NOT EXISTS productos (
     categoria_id       INTEGER REFERENCES categorias(id) ON DELETE SET NULL,    -- la sección se toma de la categoría
     foto               BYTEA,                                               -- foto reducida (JPEG)
     foto_tipo          VARCHAR(30),
+    foto_editada       BOOLEAN       NOT NULL DEFAULT FALSE,                -- la foto ya tiene el estilo del catálogo
     foto_actualizada   TIMESTAMP
 );
 

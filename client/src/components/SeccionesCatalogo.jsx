@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { pedir } from "../api.js";
 import { TEMAS, iconoTema } from "../secciones.js";
 import CategoriasSeccion from "./CategoriasSeccion.jsx";
+import EditarFotos from "./EditarFotos.jsx";
 
 const VACIA = { nombre: "", descripcion: "", tema: "general", visible: true, orden: "0" };
 
@@ -245,6 +246,8 @@ export default function SeccionesCatalogo({ onError }) {
                     )}
                 </form>
             </section>
+
+            <EditarFotos onError={onError} />
         </div>
     );
 }

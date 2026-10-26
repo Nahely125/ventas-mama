@@ -1,6 +1,7 @@
 require("dotenv").config();
 
 const express = require("express");
+const compression = require("compression");
 const path = require("path");
 const session = require("express-session");
 const AlmacenSesiones = require("connect-pg-simple")(session);
@@ -25,6 +26,8 @@ if (enProduccion) {
 }
 
 // 3 MB: alcanza para la foto de un producto ya reducida por el navegador.
+// Respuestas comprimidas (el motor que edita las fotos pesa ~14 MB; comprimido, ~4 MB).
+app.use(compression());
 app.use(express.json({ limit: "3mb" }));
 
 // Revisión de estado para el hosting: responde 200 si el servidor y la base de datos funcionan.

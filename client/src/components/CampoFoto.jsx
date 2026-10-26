@@ -1,8 +1,10 @@
 import { useRef, useState } from "react";
 import { leerImagen, prepararFoto } from "../fotos.js";
 
-// foto: data URL nueva, null (quitada) o undefined (sin cambios).
-export default function CampoFoto({ id, foto, fotoActual, onCambio }) {
+/* foto: data URL nueva, null (quitada) o undefined (sin cambios).
+   onCambio(foto, editada): editada = la foto ya tiene el estilo del catálogo.
+   onProcesando(true/false): mientras se edita la foto (no se debe guardar todavía). */
+export default function CampoFoto({ id, foto, fotoActual, onCambio, onProcesando }) {
     const entrada = useRef(null);
     // Imagen que se está editando (recién elegida o la guardada), con su giro y estilo.
     const [edicion, setEdicion] = useState(null);
@@ -13,21 +15,35 @@ export default function CampoFoto({ id, foto, fotoActual, onCambio }) {
     // Si el formulario se limpió (foto sin cambios), ya no hay nada en edición.
     const editando = foto ? edicion : null;
 
-    function aplicar(nueva) {
-        setEdicion(nueva);
-        onCambio(prepararFoto(nueva.imagen, nueva));
+    function cambiarProcesando(valor) {
+        setProcesando(valor);
+        onProcesando?.(valor);
+    }
+
+    async function aplicar(nueva) {
+        setError("");
+        cambiarProcesando(true);
+
+        try {
+            setEdicion(nueva);
+            onCambio(await prepararFoto(nueva.imagen, nueva), nueva.estilo);
+        } catch (err) {
+            setError(err.message || "No se pudo editar la foto.");
+        } finally {
+            cambiarProcesando(false);
+        }
     }
 
     async function abrir(origen) {
         setError("");
-        setProcesando(true);
+        cambiarProcesando(true);
 
         try {
-            aplicar({ imagen: await leerImagen(origen), giro: 0, estilo: true });
+            const imagen = await leerImagen(origen);
+            await aplicar({ imagen, giro: 0, estilo: true });
         } catch (err) {
             setError(err.message || "No se pudo leer la imagen.");
-        } finally {
-            setProcesando(false);
+            cambiarProcesando(false);
         }
     }
 
@@ -48,7 +64,7 @@ export default function CampoFoto({ id, foto, fotoActual, onCambio }) {
             <legend>Foto del producto (opcional)</legend>
 
             <div className="foto-producto-editor">
-                <div className="foto-previa">
+                <div className={`foto-previa ${procesando ? "procesando" : ""}`}>
                     {vista ? (
                         <img src={vista} alt="Foto del producto" />
                     ) : (
@@ -71,7 +87,7 @@ export default function CampoFoto({ id, foto, fotoActual, onCambio }) {
                         onClick={() => entrada.current?.click()}
                         disabled={procesando}
                     >
-                        {procesando ? "Procesando..." : vista ? "📷 Cambiar foto" : "📷 Tomar o elegir foto"}
+                        {procesando ? "✨ Editando la foto..." : vista ? "📷 Cambiar foto" : "📷 Tomar o elegir foto"}
                     </button>
 
                     {editando && (
@@ -80,6 +96,7 @@ export default function CampoFoto({ id, foto, fotoActual, onCambio }) {
                                 type="button"
                                 className="boton-secundario boton-pequeno"
                                 onClick={() => aplicar({ ...editando, giro: (editando.giro + 90) % 360 })}
+                                disabled={procesando}
                             >
                                 ↻ Girar
                             </button>
@@ -88,8 +105,9 @@ export default function CampoFoto({ id, foto, fotoActual, onCambio }) {
                                     type="checkbox"
                                     checked={editando.estilo}
                                     onChange={(e) => aplicar({ ...editando, estilo: e.target.checked })}
+                                    disabled={procesando}
                                 />
-                                <span>✨ Estilo catálogo</span>
+                                <span>✨ Fondo blanco</span>
                             </label>
                         </div>
                     )}
@@ -101,20 +119,22 @@ export default function CampoFoto({ id, foto, fotoActual, onCambio }) {
                             onClick={() => abrir(fotoActual)}
                             disabled={procesando}
                         >
-                            ✨ Editar y estilizar esta foto
+                            ✨ Editar esta foto (fondo blanco)
                         </button>
                     )}
 
-                    {vista && (
+                    {vista && !procesando && (
                         <button type="button" className="boton-enlace" onClick={quitar}>
                             Quitar foto
                         </button>
                     )}
 
                     <span className="ayuda-campo">
-                        {editando?.estilo
-                            ? "Se mejoran la luz y el color, y se le da un marco para el catálogo."
-                            : "En el celular puedes tomarla con la cámara."}
+                        {procesando
+                            ? "Quitando el fondo y mejorando la luz. La primera vez tarda un poco más."
+                            : editando?.estilo
+                                ? "Se quitó el fondo, se mejoró la luz y quedó sobre blanco. Si no te gusta, desmarca «Fondo blanco»."
+                                : "En el celular puedes tomarla con la cámara."}
                     </span>
                     {error && <span className="texto-error">{error}</span>}
                 </div>

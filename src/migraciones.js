@@ -147,6 +147,9 @@ const MIGRACIONES = `
     CREATE INDEX IF NOT EXISTS devoluciones_fecha_idx ON devoluciones (fecha);
     CREATE INDEX IF NOT EXISTS devoluciones_venta_idx ON devoluciones (venta_id);
 
+    -- La foto ya tiene el estilo del catálogo (fondo blanco): no se vuelve a editar.
+    ALTER TABLE productos ADD COLUMN IF NOT EXISTS foto_editada BOOLEAN NOT NULL DEFAULT FALSE;
+
     -- Costos con hasta 4 decimales (por ejemplo, S/ 0.0833 por unidad). Solo se cambia una vez.
     DO $$
     BEGIN

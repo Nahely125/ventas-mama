@@ -449,7 +449,8 @@ export default function CamposProducto({ valores, onCambio, prefijo, etiquetaCom
                 id={id("foto")}
                 foto={valores.foto}
                 fotoActual={valores.fotoActual}
-                onCambio={(foto) => onCambio((anteriores) => ({ ...anteriores, foto }))}
+                onCambio={(foto, fotoEditada = false) => onCambio((anteriores) => ({ ...anteriores, foto, fotoEditada }))}
+                onProcesando={(fotoProcesando) => onCambio((anteriores) => ({ ...anteriores, fotoProcesando }))}
             />
 
             {escaneando && (

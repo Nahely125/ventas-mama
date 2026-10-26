@@ -22,6 +22,7 @@ const COLUMNAS_COMUNES = `
     seccion_id AS "seccionId",
     categoria_id AS "categoriaId",
     (foto IS NOT NULL) AS "tieneFoto",
+    foto_editada AS "fotoEditada",
     -- Se puede regalar (el empleado solo ve si sí o no, nunca el costo).
     ${OBSEQUIABLE} AS "obsequiable",
     ${COLORES_JSON} AS colores,
@@ -421,10 +422,10 @@ router.put("/:id/foto", requiereJefe, async (req, res) => {
     try {
         const resultado = await pool.query(
             `UPDATE productos
-             SET foto = $1, foto_tipo = $2, foto_actualizada = CURRENT_TIMESTAMP
+             SET foto = $1, foto_tipo = $2, foto_editada = $4, foto_actualizada = CURRENT_TIMESTAMP
              WHERE id = $3
              RETURNING id`,
-            [foto, coincidencia[1], id]
+            [foto, coincidencia[1], id, req.body.editada === true]
         );
 
         if (resultado.rows.length === 0) {
@@ -448,7 +449,7 @@ router.delete("/:id/foto", requiereJefe, async (req, res) => {
     try {
         await pool.query(
             `UPDATE productos
-             SET foto = NULL, foto_tipo = NULL, foto_actualizada = CURRENT_TIMESTAMP
+             SET foto = NULL, foto_tipo = NULL, foto_editada = FALSE, foto_actualizada = CURRENT_TIMESTAMP
              WHERE id = $1`,
             [id]
         );

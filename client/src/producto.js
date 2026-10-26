@@ -65,6 +65,10 @@ function validarColores(valores) {
 // Convierte los valores del formulario y valida un producto.
 // Devuelve { datos } si es válido o { error } si no lo es.
 export function validarProducto(valoresFormulario) {
+    if (valoresFormulario.fotoProcesando) {
+        return { error: "Espera un momento: la foto todavía se está editando." };
+    }
+
     // Con colores, el stock es la suma de sus cantidades.
     const { colores, error: errorColores } = validarColores(valoresFormulario);
 

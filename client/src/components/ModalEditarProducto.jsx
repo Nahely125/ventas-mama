@@ -64,7 +64,7 @@ export default function ModalEditarProducto({ producto, onCerrar, onGuardado, on
                 method: "PUT",
                 cuerpo: resultado.datos
             });
-            await guardarFoto(producto.id, valores.foto);
+            await guardarFoto(producto.id, valores.foto, valores.fotoEditada);
             await onGuardado();
         } catch (err) {
             onError(err, () => setError(err.message));

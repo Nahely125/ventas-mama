@@ -89,10 +89,10 @@ export default function Inventario({
                         </button>
                     )}
                 </div>
-                {parte === "2025" && (
+                {parte === "2025" && esJefe && (
                     <p className="ayuda-campo aviso-2025">Mercadería sobrante del año pasado: lo que se vende de aquí es ganancia del inventario 2025.</p>
                 )}
-                <p>Busca un producto por su código o nombre, o escanea su código.</p>
+                <p>Aquí están todos los productos. Para encontrar uno rápido, búscalo por código o nombre, o escanea su código.</p>
                 {aviso && <p className="mensaje mensaje-exito" role="status">✅ {aviso}</p>}
 
                 <div className="buscador">
@@ -121,12 +121,9 @@ export default function Inventario({
                     <p className="mensaje mensaje-error">{errorProductos}</p>
                 ) : productos === null ? (
                     <p>Cargando productos...</p>
-                ) : !texto ? (
+                ) : deLaParte.length === 0 ? (
                     <p className="aviso-busqueda">
-                        <span aria-hidden="true">🔎</span>{" "}
-                        {deLaParte.length === 0
-                            ? (parte === "2025" ? "No hay productos del inventario 2025." : "Todavía no hay productos nuevos registrados.")
-                            : `Hay ${deLaParte.length} ${deLaParte.length === 1 ? "producto" : "productos"} en este inventario. Escribe o escanea para ver uno.`}
+                        {parte === "2025" ? "No hay productos del inventario 2025." : "Todavía no hay productos nuevos registrados."}
                     </p>
                 ) : filtrados.length === 0 ? (
                     <p>
@@ -141,20 +138,27 @@ export default function Inventario({
                         )}
                     </p>
                 ) : (
-                    <div className="lista-productos">
-                        {filtrados.map((producto, indice) => (
-                            <TarjetaProducto
-                                key={producto.id}
-                                producto={producto}
-                                parte={parte}
-                                esJefe={esJefe}
-                                retraso={Math.min(indice * 70, 490)}
-                                onEditar={() => setProductoEditando(producto)}
-                                onIngresar={() => setIngresando(producto)}
-                                onEliminar={() => eliminar(producto)}
-                            />
-                        ))}
-                    </div>
+                    <>
+                        <p className="conteo-productos">
+                            {texto
+                                ? `${filtrados.length} de ${deLaParte.length} ${deLaParte.length === 1 ? "producto" : "productos"}`
+                                : `${deLaParte.length} ${deLaParte.length === 1 ? "producto" : "productos"}`}
+                        </p>
+                        <div className="lista-productos">
+                            {filtrados.map((producto, indice) => (
+                                <TarjetaProducto
+                                    key={producto.id}
+                                    producto={producto}
+                                    parte={parte}
+                                    esJefe={esJefe}
+                                    retraso={Math.min(indice * 70, 490)}
+                                    onEditar={() => setProductoEditando(producto)}
+                                    onIngresar={() => setIngresando(producto)}
+                                    onEliminar={() => eliminar(producto)}
+                                />
+                            ))}
+                        </div>
+                    </>
                 )}
             </section>
 
