@@ -4,6 +4,7 @@ import { urlFoto } from "../fotos.js";
 import { iconoTema } from "../secciones.js";
 import { WHATSAPP_NEGOCIO } from "../datosPago.js";
 import CarritoCatalogo, { detalleCarrito, precioCatalogo, useCarrito } from "./CarritoCatalogo.jsx";
+import { PanelFiltros, VentanaFiltros, aplicarFiltros, cantidadFiltros } from "./FiltrosCatalogo.jsx";
 import { BarraPromociones, Nosotros, PieTienda, Portada, VentanaBienvenida } from "./TiendaWeb.jsx";
 import { totalesPedido, useCupon, useTienda } from "../tienda.js";
 
@@ -155,7 +156,9 @@ export default function Catalogo() {
     const [ruta, setRuta] = useState(leerHash);
     const [busqueda, setBusqueda] = useState("");
     const [buscando, setBuscando] = useState(false);
-    const [soloDisponibles, setSoloDisponibles] = useState(false);
+    // Filtros del panel izquierdo (la categoría va en la dirección: #feria/categoria).
+    const [filtros, setFiltros] = useState({ soloDisponibles: false, rango: "", orden: "" });
+    const [viendoFiltros, setViendoFiltros] = useState(false);
     const [detalle, setDetalle] = useState(null);
     const [viendoPedido, setViendoPedido] = useState(false);
     const [bienvenidaForzada, setBienvenidaForzada] = useState(false);
@@ -284,7 +287,7 @@ export default function Catalogo() {
     }
 
     const texto = busqueda.trim().toLowerCase();
-    const filtrar = (productos) => productos.filter((p) => !soloDisponibles || p.disponible);
+    const filtrar = (productos) => aplicarFiltros(productos, filtros);
 
     // Búsqueda: nombre, código o categoría, en todas las secciones.
     const resultados = texto
@@ -332,6 +335,21 @@ export default function Catalogo() {
 
     const mostrarBanner = !texto && seccionActiva && !categoriaActiva;
     const anuncio = secciones.find((s) => s.id !== 0);
+    const totalResultados = bloques.reduce((suma, b) => suma + b.productos.length, 0);
+    const panelFiltros = (
+        <PanelFiltros
+            secciones={secciones}
+            seccionClave={texto ? null : seccionClave}
+            categoriaActiva={texto ? null : categoriaActiva}
+            filtros={filtros}
+            onFiltros={setFiltros}
+            onIr={(seccion, categoria = null) => {
+                setViendoFiltros(false);
+                ir(seccion, categoria);
+            }}
+            onLimpiar={() => setFiltros({ soloDisponibles: false, rango: "", orden: "" })}
+        />
+    );
     const grilla = (productos) => <Grilla productos={productos} onAbrir={setDetalle} enPedido={enPedido} onAgregar={agregar} />;
     const tituloListado = texto
         ? `Resultados para “${busqueda.trim()}”`
@@ -518,47 +536,56 @@ export default function Catalogo() {
                             </section>
                         )}
 
-                        <div className="cat-filtros" ref={listado}>
-                            <p>{tituloListado}</p>
-                            <label className="cat-chip">
-                                <input
-                                    type="checkbox"
-                                    checked={soloDisponibles}
-                                    onChange={(e) => setSoloDisponibles(e.target.checked)}
-                                />
-                                Solo disponibles
-                            </label>
-                        </div>
+                        <div className="cat-tienda">
+                            <aside className="cat-lateral" aria-label="Filtros">
+                                {panelFiltros}
+                            </aside>
 
-                        {bloques.length === 0 ? (
-                            <p className="cat-vacio">
-                                {texto
-                                    ? "No encontramos productos con esa búsqueda."
-                                    : "Pronto tendremos productos aquí. ✦"}
-                            </p>
-                        ) : (
-                            bloques.map((bloque) => (
-                                <section key={bloque.clave} className="cat-bloque" aria-label={bloque.titulo ?? tituloListado}>
-                                    {bloque.titulo && (
-                                        <h2 className="cat-bloque-titulo">
-                                            {bloque.titulo}
-                                            {bloque.subtitulo && <em>{bloque.subtitulo}</em>}
-                                            <span>{bloque.productos.length}</span>
-                                            {bloque.categoria && (
-                                                <button
-                                                    type="button"
-                                                    className="cat-ver-mas"
-                                                    onClick={() => ir(seccionActiva.slug, bloque.categoria.slug)}
-                                                >
-                                                    Ver solo esta →
-                                                </button>
+                            <div className="cat-resultados">
+                                <div className="cat-filtros" ref={listado}>
+                                    <p>{tituloListado}</p>
+                                    <span className="cat-total-resultados">{totalResultados} {totalResultados === 1 ? "producto" : "productos"}</span>
+                                    <button type="button" className="cat-boton-filtros" onClick={() => setViendoFiltros(true)}>
+                                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                                            <path d="M4 6h16M7 12h10M10 18h4" />
+                                        </svg>
+                                        Filtros{cantidadFiltros(filtros) > 0 ? ` (${cantidadFiltros(filtros)})` : ""}
+                                    </button>
+                                </div>
+
+                                {bloques.length === 0 ? (
+                                    <p className="cat-vacio">
+                                        {texto
+                                            ? "No encontramos productos con esa búsqueda."
+                                            : cantidadFiltros(filtros) > 0
+                                                ? "Ningún producto cumple con estos filtros."
+                                                : "Pronto tendremos productos aquí. ✦"}
+                                    </p>
+                                ) : (
+                                    bloques.map((bloque) => (
+                                        <section key={bloque.clave} className="cat-bloque" aria-label={bloque.titulo ?? tituloListado}>
+                                            {bloque.titulo && (
+                                                <h2 className="cat-bloque-titulo">
+                                                    {bloque.titulo}
+                                                    {bloque.subtitulo && <em>{bloque.subtitulo}</em>}
+                                                    <span>{bloque.productos.length}</span>
+                                                    {bloque.categoria && (
+                                                        <button
+                                                            type="button"
+                                                            className="cat-ver-mas"
+                                                            onClick={() => ir(seccionActiva.slug, bloque.categoria.slug)}
+                                                        >
+                                                            Ver solo esta →
+                                                        </button>
+                                                    )}
+                                                </h2>
                                             )}
-                                        </h2>
-                                    )}
-                                    {grilla(bloque.productos)}
-                                </section>
-                            ))
-                        )}
+                                            {grilla(bloque.productos)}
+                                        </section>
+                                    ))
+                                )}
+                            </div>
+                        </div>
                     </>
                 )}
             </main>
@@ -566,6 +593,12 @@ export default function Catalogo() {
             <PieTienda tienda={tienda} secciones={secciones} onIr={ir} />
 
             {aviso && <p className="cat-aviso" role="status">{aviso}</p>}
+
+            {viendoFiltros && (
+                <VentanaFiltros total={totalResultados} onCerrar={() => setViendoFiltros(false)}>
+                    {panelFiltros}
+                </VentanaFiltros>
+            )}
 
             <VentanaBienvenida
                 tienda={tienda}
