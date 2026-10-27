@@ -79,7 +79,7 @@ const VISTAS = [
         clave: "catalogo",
         icono: "🛍️",
         nombre: "Catálogo",
-        descripcion: "Organiza el catálogo por secciones (ferias) y elige cuáles se muestran.",
+        descripcion: "Organiza el catálogo por secciones (ferias), edita la página web (nosotros, valores, promociones) y crea las fotos.",
         soloJefe: true
     },
     {

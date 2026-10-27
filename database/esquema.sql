@@ -276,4 +276,11 @@ CREATE TABLE IF NOT EXISTS compras (
 ALTER TABLE compras ADD COLUMN IF NOT EXISTS color_id INTEGER REFERENCES producto_colores(id) ON DELETE SET NULL;
 ALTER TABLE compras ADD COLUMN IF NOT EXISTS color VARCHAR(40);
 
+-- Página web del catálogo: quiénes somos, valores, datos de la empresa y promociones (una sola fila).
+CREATE TABLE IF NOT EXISTS tienda (
+    id          INTEGER PRIMARY KEY CHECK (id = 1),
+    datos       JSONB NOT NULL,
+    actualizado TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 COMMIT;

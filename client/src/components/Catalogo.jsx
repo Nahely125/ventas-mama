@@ -4,6 +4,8 @@ import { urlFoto } from "../fotos.js";
 import { iconoTema } from "../secciones.js";
 import { WHATSAPP_NEGOCIO } from "../datosPago.js";
 import CarritoCatalogo, { detalleCarrito, precioCatalogo, useCarrito } from "./CarritoCatalogo.jsx";
+import { BarraPromociones, Nosotros, PieTienda, Portada, VentanaBienvenida } from "./TiendaWeb.jsx";
+import { totalesPedido, useCupon, useTienda } from "../tienda.js";
 
 // Enlace para pedir un producto por WhatsApp con el mensaje ya escrito.
 function enlacePedido(producto) {
@@ -34,6 +36,9 @@ function BotonPedir({ producto, grande = false }) {
 
 const TODO = "todo";
 const OTROS = "otros";
+// Páginas de la tienda que no son secciones del catálogo.
+const INICIO = "inicio";
+const NOSOTROS = "nosotros";
 const SIN_SECCION = { id: 0, nombre: "Más productos", descripcion: null, tema: "general", categorias: [] };
 
 // "Feria Navideña" → "feria-navidena" (para el enlace #seccion/categoria).
@@ -153,17 +158,30 @@ export default function Catalogo() {
     const [soloDisponibles, setSoloDisponibles] = useState(false);
     const [detalle, setDetalle] = useState(null);
     const [viendoPedido, setViendoPedido] = useState(false);
+    const [bienvenidaForzada, setBienvenidaForzada] = useState(false);
+    const [aviso, setAviso] = useState("");
     const carrito = useCarrito();
+    const tienda = useTienda();
+    const [cupon, setCupon] = useCupon();
     const listado = useRef(null);
     const campoBusqueda = useRef(null);
 
     useEffect(() => {
-        document.title = "Catálogo | Mil Deseos";
-
         pedir("/api/publico/catalogo")
             .then(setDatos)
             .catch((err) => setError(err.message));
+
+        // Botón "atrás" del navegador: vuelve a la página anterior de la tienda.
+        const alVolver = () => setRuta(leerHash());
+        window.addEventListener("popstate", alVolver);
+        return () => window.removeEventListener("popstate", alVolver);
     }, []);
+
+    useEffect(() => {
+        if (!aviso) return undefined;
+        const espera = setTimeout(() => setAviso(""), 3500);
+        return () => clearTimeout(espera);
+    }, [aviso]);
 
     // Secciones con sus categorías y productos. Los productos sin sección van a "Más productos";
     // los que no tienen categoría, a "Otros" dentro de su sección.
@@ -205,23 +223,59 @@ export default function Catalogo() {
     const enPedido = (id) => pedido.items.filter((i) => i.id === id).reduce((suma, i) => suma + i.cantidad, 0);
     const agregar = (producto) => carrito.agregar(producto);
 
+    // Página: portada (sin enlace o #inicio), "Nosotros" o una sección del catálogo.
+    const pagina = !ruta.seccion || ruta.seccion === INICIO ? INICIO : ruta.seccion === NOSOTROS ? NOSOTROS : "catalogo";
+
     // Sección elegida: la del enlace o la primera; "todo" muestra todas.
-    const seccionClave = ruta.seccion === TODO || secciones.some((s) => s.slug === ruta.seccion)
-        ? ruta.seccion
-        : secciones[0]?.slug ?? TODO;
+    const seccionClave = pagina !== "catalogo"
+        ? null
+        : ruta.seccion === TODO || secciones.some((s) => s.slug === ruta.seccion)
+            ? ruta.seccion
+            : secciones[0]?.slug ?? TODO;
     const seccionActiva = secciones.find((s) => s.slug === seccionClave) ?? null;
     const categoriaActiva = seccionActiva?.categorias.find((c) => c.slug === ruta.categoria) ?? null;
 
+    useEffect(() => {
+        document.title = pagina === INICIO
+            ? "Mil Deseos | Adornos, luces, útiles y regalos"
+            : pagina === NOSOTROS
+                ? "Nosotros | Mil Deseos"
+                : `${seccionActiva?.nombre ?? "Catálogo"} | Mil Deseos`;
+    }, [pagina, seccionActiva]);
+
+    // Lo más nuevo: primero lo disponible y con foto.
+    const destacados = useMemo(
+        () => [...(datos?.productos ?? [])]
+            .filter((p) => p.disponible)
+            .sort((a, b) => Number(b.tieneFoto) - Number(a.tieneFoto) || b.id - a.id)
+            .slice(0, 8),
+        [datos]
+    );
+
     function ir(seccion, categoria = null, desplazar = true) {
+        // "nosotros/valores" → página "nosotros", apartado "valores".
+        if (categoria === null && seccion.includes("/")) {
+            [seccion, categoria] = seccion.split("/");
+        }
+
         setRuta({ seccion, categoria });
         setBusqueda("");
-        history.replaceState(null, "", `#${seccion}${categoria ? `/${categoria}` : ""}`);
+        setBuscando(false);
+        history.pushState(null, "", `#${seccion}${categoria ? `/${categoria}` : ""}`);
 
-        if (desplazar && categoria) {
+        if (seccion === NOSOTROS) {
+            // La página "Nosotros" se desplaza sola al apartado.
+        } else if (desplazar && categoria) {
             setTimeout(() => listado.current?.scrollIntoView({ behavior: "smooth" }), 30);
         } else {
             window.scrollTo({ top: 0, behavior: "smooth" });
         }
+    }
+
+    function aplicarCupon() {
+        if (!tienda?.cupon.activo) return;
+        setCupon(tienda.cupon.codigo);
+        setAviso(`🏷️ Cupón ${tienda.cupon.codigo} aplicado: se descuenta en tu pedido.`);
     }
 
     function abrirBusqueda() {
@@ -278,6 +332,7 @@ export default function Catalogo() {
 
     const mostrarBanner = !texto && seccionActiva && !categoriaActiva;
     const anuncio = secciones.find((s) => s.id !== 0);
+    const grilla = (productos) => <Grilla productos={productos} onAbrir={setDetalle} enPedido={enPedido} onAgregar={agregar} />;
     const tituloListado = texto
         ? `Resultados para “${busqueda.trim()}”`
         : seccionClave === TODO
@@ -288,11 +343,7 @@ export default function Catalogo() {
 
     return (
         <div className="cat-pagina">
-            <div className="cat-anuncio">
-                {anuncio
-                    ? `✦ ${anuncio.nombre} · Precios especiales por docena ✦`
-                    : "✦ Bienvenida a Mil Deseos ✦"}
-            </div>
+            <BarraPromociones tienda={tienda} feria={anuncio} onCupon={() => setBienvenidaForzada(true)} />
 
             <header className="cat-cabecera">
                 <div className="cat-cabecera-fila">
@@ -309,7 +360,7 @@ export default function Catalogo() {
                         </svg>
                     </button>
 
-                    <a className="cat-logo" href="/catalogo" onClick={(e) => { e.preventDefault(); ir(secciones[0]?.slug ?? TODO); }}>
+                    <a className="cat-logo" href="/catalogo" onClick={(e) => { e.preventDefault(); ir(INICIO); }}>
                         Mil Deseos
                     </a>
 
@@ -343,6 +394,16 @@ export default function Catalogo() {
                 {secciones.length > 0 && (
                     <nav className="cat-nav" aria-label="Secciones del catálogo">
                         <ul>
+                            <li>
+                                <button
+                                    type="button"
+                                    className={pagina === INICIO && !texto ? "activa" : ""}
+                                    aria-current={pagina === INICIO && !texto ? "page" : undefined}
+                                    onClick={() => ir(INICIO)}
+                                >
+                                    Inicio
+                                </button>
+                            </li>
                             {secciones.map((seccion) => (
                                 <li key={seccion.slug}>
                                     <button
@@ -366,6 +427,16 @@ export default function Catalogo() {
                                     </button>
                                 </li>
                             )}
+                            <li>
+                                <button
+                                    type="button"
+                                    className={pagina === NOSOTROS && !texto ? "activa" : ""}
+                                    aria-current={pagina === NOSOTROS && !texto ? "page" : undefined}
+                                    onClick={() => ir(NOSOTROS)}
+                                >
+                                    Nosotros
+                                </button>
+                            </li>
                         </ul>
                     </nav>
                 )}
@@ -406,6 +477,17 @@ export default function Catalogo() {
                     <p className="cargando-imagen cat-centrado">
                         <span className="spinner" aria-hidden="true"></span> Cargando catálogo...
                     </p>
+                ) : pagina === INICIO && !texto ? (
+                    <Portada
+                        tienda={tienda}
+                        secciones={secciones}
+                        destacados={destacados}
+                        grilla={grilla}
+                        onIr={ir}
+                        onAplicarCupon={aplicarCupon}
+                    />
+                ) : pagina === NOSOTROS && !texto ? (
+                    <Nosotros tienda={tienda} apartado={ruta.categoria} />
                 ) : (
                     <>
                         {mostrarBanner && (
@@ -473,7 +555,7 @@ export default function Catalogo() {
                                             )}
                                         </h2>
                                     )}
-                                    <Grilla productos={bloque.productos} onAbrir={setDetalle} enPedido={enPedido} onAgregar={agregar} />
+                                    {grilla(bloque.productos)}
                                 </section>
                             ))
                         )}
@@ -481,15 +563,21 @@ export default function Catalogo() {
                 )}
             </main>
 
-            <footer className="cat-pie">
-                <span className="cat-logo cat-logo-pie">Mil Deseos</span>
-                <p>Precios en soles (S/). Consulta disponibilidad antes de tu compra.</p>
-            </footer>
+            <PieTienda tienda={tienda} secciones={secciones} onIr={ir} />
+
+            {aviso && <p className="cat-aviso" role="status">{aviso}</p>}
+
+            <VentanaBienvenida
+                tienda={tienda}
+                forzada={bienvenidaForzada}
+                onAplicar={aplicarCupon}
+                onCerrar={() => setBienvenidaForzada(false)}
+            />
 
             {pedido.piezas > 0 && !viendoPedido && (
                 <button type="button" className="cat-barra-pedido" onClick={() => setViendoPedido(true)}>
                     <span>🛒 Ver mi pedido ({pedido.piezas})</span>
-                    <strong>{moneda(pedido.total)}</strong>
+                    <strong>{moneda(totalesPedido(pedido.total, tienda, cupon).total)}</strong>
                 </button>
             )}
 
@@ -503,7 +591,14 @@ export default function Catalogo() {
             )}
 
             {viendoPedido && (
-                <CarritoCatalogo carrito={carrito} productos={datos?.productos ?? []} onCerrar={() => setViendoPedido(false)} />
+                <CarritoCatalogo
+                    carrito={carrito}
+                    productos={datos?.productos ?? []}
+                    tienda={tienda}
+                    cupon={cupon}
+                    onCupon={setCupon}
+                    onCerrar={() => setViendoPedido(false)}
+                />
             )}
         </div>
     );

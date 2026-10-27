@@ -3,6 +3,7 @@ import { moneda } from "../api.js";
 import { urlFoto } from "../fotos.js";
 import { WHATSAPP_NEGOCIO } from "../datosPago.js";
 import { nombreModalidad } from "../venta.js";
+import { cuponValido, totalesPedido } from "../tienda.js";
 
 const CLAVE_GUARDADO = "mil-deseos-pedido";
 const MAXIMO = 999;
@@ -93,7 +94,7 @@ export function detalleCarrito(lineas, productos) {
     };
 }
 
-function enlacePedido(items, total) {
+function enlacePedido(items, totales, tienda) {
     const mensaje = [
         "Hola Mil Deseos 👋 Quiero hacer este pedido:",
         ...items.map((item) => {
@@ -101,7 +102,16 @@ function enlacePedido(items, total) {
             const codigo = item.producto.codigo ? ` (código ${item.producto.codigo})` : "";
             return `• ${cuanto} de ${item.producto.nombre}${codigo} — ${moneda(item.importe)}`;
         }),
-        `Total aproximado: ${moneda(total)}`,
+        ...(totales.conCupon
+            ? [
+                `Subtotal: ${moneda(totales.subtotal)}`,
+                `Cupón ${tienda.cupon.codigo} (${tienda.cupon.porcentaje}% primera compra): −${moneda(totales.descuento)}`
+            ]
+            : []),
+        `Total aproximado: ${moneda(totales.total)}`,
+        ...(totales.envioActivo
+            ? [totales.envioGratis ? `Envío: GRATIS (compra mayor a ${moneda(tienda.envio.gratisDesde)})` : "Envío: por coordinar"]
+            : []),
         "¿Me confirman la disponibilidad?",
         `Lo armé en el catálogo: ${window.location.origin}/catalogo`
     ].join("\n");
@@ -110,9 +120,58 @@ function enlacePedido(items, total) {
 }
 
 // Ventana con el pedido: cantidades, unidad, media docena o docena, total y envío por WhatsApp.
-export default function CarritoCatalogo({ carrito, productos, onCerrar }) {
+/* Cupón del pedido: campo para escribirlo o, si ya está aplicado, el descuento con opción a quitarlo. */
+function CampoCupon({ tienda, cupon, onCupon }) {
+    const [escrito, setEscrito] = useState("");
+    const [error, setError] = useState("");
+
+    if (!tienda?.cupon?.activo) return null;
+
+    if (cuponValido(tienda, cupon)) {
+        return (
+            <div className="cat-cupon-aplicado">
+                <span>
+                    🏷️ <strong>{tienda.cupon.codigo}</strong> · {tienda.cupon.porcentaje}% de descuento en tu primera compra
+                </span>
+                <button type="button" onClick={() => onCupon("")}>Quitar</button>
+            </div>
+        );
+    }
+
+    function aplicar(evento) {
+        evento.preventDefault();
+
+        if (cuponValido(tienda, escrito)) {
+            onCupon(tienda.cupon.codigo);
+            setError("");
+        } else {
+            setError("Ese código no existe o ya no está vigente.");
+        }
+    }
+
+    return (
+        <form className="cat-cupon" onSubmit={aplicar}>
+            <label htmlFor="cupon-pedido">¿Tienes un cupón?</label>
+            <div>
+                <input
+                    id="cupon-pedido"
+                    value={escrito}
+                    onChange={(e) => setEscrito(e.target.value.toUpperCase())}
+                    placeholder={`Ej. ${tienda.cupon.codigo}`}
+                    autoComplete="off"
+                    maxLength={20}
+                />
+                <button type="submit">Aplicar</button>
+            </div>
+            {error && <span className="cat-cupon-error" role="alert">{error}</span>}
+        </form>
+    );
+}
+
+export default function CarritoCatalogo({ carrito, productos, tienda, cupon, onCupon, onCerrar }) {
     const dialogo = useRef(null);
-    const { items, total } = detalleCarrito(carrito.lineas, productos);
+    const { items, total: subtotal } = detalleCarrito(carrito.lineas, productos);
+    const totales = totalesPedido(subtotal, tienda, cupon);
 
     useEffect(() => {
         dialogo.current?.showModal();
@@ -207,13 +266,50 @@ export default function CarritoCatalogo({ carrito, productos, onCerrar }) {
                             })}
                         </ul>
 
+                        <CampoCupon tienda={tienda} cupon={cupon} onCupon={onCupon} />
+
+                        <dl className="cat-carrito-cuentas">
+                            {totales.conCupon && (
+                                <>
+                                    <div>
+                                        <dt>Subtotal</dt>
+                                        <dd>{moneda(totales.subtotal)}</dd>
+                                    </div>
+                                    <div className="cat-descuento">
+                                        <dt>Cupón {tienda.cupon.codigo} (−{tienda.cupon.porcentaje}%)</dt>
+                                        <dd>−{moneda(totales.descuento)}</dd>
+                                    </div>
+                                </>
+                            )}
+                            {totales.envioActivo && (
+                                <div>
+                                    <dt>Envío</dt>
+                                    <dd className={totales.envioGratis ? "cat-envio-gratis" : ""}>
+                                        {totales.envioGratis ? "¡Gratis!" : "Por coordinar"}
+                                    </dd>
+                                </div>
+                            )}
+                        </dl>
+
                         <div className="cat-carrito-total">
                             <span>Total aproximado</span>
-                            <strong>{moneda(total)}</strong>
+                            <strong>{moneda(totales.total)}</strong>
                         </div>
+
+                        {totales.envioActivo && (
+                            <div className="cat-progreso-envio">
+                                <p>
+                                    {totales.envioGratis
+                                        ? "🚚 ¡Tu pedido tiene envío gratis!"
+                                        : <>🚚 Te faltan <strong>{moneda(totales.faltaEnvio)}</strong> para el envío gratis</>}
+                                </p>
+                                <progress max={tienda.envio.gratisDesde} value={Math.min(totales.total, tienda.envio.gratisDesde)} />
+                            </div>
+                        )}
+
                         <p className="cat-carrito-nota">Te confirmamos la disponibilidad y el total por WhatsApp.</p>
 
-                        <a className="cat-pedir cat-pedir-grande" href={enlacePedido(items, total)} target="_blank" rel="noopener">
+                        <a className="cat-pedir cat-pedir-grande" href={enlacePedido(items, totales, tienda)} target="_blank" rel="noopener">
                             <span aria-hidden="true">💬</span> Enviar pedido por WhatsApp
                         </a>
                         <button

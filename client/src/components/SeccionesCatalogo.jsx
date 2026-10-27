@@ -3,6 +3,7 @@ import { pedir } from "../api.js";
 import { TEMAS, iconoTema } from "../secciones.js";
 import CategoriasSeccion from "./CategoriasSeccion.jsx";
 import EditarFotos from "./EditarFotos.jsx";
+import PaginaWeb from "./PaginaWeb.jsx";
 
 const VACIA = { nombre: "", descripcion: "", tema: "general", visible: true, orden: "0" };
 
@@ -246,6 +247,8 @@ export default function SeccionesCatalogo({ onError }) {
                     )}
                 </form>
             </section>
+
+            <PaginaWeb onError={onError} />
 
             <EditarFotos onError={onError} />
         </div>
