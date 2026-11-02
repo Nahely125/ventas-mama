@@ -1,20 +1,30 @@
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useState } from "react";
 import { pedir } from "../api.js";
 import Encabezado from "./Encabezado.jsx";
 import Cajonera from "./Cajonera.jsx";
 import PanelControl from "./PanelControl.jsx";
-import Historial from "./Historial.jsx";
-import Inventario from "./Inventario.jsx";
-import FormularioProducto from "./FormularioProducto.jsx";
-import Ventas from "./Ventas.jsx";
-import Gastos from "./Gastos.jsx";
-import Clientes from "./Clientes.jsx";
-import Compras from "./Compras.jsx";
-import Inversion from "./Inversion.jsx";
-import CodigosAjuste from "./CodigosAjuste.jsx";
-import Reportes from "./Reportes.jsx";
-import Empleados from "./Empleados.jsx";
-import SeccionesCatalogo from "./SeccionesCatalogo.jsx";
+
+// Cada sección se descarga la primera vez que se abre: la app inicia más rápido en el celular.
+const Historial = lazy(() => import("./Historial.jsx"));
+const Inventario = lazy(() => import("./Inventario.jsx"));
+const FormularioProducto = lazy(() => import("./FormularioProducto.jsx"));
+const Ventas = lazy(() => import("./Ventas.jsx"));
+const Gastos = lazy(() => import("./Gastos.jsx"));
+const Clientes = lazy(() => import("./Clientes.jsx"));
+const Compras = lazy(() => import("./Compras.jsx"));
+const Inversion = lazy(() => import("./Inversion.jsx"));
+const CodigosAjuste = lazy(() => import("./CodigosAjuste.jsx"));
+const Reportes = lazy(() => import("./Reportes.jsx"));
+const Empleados = lazy(() => import("./Empleados.jsx"));
+const SeccionesCatalogo = lazy(() => import("./SeccionesCatalogo.jsx"));
+
+function CargandoVista() {
+    return (
+        <p className="cargando-vista" role="status">
+            <span className="spinner" aria-hidden="true"></span> Cargando...
+        </p>
+    );
+}
 
 const VISTAS = [
     {
@@ -213,6 +223,7 @@ export default function Panel({ usuario, onSalir, onActualizarUsuario }) {
                         <p>{vistaActual.descripcion}</p>
                     </section>
 
+                    <Suspense fallback={<CargandoVista />}>
                     {vistaActual.clave === "panel" && (
                         <PanelControl
                             esJefe={esJefe}
@@ -290,6 +301,7 @@ export default function Panel({ usuario, onSalir, onActualizarUsuario }) {
                             onError={manejarError}
                         />
                     )}
+                    </Suspense>
                 </main>
             </div>
         </>

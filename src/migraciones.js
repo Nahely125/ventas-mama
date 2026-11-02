@@ -190,6 +190,8 @@ const MIGRACIONES = `
         creado_en TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'America/Lima')
     );
     CREATE INDEX IF NOT EXISTS ventas_cliente_idx ON ventas (cliente_id);
+    -- Ventas de un producto (inventario 2025, reportes, historial): sin índice se revisaba toda la tabla.
+    CREATE INDEX IF NOT EXISTS ventas_producto_idx ON ventas (producto_id);
 
     -- Pagos a cuenta de lo que debe un cliente.
     CREATE TABLE IF NOT EXISTS abonos (
@@ -226,6 +228,7 @@ const MIGRACIONES = `
         usuario_id INTEGER REFERENCES usuarios(id),
         creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
+    CREATE INDEX IF NOT EXISTS compras_producto_idx ON compras (producto_id);
     DO $$
     BEGIN
         IF (SELECT numeric_scale FROM information_schema.columns

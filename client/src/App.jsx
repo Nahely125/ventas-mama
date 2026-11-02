@@ -1,24 +1,35 @@
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useState } from "react";
 import { pedir } from "./api.js";
 import Login from "./components/Login.jsx";
-import Panel from "./components/Panel.jsx";
-import Catalogo from "./components/Catalogo.jsx";
-import Boleta from "./components/Boleta.jsx";
+
+// Cada parte se descarga solo cuando se usa (el catálogo no baja el panel, y al revés).
+const Panel = lazy(() => import("./components/Panel.jsx"));
+const Catalogo = lazy(() => import("./components/Catalogo.jsx"));
+const Boleta = lazy(() => import("./components/Boleta.jsx"));
+
+export function PantallaCarga() {
+    return (
+        <div className="pantalla-carga" role="status">
+            <span className="spinner" aria-hidden="true"></span>
+            Cargando...
+        </div>
+    );
+}
 
 // Páginas públicas: no piden iniciar sesión.
 export default function App() {
     const ruta = window.location.pathname;
     const boleta = /^\/boleta\/([^/]+)\/?$/.exec(ruta);
 
+    let pagina = <AppPrivada />;
+
     if (/^\/catalogo\/?$/.test(ruta)) {
-        return <Catalogo />;
+        pagina = <Catalogo />;
+    } else if (boleta) {
+        pagina = <Boleta token={decodeURIComponent(boleta[1])} />;
     }
 
-    if (boleta) {
-        return <Boleta token={decodeURIComponent(boleta[1])} />;
-    }
-
-    return <AppPrivada />;
+    return <Suspense fallback={<PantallaCarga />}>{pagina}</Suspense>;
 }
 
 function AppPrivada() {
@@ -37,12 +48,7 @@ function AppPrivada() {
     }, [consultarSesion]);
 
     if (cargando) {
-        return (
-            <div className="pantalla-carga" role="status">
-                <span className="spinner" aria-hidden="true"></span>
-                Cargando...
-            </div>
-        );
+        return <PantallaCarga />;
     }
 
     if (!usuario) {

@@ -211,10 +211,21 @@ app.get("/imagenes/:archivo", requiereSesion, (req, res) => {
     );
 });
 
-app.use(express.static(carpetaFrontend, { index: false }));
+app.use(express.static(carpetaFrontend, {
+    index: false,
+    setHeaders(res, ruta) {
+        if (ruta.includes(`${path.sep}assets${path.sep}`)) {
+            res.set("Cache-Control", "public, max-age=31536000, immutable");
+        } else if (!ruta.endsWith(".html")) {
+            res.set("Cache-Control", "public, max-age=604800");
+        }
+    }
+}));
 
 // Páginas de la app React: el panel y las boletas.
 app.get(["/", "/boleta/:token"], (req, res) => {
+    // La página siempre se revisa: así, al publicar una versión nueva, se ve enseguida.
+    res.set("Cache-Control", "no-cache");
     res.sendFile(path.join(carpetaFrontend, "index.html"));
 });
 
@@ -250,6 +261,7 @@ app.get("/catalogo", async (req, res) => {
             `<meta name="twitter:card" content="summary_large_image">`
         ].join("\n    ");
 
+        res.set("Cache-Control", "no-cache");
         res.type("html").send(
             html
                 .replace("<title>Mil Deseos</title>", `<title>${escaparHtml(titulo)}</title>`)
