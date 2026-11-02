@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { moneda, pedir } from "../api.js";
 import { formatearDia, hoy } from "../fechas.js";
-import { nombreMetodoPago } from "../venta.js";
+import { formatearFecha, nombreMetodoPago } from "../venta.js";
 
 const PESTANAS = [
     { valor: "caja", texto: "💵 Cierre de caja" },
     { valor: "empleados", texto: "👥 Por empleado" },
-    { valor: "productos", texto: "🏷️ Productos" }
+    { valor: "productos", texto: "🏷️ Productos" },
+    { valor: "ajustes", texto: "📉 Pérdidas" }
 ];
 
 // Día de hoy menos n días (YYYY-MM-DD, hora local).
@@ -395,7 +396,75 @@ function Productos({ onError }) {
     );
 }
 
-// Reportes del jefe: cierre de caja, ventas por empleado y productos.
+// Pérdidas y ajustes de stock (conteos, rotos, perdidos...) en un periodo, valorizados al costo.
+function Ajustes({ onError }) {
+    const [[desde, hasta], setRango] = useState(() => PERIODOS[3].rango());
+    const { datos, error } = useReporte(`/api/reportes/ajustes?desde=${desde}&hasta=${hasta}`, onError);
+
+    return (
+        <section className="tarjeta reporte">
+            <h2>Pérdidas y ajustes de stock</h2>
+            <p className="ayuda-campo">
+                Lo que se corrigió al contar o por productos rotos, perdidos o regalados. Se valora al costo del producto.
+            </p>
+            <SelectorPeriodo desde={desde} hasta={hasta} onCambio={(d, h) => setRango([d, h])} />
+
+            {error ? (
+                <p className="mensaje mensaje-error">{error}</p>
+            ) : datos === null ? (
+                <p>Calculando...</p>
+            ) : datos.ajustes.length === 0 ? (
+                <p className="aviso-busqueda">No hubo ajustes de stock en este periodo. 🎉</p>
+            ) : (
+                <>
+                    <div className={`total-perdidas ${Number(datos.perdidaTotal) > 0 ? "con-perdida" : ""}`}>
+                        <span>{Number(datos.perdidaTotal) >= 0 ? "Pérdida al costo" : "Sobrante al costo"}</span>
+                        <strong>{moneda(Math.abs(Number(datos.perdidaTotal)))}</strong>
+                    </div>
+
+                    <h3 className="titulo-reporte">Por motivo</h3>
+                    <ul className="ranking">
+                        {datos.motivos.map((m) => (
+                            <li key={m.motivo ?? "sin"}>
+                                <div>
+                                    <strong>{m.nombre}</strong>
+                                    <small>{m.veces} {m.veces === 1 ? "vez" : "veces"}</small>
+                                </div>
+                                <span>
+                                    {m.faltaron > 0 && <>faltaron <strong>{m.faltaron} u.</strong></>}
+                                    {m.faltaron > 0 && m.sobraron > 0 && " · "}
+                                    {m.sobraron > 0 && <>sobraron <strong>{m.sobraron} u.</strong></>}
+                                    {m.faltaron === 0 && m.sobraron === 0 && "coincidió"}
+                                    {Number(m.perdida) > 0 && <> · pierdes {moneda(m.perdida)}</>}
+                                    {Number(m.perdida) < 0 && <> · sobra {moneda(-Number(m.perdida))}</>}
+                                </span>
+                            </li>
+                        ))}
+                    </ul>
+
+                    <h3 className="titulo-reporte">Detalle</h3>
+                    <ul className="ranking ranking-quietos">
+                        {datos.ajustes.map((a) => (
+                            <li key={a.id}>
+                                <div>
+                                    {a.codigo && <span className="codigo-producto">{a.codigo}</span>}
+                                    <strong>{a.producto}</strong>
+                                    <small>{formatearFecha(a.fecha)}{a.usuario ? ` · ${a.usuario}` : ""} · {a.detalle}</small>
+                                </div>
+                                <span className={a.cantidad < 0 ? "texto-negativo" : ""}>
+                                    <strong>{a.cantidad > 0 ? "+" : ""}{a.cantidad} u.</strong>
+                                    {Number(a.perdida) !== 0 && <> · {moneda(Math.abs(Number(a.perdida)))}</>}
+                                </span>
+                            </li>
+                        ))}
+                    </ul>
+                </>
+            )}
+        </section>
+    );
+}
+
+// Reportes del jefe: cierre de caja, ventas por empleado, productos y pérdidas.
 export default function Reportes({ onError }) {
     const [pestana, setPestana] = useState("caja");
 
@@ -419,6 +488,7 @@ export default function Reportes({ onError }) {
             {pestana === "caja" && <CierreCaja onError={onError} />}
             {pestana === "empleados" && <PorEmpleado onError={onError} />}
             {pestana === "productos" && <Productos onError={onError} />}
+            {pestana === "ajustes" && <Ajustes onError={onError} />}
         </div>
     );
 }

@@ -9,7 +9,7 @@ export function stockDeLaParte(producto, parte) {
     return { stock, esMixto };
 }
 
-export default function TarjetaProducto({ producto, parte, esJefe, retraso, onEditar, onEliminar, onIngresar }) {
+export default function TarjetaProducto({ producto, parte, esJefe, retraso, onEditar, onEliminar, onIngresar, onMovimientos, onConteo }) {
     const precio = Number(producto.precio);
     // Media docena: la mitad de la docena (igual que al vender).
     const mediaDocena = Number((Number(producto.precioDocena) / 2).toFixed(2));
@@ -56,6 +56,15 @@ export default function TarjetaProducto({ producto, parte, esJefe, retraso, onEd
                 <button type="button" className="boton-ingresar" onClick={onIngresar}>
                     🚚 Ingresar mercadería
                 </button>
+
+                <div className="acciones-stock">
+                    <button type="button" className="boton-secundario boton-pequeno" onClick={onMovimientos}>
+                        📜 Movimientos
+                    </button>
+                    <button type="button" className="boton-secundario boton-pequeno" onClick={onConteo}>
+                        🧮 Contar / ajustar
+                    </button>
+                </div>
 
                 <div className="acciones-producto">
                     <button type="button" className="boton-editar" onClick={onEditar}>

@@ -5,6 +5,8 @@ import TarjetaProducto, { stockDeLaParte } from "./TarjetaProducto.jsx";
 import ModalEditarProducto from "./ModalEditarProducto.jsx";
 import Escaner from "./Escaner.jsx";
 import IngresarMercaderia from "./IngresarMercaderia.jsx";
+import MovimientosProducto from "./MovimientosProducto.jsx";
+import ConteoProducto from "./ConteoProducto.jsx";
 import { contiene, normalizar } from "../texto.js";
 
 // Un producto es del inventario 2025 si le quedan unidades del 2025, o si ya se agotó
@@ -63,6 +65,9 @@ export default function Inventario({
     const [abiertoId, setAbiertoId] = useState(null);
     // Producto cuya información completa se ve en una ventana (desde la búsqueda).
     const [infoId, setInfoId] = useState(null);
+    // Historial de movimientos y conteo físico (solo el jefe).
+    const [movimientosDe, setMovimientosDe] = useState(null);
+    const [conteoDe, setConteoDe] = useState(null);
     const [productoEditando, setProductoEditando] = useState(null);
     const [escaneando, setEscaneando] = useState(false);
     const [ingresando, setIngresando] = useState(null);
@@ -89,6 +94,8 @@ export default function Inventario({
                 onEditar={() => setProductoEditando(producto)}
                 onIngresar={() => setIngresando(producto)}
                 onEliminar={() => eliminar(producto)}
+                onMovimientos={() => setMovimientosDe(producto)}
+                onConteo={() => setConteoDe(producto)}
             />
         );
     }
@@ -289,6 +296,23 @@ export default function Inventario({
                 <VentanaInfo onCerrar={() => setInfoId(null)}>
                     {tarjeta((productos ?? []).find((p) => p.id === infoId), 0)}
                 </VentanaInfo>
+            )}
+
+            {movimientosDe && (
+                <MovimientosProducto producto={movimientosDe} onError={onError} onCerrar={() => setMovimientosDe(null)} />
+            )}
+
+            {conteoDe && (
+                <ConteoProducto
+                    producto={conteoDe}
+                    onError={onError}
+                    onCerrar={() => setConteoDe(null)}
+                    onGuardado={async (resultado) => {
+                        setConteoDe(null);
+                        setAviso(`${conteoDe.nombre}: ${resultado.mensaje}`);
+                        await onCambio();
+                    }}
+                />
             )}
 
             {productoEditando && (

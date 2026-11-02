@@ -239,6 +239,62 @@ const MIGRACIONES = `
     -- El precio mínimo solo limita a los empleados al vender: el jefe puede fijar cualquier precio.
     ALTER TABLE productos DROP CONSTRAINT IF EXISTS productos_check;
 
+    -- Historial de movimientos del stock (kardex): cada cambio del stock de un producto queda anotado
+    -- con su tipo (venta, compra, devolución, ajuste...), quién lo hizo y el costo de ese momento.
+    CREATE TABLE IF NOT EXISTS movimientos_stock (
+        id               SERIAL PRIMARY KEY,
+        producto_id      INTEGER NOT NULL REFERENCES productos(id) ON DELETE CASCADE,
+        fecha            TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'America/Lima'),
+        tipo             VARCHAR(20) NOT NULL,
+        cantidad         INTEGER NOT NULL,
+        stock_resultante INTEGER NOT NULL,
+        costo            NUMERIC(14, 4),
+        detalle          VARCHAR(200),
+        referencia       VARCHAR(60),
+        motivo           VARCHAR(20),
+        usuario_id       INTEGER REFERENCES usuarios(id) ON DELETE SET NULL
+    );
+    CREATE INDEX IF NOT EXISTS movimientos_stock_producto ON movimientos_stock (producto_id, id DESC);
+    CREATE INDEX IF NOT EXISTS movimientos_stock_fecha ON movimientos_stock (fecha);
+
+    -- El trigger anota el movimiento. La app le dice de qué se trata con set_config('app.movimiento', ...)
+    -- dentro de la misma transacción; si no lo dice (un cambio hecho a mano), queda como "ajuste".
+    CREATE OR REPLACE FUNCTION anotar_movimiento_stock() RETURNS trigger AS $$
+    DECLARE
+        contexto JSONB := NULLIF(current_setting('app.movimiento', true), '')::JSONB;
+        diferencia INTEGER;
+    BEGIN
+        IF TG_OP = 'INSERT' THEN
+            diferencia := NEW.stock;
+        ELSE
+            diferencia := NEW.stock - OLD.stock;
+        END IF;
+
+        IF diferencia <> 0 THEN
+            INSERT INTO movimientos_stock
+                (producto_id, tipo, cantidad, stock_resultante, costo, detalle, referencia, motivo, usuario_id)
+            VALUES (
+                NEW.id,
+                COALESCE(contexto->>'tipo', CASE WHEN TG_OP = 'INSERT' THEN 'registro' ELSE 'ajuste' END),
+                diferencia,
+                NEW.stock,
+                NEW.precio_compra,
+                contexto->>'detalle',
+                contexto->>'referencia',
+                contexto->>'motivo',
+                (contexto->>'usuarioId')::INTEGER
+            );
+        END IF;
+
+        RETURN NEW;
+    END;
+    $$ LANGUAGE plpgsql;
+
+    DROP TRIGGER IF EXISTS productos_movimiento_stock ON productos;
+    CREATE TRIGGER productos_movimiento_stock
+        AFTER INSERT OR UPDATE OF stock ON productos
+        FOR EACH ROW EXECUTE FUNCTION anotar_movimiento_stock();
+
     -- Página web del catálogo (quiénes somos, valores, datos de la empresa, promociones): una sola fila.
     CREATE TABLE IF NOT EXISTS tienda (
         id          INTEGER PRIMARY KEY CHECK (id = 1),
@@ -376,6 +432,17 @@ const MIGRACIONES_UNICAS = [
     },
     {
         // Los productos que empiezan con "Luces" pasan a "Luces lineales" (de su misma feria).
+        // El historial empieza con el stock que cada producto tiene hoy.
+        nombre: "2026-11-historial-de-stock",
+        async aplicar(client) {
+            await client.query(
+                `INSERT INTO movimientos_stock (producto_id, tipo, cantidad, stock_resultante, costo, detalle)
+                 SELECT id, 'inicio', stock, stock, precio_compra, 'Stock al empezar el historial'
+                 FROM productos`
+            );
+        }
+    },
+    {
         nombre: "2026-10-luces-son-lineales",
         async aplicar(client) {
             await client.query(

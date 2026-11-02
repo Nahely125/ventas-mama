@@ -1,6 +1,7 @@
 const express = require("express");
 const pool = require("../db");
 const { requiereJefe } = require("../autenticacion");
+const { MOTIVOS_AJUSTE } = require("../movimientos");
 
 // Reportes para el jefe: cierre de caja, ventas por empleado y productos (todo en hora de Lima).
 const router = express.Router();
@@ -290,6 +291,60 @@ router.get("/productos", requiereJefe, async (req, res) => {
     } catch (error) {
         console.error("Error al calcular el reporte de productos:", error.message);
         res.status(500).json({ error: "No se pudo calcular el reporte de productos." });
+    }
+});
+
+/* Pérdidas y ajustes de stock en un periodo (?desde&hasta): por motivo, cuántas unidades
+   faltaron o sobraron y cuánto valen al costo de ese momento; y el detalle de cada ajuste. */
+router.get("/ajustes", requiereJefe, async (req, res) => {
+    try {
+        const { desde, hasta } = await periodo(req.query);
+        const enPeriodo = `movimientos_stock.tipo = 'ajuste'
+                           AND movimientos_stock.fecha >= $1::DATE AND movimientos_stock.fecha < $2::DATE + 1`;
+
+        const [porMotivo, detalle] = await Promise.all([
+            pool.query(
+                `SELECT motivo,
+                        COUNT(*)::INT AS veces,
+                        COALESCE(SUM(-cantidad) FILTER (WHERE cantidad < 0), 0)::INT AS faltaron,
+                        COALESCE(SUM(cantidad) FILTER (WHERE cantidad > 0), 0)::INT AS sobraron,
+                        ROUND(COALESCE(SUM(-cantidad * COALESCE(costo, 0)), 0), 2) AS perdida
+                 FROM movimientos_stock
+                 WHERE ${enPeriodo}
+                 GROUP BY motivo
+                 ORDER BY perdida DESC`,
+                [desde, hasta]
+            ),
+            pool.query(
+                `SELECT movimientos_stock.id,
+                        TO_CHAR(movimientos_stock.fecha, 'YYYY-MM-DD"T"HH24:MI:SS') AS fecha,
+                        productos.nombre AS producto,
+                        productos.codigo,
+                        movimientos_stock.cantidad,
+                        movimientos_stock.motivo,
+                        movimientos_stock.detalle,
+                        ROUND(-movimientos_stock.cantidad * COALESCE(movimientos_stock.costo, 0), 2) AS perdida,
+                        usuarios.nombre AS usuario
+                 FROM movimientos_stock
+                 INNER JOIN productos ON productos.id = movimientos_stock.producto_id
+                 LEFT JOIN usuarios ON usuarios.id = movimientos_stock.usuario_id
+                 WHERE ${enPeriodo}
+                 ORDER BY movimientos_stock.id DESC
+                 LIMIT 100`,
+                [desde, hasta]
+            )
+        ]);
+
+        res.json({
+            desde,
+            hasta,
+            motivos: porMotivo.rows.map((fila) => ({ ...fila, nombre: MOTIVOS_AJUSTE[fila.motivo] ?? "Cambio hecho fuera de la app" })),
+            perdidaTotal: porMotivo.rows.reduce((suma, fila) => suma + Number(fila.perdida), 0).toFixed(2),
+            ajustes: detalle.rows
+        });
+    } catch (error) {
+        console.error("Error en el reporte de ajustes:", error.message);
+        res.status(500).json({ error: "No se pudo calcular el reporte de ajustes." });
     }
 });
 

@@ -3,6 +3,7 @@ const pool = require("../db");
 const { requiereSesion, requiereJefe, leerId } = require("../autenticacion");
 const { OBSEQUIABLE } = require("./ajustes");
 const { COLORES_JSON, validarColores, guardarColores } = require("./colores");
+const { MOTIVOS_AJUSTE, anotarMovimiento } = require("../movimientos");
 
 const router = express.Router();
 
@@ -212,6 +213,7 @@ router.post("/", requiereJefe, async (req, res) => {
     try {
         client = await pool.connect();
         await client.query("BEGIN");
+        await anotarMovimiento(client, { tipo: "registro", detalle: "Producto registrado", usuarioId: req.session.usuario.id });
 
         const resultado = await client.query(
             `INSERT INTO productos
@@ -275,6 +277,11 @@ router.put("/:id", requiereJefe, async (req, res) => {
     try {
         client = await pool.connect();
         await client.query("BEGIN");
+        await anotarMovimiento(client, {
+            tipo: "edicion",
+            detalle: "Stock cambiado al editar el producto",
+            usuarioId: req.session.usuario.id
+        });
 
         const resultado = await client.query(
             `UPDATE productos
@@ -512,6 +519,173 @@ router.delete("/:id/foto", requiereJefe, async (req, res) => {
     } catch (error) {
         console.error("Error al eliminar la foto:", error.message);
         res.status(500).json({ error: "No se pudo eliminar la foto." });
+    }
+});
+
+/* Historial de movimientos del stock de un producto (lo más nuevo primero). Solo el jefe. */
+router.get("/:id/movimientos", requiereJefe, async (req, res) => {
+    const id = leerId(req);
+
+    if (!id) {
+        return res.status(400).json({ error: "ID de producto inválido" });
+    }
+
+    try {
+        const resultado = await pool.query(
+            `SELECT movimientos_stock.id,
+                    TO_CHAR(movimientos_stock.fecha, 'YYYY-MM-DD"T"HH24:MI:SS') AS fecha,
+                    movimientos_stock.tipo,
+                    movimientos_stock.cantidad,
+                    movimientos_stock.stock_resultante AS "stockResultante",
+                    movimientos_stock.detalle,
+                    movimientos_stock.motivo,
+                    usuarios.nombre AS usuario
+             FROM movimientos_stock
+             LEFT JOIN usuarios ON usuarios.id = movimientos_stock.usuario_id
+             WHERE movimientos_stock.producto_id = $1
+             ORDER BY movimientos_stock.id DESC
+             LIMIT 300`,
+            [id]
+        );
+
+        res.json(resultado.rows);
+    } catch (error) {
+        console.error("Error al leer los movimientos:", error.message);
+        res.status(500).json({ error: "No se pudo cargar el historial del producto." });
+    }
+});
+
+/* Conteo físico o ajuste del stock: { motivo, nota, contado } o, si tiene colores,
+   { motivo, nota, colores: [{ id, contado }] }. Se guarda la diferencia con el sistema,
+   con su motivo (roto, perdido...). Si el conteo coincide, queda anotado igual. Solo el jefe. */
+router.post("/:id/conteo", requiereJefe, async (req, res) => {
+    const id = leerId(req);
+    const motivo = req.body?.motivo;
+    const nota = typeof req.body?.nota === "string" ? req.body.nota.trim().slice(0, 150) : "";
+    const esEntero = (valor) => Number.isInteger(valor) && valor >= 0 && valor <= 1000000;
+
+    if (!id) {
+        return res.status(400).json({ error: "ID de producto inválido" });
+    }
+
+    if (!MOTIVOS_AJUSTE[motivo]) {
+        return res.status(400).json({ error: "Elige el motivo del ajuste." });
+    }
+
+    if (motivo === "otro" && !nota) {
+        return res.status(400).json({ error: "Escribe una nota que explique el motivo." });
+    }
+
+    let client;
+
+    try {
+        client = await pool.connect();
+        await client.query("BEGIN");
+
+        const fila = await client.query(`SELECT id, nombre, stock FROM productos WHERE id = $1 FOR UPDATE`, [id]);
+        const producto = fila.rows[0];
+
+        if (!producto) {
+            await client.query("ROLLBACK");
+            return res.status(404).json({ error: "Producto no encontrado" });
+        }
+
+        const filasColores = await client.query(
+            `SELECT id, nombre, stock FROM producto_colores WHERE producto_id = $1 ORDER BY orden, id FOR UPDATE`,
+            [id]
+        );
+
+        // Qué se contó: el producto entero o algunos de sus colores.
+        let cambios;
+
+        if (filasColores.rows.length > 0) {
+            const enviados = Array.isArray(req.body?.colores) ? req.body.colores : [];
+            cambios = [];
+
+            for (const enviado of enviados) {
+                const color = filasColores.rows.find((c) => c.id === enviado?.id);
+
+                if (!color || !esEntero(enviado.contado)) {
+                    await client.query("ROLLBACK");
+                    return res.status(400).json({ error: "Escribe cuántas unidades contaste de cada color (0 o más)." });
+                }
+
+                cambios.push({ color, antes: color.stock, contado: enviado.contado });
+            }
+
+            if (cambios.length === 0) {
+                await client.query("ROLLBACK");
+                return res.status(400).json({ error: "Escribe cuántas unidades contaste de al menos un color." });
+            }
+        } else {
+            if (!esEntero(req.body?.contado)) {
+                await client.query("ROLLBACK");
+                return res.status(400).json({ error: "Escribe cuántas unidades contaste (0 o más)." });
+            }
+
+            cambios = [{ color: null, antes: producto.stock, contado: req.body.contado }];
+        }
+
+        let diferenciaTotal = 0;
+        let cambiados = 0;
+
+        for (const cambio of cambios) {
+            const diferencia = cambio.contado - cambio.antes;
+            const detalle = [
+                MOTIVOS_AJUSTE[motivo],
+                cambio.color?.nombre,
+                `sistema ${cambio.antes}, contado ${cambio.contado}`,
+                nota || null
+            ].filter(Boolean).join(" · ");
+
+            if (diferencia === 0) {
+                // Coincide: se anota que se contó (sin cambiar el stock).
+                if (motivo === "conteo") {
+                    await client.query(
+                        `INSERT INTO movimientos_stock
+                            (producto_id, tipo, cantidad, stock_resultante, costo, detalle, motivo, usuario_id)
+                         SELECT id, 'ajuste', 0, stock, precio_compra, $2, $3, $4 FROM productos WHERE id = $1`,
+                        [id, `${detalle} · coincide`, motivo, req.session.usuario.id]
+                    );
+                }
+                continue;
+            }
+
+            if (cambio.color) {
+                await client.query(`UPDATE producto_colores SET stock = $1 WHERE id = $2`, [cambio.contado, cambio.color.id]);
+            }
+
+            await anotarMovimiento(client, { tipo: "ajuste", motivo, detalle, usuarioId: req.session.usuario.id });
+            // Si bajan las unidades, las del 2025 nunca pueden quedar por encima del stock.
+            await client.query(
+                `UPDATE productos SET stock = stock + $1, stock_2025 = LEAST(stock_2025, stock + $1) WHERE id = $2`,
+                [diferencia, id]
+            );
+            diferenciaTotal += diferencia;
+            cambiados++;
+        }
+
+        if (cambiados === 0 && motivo !== "conteo") {
+            await client.query("ROLLBACK");
+            return res.status(400).json({ error: "La cantidad es la misma que en el sistema: no hay nada que ajustar." });
+        }
+
+        const actualizado = await client.query(`SELECT stock FROM productos WHERE id = $1`, [id]);
+        await client.query("COMMIT");
+
+        res.json({
+            mensaje: cambiados === 0
+                ? "Conteo guardado: coincide con el sistema."
+                : `Stock corregido: ${diferenciaTotal > 0 ? "+" : ""}${diferenciaTotal} u. (${MOTIVOS_AJUSTE[motivo].toLowerCase()}).`,
+            stock: actualizado.rows[0].stock,
+            diferencia: diferenciaTotal
+        });
+    } catch (error) {
+        if (client) await client.query("ROLLBACK").catch(() => {});
+        console.error("Error al guardar el conteo:", error.message);
+        res.status(500).json({ error: "No se pudo guardar el conteo." });
+    } finally {
+        client?.release();
     }
 });
 

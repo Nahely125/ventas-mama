@@ -18,6 +18,7 @@ const {
     armarBoleta
 } = require("./consultasVentas");
 const { SALDO } = require("./clientes");
+const { anotarMovimiento, textoBoleta } = require("../movimientos");
 const { COSTO_MAXIMO_OBSEQUIO, OBSEQUIABLE, normalizarCodigo, resolverAjuste, repartirAjuste } = require("./ajustes");
 
 const NOMBRE_MODALIDAD = { unidad: "unidad", media: "media docena", docena: "docena" };
@@ -490,7 +491,25 @@ router.post("/", requiereSesion, async (req, res) => {
             );
         }
 
+        // Historial de stock: cada producto anota la venta con su boleta, colores y obsequios.
+        const boletaVenta = textoBoleta(
+            (await client.query(`SELECT MIN(id) AS id FROM ventas WHERE grupo = $1`, [grupo])).rows[0].id
+        );
+        const unidadesDe = (item) => item.cantidad * UNIDADES_MODALIDAD[item.modalidad ?? "unidad"];
+
         for (const [id, unidades] of unidadesPorProducto) {
+            const suyos = items.filter((item) => item.productoId === id);
+            const deColores = conColores.has(id)
+                ? suyos.map((item) => `${colores.get(item.colorId)?.nombre} ${unidadesDe(item)}`).join(", ")
+                : null;
+            const regalados = suyos.filter((item) => item.obsequio === true).reduce((suma, item) => suma + unidadesDe(item), 0);
+
+            await anotarMovimiento(client, {
+                tipo: "venta",
+                referencia: grupo,
+                usuarioId: usuario.id,
+                detalle: [boletaVenta, deColores, regalados ? `${regalados} de obsequio` : null].filter(Boolean).join(" · ")
+            });
             await client.query(
                 `UPDATE productos SET stock = stock - $1, stock_2025 = $2 WHERE id = $3`,
                 [unidades, quedan2025.get(id), id]
@@ -590,7 +609,7 @@ router.post("/:grupo/anular", requiereJefe, async (req, res) => {
         await client.query("BEGIN");
 
         const filas = await client.query(
-            `SELECT id, producto_id, cantidad, unidades_2025, anulada_en, total, metodo_pago, cliente_id, color_id
+            `SELECT id, producto_id, cantidad, unidades_2025, anulada_en, total, metodo_pago, cliente_id, color_id, color
              FROM ventas WHERE grupo = $1
              ORDER BY producto_id
              FOR UPDATE`,
@@ -617,7 +636,15 @@ router.post("/:grupo/anular", requiereJefe, async (req, res) => {
             return res.status(409).json({ error: errorFiado });
         }
 
+        const boletaAnulada = textoBoleta(Math.min(...filas.rows.map((f) => f.id)));
+
         for (const fila of activas) {
+            await anotarMovimiento(client, {
+                tipo: "anulacion",
+                referencia: grupo,
+                usuarioId: req.session.usuario.id,
+                detalle: `${boletaAnulada} anulada${fila.color ? ` · ${fila.color}` : ""}: ${motivo}`
+            });
             await client.query(
                 `UPDATE productos
                  SET stock = stock + $1, stock_2025 = stock_2025 + $2
@@ -679,7 +706,7 @@ router.post("/:grupo/devolver", requiereJefe, async (req, res) => {
 
         const filas = await client.query(
             `SELECT id, producto_id, cantidad, modalidad, total, descuento, unidades_2025, anulada_en,
-                    metodo_pago, cliente_id, color_id
+                    metodo_pago, cliente_id, color_id, color
              FROM ventas WHERE grupo = $1
              ORDER BY id
              FOR UPDATE`,
@@ -747,6 +774,12 @@ router.post("/:grupo/devolver", requiereJefe, async (req, res) => {
             );
         }
 
+        await anotarMovimiento(client, {
+            tipo: "devolucion",
+            referencia: grupo,
+            usuarioId: req.session.usuario.id,
+            detalle: `Devolución de ${textoBoleta(Math.min(...filas.rows.map((f) => f.id)))}${fila.color ? ` · ${fila.color}` : ""}: ${motivo}`
+        });
         await client.query(
             `UPDATE productos SET stock = stock + $1, stock_2025 = stock_2025 + $2 WHERE id = $3`,
             [unidades, devueltas2025, fila.producto_id]

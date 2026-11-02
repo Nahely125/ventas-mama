@@ -613,6 +613,9 @@ export default function Catalogo() {
 
             {detalle && (
                 <DetalleProducto
+                    key={detalle.id}
+                    relacionados={relacionadosDe(detalle, datos?.productos ?? [])}
+                    onAbrir={setDetalle}
                     producto={detalle}
                     enPedido={enPedido(detalle.id)}
                     onAgregar={agregar}
@@ -634,7 +637,18 @@ export default function Catalogo() {
     );
 }
 
-function DetalleProducto({ producto, enPedido, onAgregar, onCerrar }) {
+/* "También te puede gustar": productos de la misma categoría (o de la misma feria si no tiene),
+   primero los disponibles y con foto. */
+function relacionadosDe(producto, productos) {
+    const mismos = productos.filter((p) => p.id !== producto.id && (
+        producto.categoriaId ? p.categoriaId === producto.categoriaId : p.seccionId === producto.seccionId
+    ));
+    return mismos
+        .sort((a, b) => Number(b.disponible) - Number(a.disponible) || Number(b.tieneFoto) - Number(a.tieneFoto) || b.id - a.id)
+        .slice(0, 8);
+}
+
+function DetalleProducto({ producto, relacionados = [], enPedido, onAgregar, onAbrir, onCerrar }) {
     const dialogo = useRef(null);
     const foto = urlFoto(producto);
 
@@ -693,6 +707,29 @@ function DetalleProducto({ producto, enPedido, onAgregar, onCerrar }) {
                     <BotonPedir producto={producto} />
                 </div>
             </div>
+
+            {relacionados.length > 0 && (
+                <section className="cat-relacionados" aria-label="También te puede gustar">
+                    <h3>También te puede gustar</h3>
+                    <ul>
+                        {relacionados.map((p) => {
+                            const fotoRelacionado = urlFoto(p);
+                            return (
+                                <li key={p.id}>
+                                    <button type="button" onClick={() => onAbrir(p)}>
+                                        <span className="cat-relacionado-foto">
+                                            {fotoRelacionado ? <img src={fotoRelacionado} alt="" loading="lazy" /> : <span aria-hidden="true">✦</span>}
+                                            {!p.disponible && <span className="cat-etiqueta">Agotado</span>}
+                                        </span>
+                                        <span className="cat-relacionado-nombre">{p.nombre}</span>
+                                        <span className="cat-relacionado-precio">{moneda(p.precioMinimo)} <small>c/u</small></span>
+                                    </button>
+                                </li>
+                            );
+                        })}
+                    </ul>
+                </section>
+            )}
         </dialog>
     );
 }

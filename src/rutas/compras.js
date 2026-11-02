@@ -1,6 +1,7 @@
 const express = require("express");
 const pool = require("../db");
 const { requiereJefe, leerId } = require("../autenticacion");
+const { anotarMovimiento } = require("../movimientos");
 
 /* Compras y reposiciones de mercadería (solo el jefe).
    Al ingresar mercadería: se suma al stock, se recalcula el costo por unidad (promedio)
@@ -96,6 +97,12 @@ router.post("/", requiereJefe, async (req, res) => {
         const costoActual = Number(producto.precio_compra ?? 0);
         const costoPromedio = (nuevas * costoActual + costoTotal) / (nuevas + cantidad);
 
+        await anotarMovimiento(client, {
+            tipo: "compra",
+            usuarioId: req.session.usuario.id,
+            detalle: ["Ingreso de mercadería", color?.nombre, proveedor.trim() ? `proveedor ${proveedor.trim()}` : null]
+                .filter(Boolean).join(" · ")
+        });
         await client.query(
             `UPDATE productos SET stock = stock + $1, precio_compra = $2 WHERE id = $3`,
             [cantidad, Number(costoPromedio.toFixed(4)), producto.id]
@@ -201,6 +208,11 @@ router.delete("/:id", requiereJefe, async (req, res) => {
             ? Math.max((nuevas * Number(producto.precio_compra) - Number(compra.costo_total)) / restantes, 0)
             : Number(producto.precio_compra);
 
+        await anotarMovimiento(client, {
+            tipo: "compra_anulada",
+            usuarioId: req.session.usuario.id,
+            detalle: `Se deshizo un ingreso de mercadería${compra.color ? ` · ${compra.color}` : ""}`
+        });
         await client.query(
             `UPDATE productos SET stock = stock - $1, precio_compra = $2 WHERE id = $3`,
             [compra.cantidad, Number(costo.toFixed(4)), compra.producto_id]
