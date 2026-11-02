@@ -13,7 +13,7 @@ const REGLAS = [
     { nombre: "Coronas y guirnaldas", patron: "corona|guirnalda" },
     { nombre: "Nacimientos", patron: "nacimiento|pesebre|bel[eé]n" },
     { nombre: "Muñecos", patron: "mu[ñn]ec|pap[aá] noel|santa|duende|elfo|reno|figura" },
-    { nombre: "Decoración de árbol", patron: "esfera|bola|adorno|colgante|campana|estrella|escarchad|lazo|cinta|bast[oó]n" },
+    { nombre: "Decoración para árbol", patron: "esfera|bola|adorno|colgante|campana|estrella|escarchad|lazo|cinta|bast[oó]n" },
     { nombre: "Útiles escolares", patron: "l[aá]piz|lapicero|borrador|tajador|regla|tijera|goma|cartuchera|resaltador|corrector" },
     { nombre: "Cuadernos", patron: "cuaderno|libreta|block|archivador|folder|f[oó]lder" },
     { nombre: "Mochilas", patron: "mochila|maleta escolar" },

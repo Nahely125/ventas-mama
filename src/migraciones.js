@@ -432,6 +432,18 @@ const MIGRACIONES_UNICAS = [
     },
     {
         // Los productos que empiezan con "Luces" pasan a "Luces lineales" (de su misma feria).
+        // "Decoración de árbol" pasa a llamarse "Decoración para árbol" (si no la cambiaron a mano).
+        nombre: "2026-11-decoracion-para-arbol",
+        async aplicar(client) {
+            await client.query(
+                `UPDATE categorias SET nombre = 'Decoración para árbol'
+                 WHERE nombre = 'Decoración de árbol'
+                   AND NOT EXISTS (SELECT 1 FROM categorias otra
+                                   WHERE otra.seccion_id = categorias.seccion_id AND otra.nombre = 'Decoración para árbol')`
+            );
+        }
+    },
+    {
         // El historial empieza con el stock que cada producto tiene hoy.
         nombre: "2026-11-historial-de-stock",
         async aplicar(client) {

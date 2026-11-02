@@ -6,7 +6,7 @@
 const CATEGORIAS_NAVIDAD = [
     { nombre: "Árboles y pinos", icono: "🎄", patron: "^\\s*([aá]rbol|arbolito|pino)" },
     { nombre: "Puntas de árbol", icono: "⭐", patron: "^\\s*punta|punta (de|para) [aá]rbol|estrella (de|para) (la )?punta" },
-    { nombre: "Decoración de árbol", icono: "🔴", patron: "esfera|bola|adorno|colgante|campana|estrella|escarchad|lazo|cinta|bast[oó]n" },
+    { nombre: "Decoración para árbol", icono: "🔴", patron: "esfera|bola|adorno|colgante|campana|estrella|escarchad|lazo|cinta|bast[oó]n" },
     { nombre: "Pisos de árbol", icono: "🎁", patron: "^\\s*piso|falda (de|para) [aá]rbol|cubre ?pie|pie de [aá]rbol" },
     { nombre: "Muñecos", icono: "🎅", patron: "mu[ñn]ec|pap[aá] noel|santa|duende|elfo|mu[ñn]eco de nieve|reno|figura" },
     { nombre: "Cascanueces", icono: "💂", patron: "cascanueces" },
@@ -40,7 +40,7 @@ const PRIORIDAD_NAVIDAD = [
     "Coronas y guirnaldas",
     "Nacimientos",
     "Muñecos",
-    "Decoración de árbol"
+    "Decoración para árbol"
 ];
 
 module.exports = { CATEGORIAS_NAVIDAD, CATEGORIAS_ESCOLAR, PRIORIDAD_NAVIDAD };
