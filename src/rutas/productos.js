@@ -555,9 +555,12 @@ router.get("/:id/movimientos", requiereJefe, async (req, res) => {
     }
 });
 
-/* Conteo físico o ajuste del stock: { motivo, nota, contado } o, si tiene colores,
-   { motivo, nota, colores: [{ id, contado }] }. Se guarda la diferencia con el sistema,
-   con su motivo (roto, perdido...). Si el conteo coincide, queda anotado igual. Solo el jefe. */
+/* Conteo físico o ajuste del stock. Solo el jefe.
+   - Conteo físico: { motivo: "conteo", contado } → cuántas hay de verdad; se guarda la diferencia
+     (si coincide, queda anotado igual).
+   - Roto, perdido, regalado, uso u otro: { motivo, quitar } → cuántas unidades salen (por ejemplo,
+     2 rotas), para saber qué productos se dañaron.
+   Con colores: { motivo, colores: [{ id, contado }] } o { motivo, colores: [{ id, quitar }] }. */
 router.post("/:id/conteo", requiereJefe, async (req, res) => {
     const id = leerId(req);
     const motivo = req.body?.motivo;
@@ -595,7 +598,30 @@ router.post("/:id/conteo", requiereJefe, async (req, res) => {
             [id]
         );
 
-        // Qué se contó: el producto entero o algunos de sus colores.
+        // En un conteo se escribe cuántas hay; en los demás motivos, cuántas salen.
+        const esConteo = motivo === "conteo";
+
+        // Lee lo enviado para el producto entero o para un color: { contado, quitar } o { error }.
+        const leer = (enviado, antes, nombre) => {
+            const de = nombre ? ` de ${nombre}` : "";
+
+            if (esConteo) {
+                return esEntero(enviado?.contado)
+                    ? { contado: enviado.contado, quitar: null }
+                    : { error: `Escribe cuántas unidades contaste${de} (0 o más).` };
+            }
+
+            if (!esEntero(enviado?.quitar) || enviado.quitar < 1) {
+                return { error: `Escribe cuántas unidades${de} salen (1 o más).` };
+            }
+
+            if (enviado.quitar > antes) {
+                return { error: `Solo hay ${antes} unidades${de}: no se pueden quitar ${enviado.quitar}.` };
+            }
+
+            return { contado: antes - enviado.quitar, quitar: enviado.quitar };
+        };
+
         let cambios;
 
         if (filasColores.rows.length > 0) {
@@ -605,25 +631,38 @@ router.post("/:id/conteo", requiereJefe, async (req, res) => {
             for (const enviado of enviados) {
                 const color = filasColores.rows.find((c) => c.id === enviado?.id);
 
-                if (!color || !esEntero(enviado.contado)) {
+                if (!color) {
                     await client.query("ROLLBACK");
-                    return res.status(400).json({ error: "Escribe cuántas unidades contaste de cada color (0 o más)." });
+                    return res.status(400).json({ error: "Uno de los colores ya no existe." });
                 }
 
-                cambios.push({ color, antes: color.stock, contado: enviado.contado });
+                const leido = leer(enviado, color.stock, color.nombre);
+
+                if (leido.error) {
+                    await client.query("ROLLBACK");
+                    return res.status(400).json({ error: leido.error });
+                }
+
+                cambios.push({ color, antes: color.stock, ...leido });
             }
 
             if (cambios.length === 0) {
                 await client.query("ROLLBACK");
-                return res.status(400).json({ error: "Escribe cuántas unidades contaste de al menos un color." });
+                return res.status(400).json({
+                    error: esConteo
+                        ? "Escribe cuántas unidades contaste de al menos un color."
+                        : "Escribe cuántas unidades salen de al menos un color."
+                });
             }
         } else {
-            if (!esEntero(req.body?.contado)) {
+            const leido = leer(req.body, producto.stock, null);
+
+            if (leido.error) {
                 await client.query("ROLLBACK");
-                return res.status(400).json({ error: "Escribe cuántas unidades contaste (0 o más)." });
+                return res.status(400).json({ error: leido.error });
             }
 
-            cambios = [{ color: null, antes: producto.stock, contado: req.body.contado }];
+            cambios = [{ color: null, antes: producto.stock, ...leido }];
         }
 
         let diferenciaTotal = 0;
@@ -634,7 +673,9 @@ router.post("/:id/conteo", requiereJefe, async (req, res) => {
             const detalle = [
                 MOTIVOS_AJUSTE[motivo],
                 cambio.color?.nombre,
-                `sistema ${cambio.antes}, contado ${cambio.contado}`,
+                cambio.quitar === null
+                    ? `sistema ${cambio.antes}, contado ${cambio.contado}`
+                    : `${cambio.quitar} de ${cambio.antes} u.`,
                 nota || null
             ].filter(Boolean).join(" · ");
 

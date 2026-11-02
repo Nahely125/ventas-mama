@@ -1,24 +1,26 @@
 import { useEffect, useRef, useState } from "react";
 import { pedir } from "../api.js";
 
-// Mismos motivos que en el servidor (src/movimientos.js).
+/* Mismos motivos que en el servidor (src/movimientos.js).
+   pregunta: en el conteo se escribe cuántas hay; en los demás, cuántas salen. */
 const MOTIVOS = [
-    { valor: "conteo", texto: "🧮 Conteo físico", ayuda: "Contaste el producto y corriges la diferencia con el sistema." },
-    { valor: "roto", texto: "💔 Roto o dañado", ayuda: "Unidades que ya no se pueden vender." },
-    { valor: "perdido", texto: "❓ Perdido o faltante", ayuda: "Faltan unidades y no se sabe por qué." },
-    { valor: "regalado", texto: "🎁 Regalado (fuera de una venta)", ayuda: "Se regaló sin registrarlo en una venta." },
-    { valor: "uso", texto: "🏪 Uso del negocio", ayuda: "Se usó para decorar la tienda, muestras, etc." },
-    { valor: "otro", texto: "✍️ Otro motivo", ayuda: "Explica en la nota qué pasó." }
+    { valor: "conteo", texto: "🧮 Conteo físico", pregunta: "¿Cuántas unidades hay de verdad?", ayuda: "Contaste el producto: se corrige la diferencia con el sistema." },
+    { valor: "roto", texto: "💔 Roto o dañado", pregunta: "¿Cuántas se rompieron o dañaron?", ayuda: "Unidades que ya no se pueden vender." },
+    { valor: "perdido", texto: "❓ Perdido o faltante", pregunta: "¿Cuántas faltan?", ayuda: "Faltan unidades y no se sabe por qué." },
+    { valor: "regalado", texto: "🎁 Regalado (fuera de una venta)", pregunta: "¿Cuántas se regalaron?", ayuda: "Se regaló sin registrarlo en una venta." },
+    { valor: "uso", texto: "🏪 Uso del negocio", pregunta: "¿Cuántas se usaron?", ayuda: "Para decorar la tienda, muestras, etc." },
+    { valor: "otro", texto: "✍️ Otro motivo", pregunta: "¿Cuántas unidades salen?", ayuda: "Explica en la nota qué pasó." }
 ];
 
-/* Conteo físico o ajuste del stock: escribes cuántas unidades hay de verdad (o de cada color)
-   y por qué cambia. La diferencia queda en el historial de movimientos y en el reporte de pérdidas. */
+/* Conteo físico o ajuste del stock. En "Conteo físico" escribes cuántas hay de verdad; en roto,
+   perdido, regalado, etc., cuántas unidades salen (por ejemplo, 2 rotas). Todo queda en el
+   historial de movimientos y en el reporte de pérdidas. Con colores, se indica por color. */
 export default function ConteoProducto({ producto, onGuardado, onCerrar, onError }) {
     const dialogo = useRef(null);
     const colores = producto.colores ?? [];
-    const [contado, setContado] = useState("");
+    const [motivo, setMotivo] = useState("roto");
+    const [cantidad, setCantidad] = useState("");
     const [porColor, setPorColor] = useState({});
-    const [motivo, setMotivo] = useState("conteo");
     const [nota, setNota] = useState("");
     const [error, setError] = useState("");
     const [enviando, setEnviando] = useState(false);
@@ -27,41 +29,54 @@ export default function ConteoProducto({ producto, onGuardado, onCerrar, onError
         dialogo.current?.showModal();
     }, []);
 
-    // Diferencia con el sistema (solo de lo que se escribió).
-    const lineas = colores.length > 0
+    const elegido = MOTIVOS.find((m) => m.valor === motivo);
+    const esConteo = motivo === "conteo";
+
+    function cambiarMotivo(nuevo) {
+        // Al cambiar entre "cuántas hay" y "cuántas salen", lo escrito ya no significa lo mismo.
+        if ((nuevo === "conteo") !== esConteo) {
+            setCantidad("");
+            setPorColor({});
+        }
+        setMotivo(nuevo);
+    }
+
+    // Lo escrito, con el stock que queda después.
+    const lineas = (colores.length > 0
         ? colores
             .filter((c) => porColor[c.id] !== undefined && porColor[c.id] !== "")
-            .map((c) => ({ nombre: c.nombre, antes: c.stock, ahora: Number(porColor[c.id]) }))
-        : contado === "" ? [] : [{ nombre: null, antes: producto.stock, ahora: Number(contado) }];
-    const diferencia = lineas.reduce((suma, l) => suma + (l.ahora - l.antes), 0);
-    const ayudaMotivo = MOTIVOS.find((m) => m.valor === motivo)?.ayuda;
+            .map((c) => ({ id: c.id, nombre: c.nombre, antes: c.stock, valor: Number(porColor[c.id]) }))
+        : cantidad === "" ? [] : [{ id: null, nombre: null, antes: producto.stock, valor: Number(cantidad) }]
+    ).map((l) => ({ ...l, despues: esConteo ? l.valor : l.antes - l.valor }));
+    const diferencia = lineas.reduce((suma, l) => suma + (l.despues - l.antes), 0);
 
     async function guardar(evento) {
         evento.preventDefault();
         setError("");
 
         if (lineas.length === 0) {
-            setError(colores.length > 0 ? "Escribe cuántas unidades contaste de al menos un color." : "Escribe cuántas unidades contaste.");
+            setError(colores.length > 0 ? "Escribe la cantidad de al menos un color." : "Escribe la cantidad.");
             return;
         }
 
-        if (lineas.some((l) => !Number.isInteger(l.ahora) || l.ahora < 0)) {
-            setError("Las cantidades deben ser números enteros (0 o más).");
+        if (lineas.some((l) => !Number.isInteger(l.valor) || l.valor < (esConteo ? 0 : 1))) {
+            setError(esConteo ? "Las cantidades deben ser números enteros (0 o más)." : "Las cantidades deben ser números enteros (1 o más).");
+            return;
+        }
+
+        const demasiado = lineas.find((l) => l.despues < 0);
+        if (demasiado) {
+            setError(`Solo hay ${demasiado.antes} unidades${demasiado.nombre ? ` de ${demasiado.nombre}` : ""}.`);
             return;
         }
 
         setEnviando(true);
 
         try {
+            const clave = esConteo ? "contado" : "quitar";
             const cuerpo = colores.length > 0
-                ? {
-                    motivo,
-                    nota,
-                    colores: colores
-                        .filter((c) => porColor[c.id] !== undefined && porColor[c.id] !== "")
-                        .map((c) => ({ id: c.id, contado: Number(porColor[c.id]) }))
-                }
-                : { motivo, nota, contado: Number(contado) };
+                ? { motivo, nota, colores: lineas.map((l) => ({ id: l.id, [clave]: l.valor })) }
+                : { motivo, nota, [clave]: lineas[0].valor };
             const resultado = await pedir(`/api/productos/${producto.id}/conteo`, { method: "POST", cuerpo });
             await onGuardado(resultado);
         } catch (err) {
@@ -74,7 +89,7 @@ export default function ConteoProducto({ producto, onGuardado, onCerrar, onError
         <dialog ref={dialogo} className="modal" onClose={onCerrar} aria-labelledby="titulo-conteo">
             <form className="modal-contenido formulario" onSubmit={guardar}>
                 <div className="modal-encabezado">
-                    <h2 id="titulo-conteo">🧮 Contar / ajustar stock</h2>
+                    <h2 id="titulo-conteo">🧮 Dañados, pérdidas y conteo</h2>
                     <button type="button" className="boton-cerrar-modal" onClick={onCerrar} aria-label="Cerrar">✕</button>
                 </div>
 
@@ -82,19 +97,30 @@ export default function ConteoProducto({ producto, onGuardado, onCerrar, onError
                     <strong>{producto.nombre}</strong> · en el sistema: <strong>{producto.stock} u.</strong>
                 </p>
 
+                <div className="campo">
+                    <label htmlFor="conteo-motivo">¿Qué pasó?</label>
+                    <select id="conteo-motivo" value={motivo} onChange={(e) => cambiarMotivo(e.target.value)}>
+                        {MOTIVOS.map((m) => (
+                            <option key={m.valor} value={m.valor}>{m.texto}</option>
+                        ))}
+                    </select>
+                    <span className="ayuda-campo">{elegido.ayuda}</span>
+                </div>
+
                 {colores.length > 0 ? (
                     <fieldset className="grupo-campos">
-                        <legend>¿Cuántas hay de verdad? (solo los colores que contaste)</legend>
+                        <legend>{elegido.pregunta} <small>(solo los colores que correspondan)</small></legend>
                         <div className="fila-campos fila-dos">
                             {colores.map((color) => (
                                 <div className="campo" key={color.id}>
                                     <label htmlFor={`conteo-color-${color.id}`}>
-                                        {color.nombre} <small>(sistema: {color.stock})</small>
+                                        {color.nombre} <small>(hay {color.stock})</small>
                                     </label>
                                     <input
                                         id={`conteo-color-${color.id}`}
                                         type="number"
-                                        min="0"
+                                        min={esConteo ? 0 : 1}
+                                        max={esConteo ? undefined : color.stock}
                                         step="1"
                                         inputMode="numeric"
                                         value={porColor[color.id] ?? ""}
@@ -106,29 +132,20 @@ export default function ConteoProducto({ producto, onGuardado, onCerrar, onError
                     </fieldset>
                 ) : (
                     <div className="campo">
-                        <label htmlFor="conteo-cantidad">¿Cuántas unidades hay de verdad?</label>
+                        <label htmlFor="conteo-cantidad">{elegido.pregunta}</label>
                         <input
                             id="conteo-cantidad"
                             type="number"
-                            min="0"
+                            min={esConteo ? 0 : 1}
+                            max={esConteo ? undefined : producto.stock}
                             step="1"
                             inputMode="numeric"
-                            value={contado}
-                            onChange={(e) => setContado(e.target.value)}
+                            value={cantidad}
+                            onChange={(e) => setCantidad(e.target.value)}
                             required
                         />
                     </div>
                 )}
-
-                <div className="campo">
-                    <label htmlFor="conteo-motivo">Motivo</label>
-                    <select id="conteo-motivo" value={motivo} onChange={(e) => setMotivo(e.target.value)}>
-                        {MOTIVOS.map((m) => (
-                            <option key={m.valor} value={m.valor}>{m.texto}</option>
-                        ))}
-                    </select>
-                    <span className="ayuda-campo">{ayudaMotivo}</span>
-                </div>
 
                 <div className="campo">
                     <label htmlFor="conteo-nota">Nota {motivo === "otro" ? "" : "(opcional)"}</label>
@@ -147,7 +164,7 @@ export default function ConteoProducto({ producto, onGuardado, onCerrar, onError
                         {diferencia === 0
                             ? "✅ Coincide con el sistema."
                             : diferencia < 0
-                                ? `Faltan ${-diferencia} u.: el stock bajará a ${producto.stock + diferencia}.`
+                                ? `${esConteo ? "Faltan" : "Salen"} ${-diferencia} u.: el stock bajará a ${producto.stock + diferencia}.`
                                 : `Sobran ${diferencia} u.: el stock subirá a ${producto.stock + diferencia}.`}
                     </p>
                 )}

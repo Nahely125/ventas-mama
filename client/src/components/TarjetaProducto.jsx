@@ -62,7 +62,7 @@ export default function TarjetaProducto({ producto, parte, esJefe, retraso, onEd
                         📜 Movimientos
                     </button>
                     <button type="button" className="boton-secundario boton-pequeno" onClick={onConteo}>
-                        🧮 Contar / ajustar
+                        💔 Dañados / conteo
                     </button>
                 </div>
 
