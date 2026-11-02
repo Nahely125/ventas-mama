@@ -37,6 +37,9 @@ html {
 body {
     min-height: 100vh;
     min-height: 100dvh;
+    /* iPhone en horizontal: que nada quede detrás de la muesca. */
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
     font-family: 'Montserrat', system-ui, sans-serif;
     background-color: var(--morado-50);
     color: var(--texto);
@@ -58,6 +61,16 @@ select {
 button {
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
+}
+
+/* Sin la espera del "doble toque para acercar" del iPhone: los botones responden al instante. */
+button,
+a,
+input,
+select,
+textarea,
+label {
+    touch-action: manipulation;
 }
 
 button:disabled {
@@ -857,8 +870,9 @@ input[type="date"],
 input[type="password"],
 input[type="number"],
 input[type="search"],
-input[type="tel"],
-input[type="date"],
+input[type="email"],
+input[type="url"],
+input[type="month"],
 select {
     width: 100%;
     min-width: 0;
@@ -1519,6 +1533,10 @@ select {
 }
 
 .boton-enlace {
+    /* Alto mínimo para tocarlo cómodo con el dedo. */
+    display: inline-flex;
+    align-items: center;
+    min-height: 36px;
     padding: 0;
     border: none;
     background: none;
@@ -3919,9 +3937,10 @@ textarea {
 
 .cat-carrito-controles select {
     width: auto;
-    min-height: 34px;
+    min-height: 36px;
     padding: 4px 8px;
-    font-size: 0.82rem;
+    /* 16px: con menos, el iPhone hace zoom al tocarlo */
+    font-size: 16px;
 }
 
 .cat-cantidad {
@@ -3964,6 +3983,8 @@ textarea {
 
 .cat-carrito-quitar,
 .cat-carrito-vaciar {
+    min-height: 36px;
+    padding: 0 6px;
     border: none;
     background: none;
     color: var(--texto-suave);
@@ -4696,12 +4717,14 @@ textarea {
 .cat-pie ul {
     list-style: none;
     display: grid;
-    gap: 8px;
+    gap: 0;
     margin: 0;
     padding: 0;
 }
 
 .cat-pie a {
+    display: inline-block;
+    padding: 7px 0;
     color: rgba(255, 255, 255, 0.8);
     font-size: 0.9rem;
     text-decoration: none;

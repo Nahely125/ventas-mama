@@ -254,6 +254,8 @@ app.get("/catalogo", async (req, res) => {
             html
                 .replace("<title>Mil Deseos</title>", `<title>${escaparHtml(titulo)}</title>`)
                 .replace("<!--vista-previa-->", etiquetas)
+                // Si un cliente lo agrega a su pantalla de inicio, que abra el catálogo (no el login).
+                .replace("/manifest.webmanifest", "/manifest-catalogo.webmanifest")
         );
     } catch (error) {
         console.error("Error al preparar el catálogo:", error.message);
