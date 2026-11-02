@@ -11,9 +11,8 @@ export function stockDeLaParte(producto, parte) {
 
 export default function TarjetaProducto({ producto, parte, esJefe, retraso, onEditar, onEliminar, onIngresar }) {
     const precio = Number(producto.precio);
-    // Media docena: la mitad de la docena (igual que al vender), y su mínimo, la mitad del de la docena.
+    // Media docena: la mitad de la docena (igual que al vender).
     const mediaDocena = Number((Number(producto.precioDocena) / 2).toFixed(2));
-    const minimoMediaDocena = Number((Number(producto.precioMinimoDocena) / 2).toFixed(2));
     const stockBajo = producto.stock <= 5;
     const { stock: stockParte, esMixto } = stockDeLaParte(producto, parte);
 
@@ -107,10 +106,6 @@ export default function TarjetaProducto({ producto, parte, esJefe, retraso, onEd
                 <div>
                     <dt>Precio por media docena</dt>
                     <dd>{moneda(mediaDocena)}</dd>
-                </div>
-                <div>
-                    <dt>Precio mínimo por media docena</dt>
-                    <dd>{moneda(minimoMediaDocena)}</dd>
                 </div>
                 <div>
                     <dt>Stock disponible</dt>

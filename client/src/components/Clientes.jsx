@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { moneda, pedir } from "../api.js";
 import { formatearFecha } from "../venta.js";
+import { contiene, normalizar } from "../texto.js";
 
 function mostrarTelefono(telefono) {
     return telefono ? telefono.replace(/^51(?=9\d{8}$)/, "") : "";
@@ -272,10 +273,10 @@ export default function Clientes({ esJefe, onError }) {
         }
     }
 
-    const texto = busqueda.trim().toLowerCase();
+    const texto = normalizar(busqueda);
     const filtrados = (clientes ?? []).filter((c) =>
         (!soloDeudores || Number(c.saldo) > 0) &&
-        (!texto || c.nombre.toLowerCase().includes(texto) || (c.telefono ?? "").includes(texto.replace(/\D/g, "") || "-"))
+        (!texto || contiene(texto, c.nombre) || (c.telefono ?? "").includes(texto.replace(/\D/g, "") || "-"))
     );
     const totalDeuda = (clientes ?? []).reduce((suma, c) => suma + Math.max(Number(c.saldo), 0), 0);
     const deudores = (clientes ?? []).filter((c) => Number(c.saldo) > 0).length;

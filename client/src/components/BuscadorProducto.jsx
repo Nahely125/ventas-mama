@@ -1,25 +1,23 @@
 import { useCallback, useState } from "react";
 import { moneda } from "../api.js";
 import Escaner from "./Escaner.jsx";
+import { contiene, normalizar } from "../texto.js";
 
 const MAXIMO_RESULTADOS = 8;
 
 // Ordena primero los productos cuyo código coincide exactamente, luego por nombre.
 function buscar(productos, texto) {
-    const busqueda = texto.trim().toLowerCase();
+    const busqueda = normalizar(texto);
 
     if (!busqueda) {
         return productos.slice(0, MAXIMO_RESULTADOS);
     }
 
     return productos
-        .filter((producto) =>
-            producto.nombre.toLowerCase().includes(busqueda) ||
-            (producto.codigo ?? "").toLowerCase().includes(busqueda)
-        )
+        .filter((producto) => contiene(busqueda, producto.nombre, producto.codigo))
         .sort((a, b) => {
-            const exactoA = (a.codigo ?? "").toLowerCase() === busqueda ? 0 : 1;
-            const exactoB = (b.codigo ?? "").toLowerCase() === busqueda ? 0 : 1;
+            const exactoA = normalizar(a.codigo) === busqueda ? 0 : 1;
+            const exactoB = normalizar(b.codigo) === busqueda ? 0 : 1;
             return exactoA - exactoB;
         })
         .slice(0, MAXIMO_RESULTADOS);

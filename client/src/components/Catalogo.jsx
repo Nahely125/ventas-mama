@@ -7,6 +7,7 @@ import CarritoCatalogo, { detalleCarrito, precioCatalogo, useCarrito } from "./C
 import { PanelFiltros, VentanaFiltros, aplicarFiltros, cantidadFiltros } from "./FiltrosCatalogo.jsx";
 import { BarraPromociones, Nosotros, PieTienda, Portada, VentanaBienvenida } from "./TiendaWeb.jsx";
 import { totalesPedido, useCupon, useTienda } from "../tienda.js";
+import { contiene, normalizar } from "../texto.js";
 
 // Enlace para pedir un producto por WhatsApp con el mensaje ya escrito.
 function enlacePedido(producto) {
@@ -286,7 +287,7 @@ export default function Catalogo() {
         setTimeout(() => campoBusqueda.current?.focus(), 50);
     }
 
-    const texto = busqueda.trim().toLowerCase();
+    const texto = normalizar(busqueda);
     const filtrar = (productos) => aplicarFiltros(productos, filtros);
 
     // Búsqueda: nombre, código o categoría, en todas las secciones.
@@ -294,11 +295,7 @@ export default function Catalogo() {
         ? secciones.flatMap((seccion) =>
             seccion.productos.filter((p) => {
                 const categoria = seccion.categorias.find((c) => c.id === p.categoriaId);
-                return (
-                    p.nombre.toLowerCase().includes(texto) ||
-                    (p.codigo ?? "").toLowerCase().includes(texto) ||
-                    (categoria?.nombre ?? "").toLowerCase().includes(texto)
-                );
+                return contiene(texto, p.nombre, p.codigo, categoria?.nombre);
             }))
         : [];
 

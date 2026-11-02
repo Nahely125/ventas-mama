@@ -1,11 +1,11 @@
-import { useCallback, useState } from "react";
-import { pedir } from "../api.js";
-import { moneda } from "../api.js";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { moneda, pedir } from "../api.js";
 import { urlFoto } from "../fotos.js";
 import TarjetaProducto, { stockDeLaParte } from "./TarjetaProducto.jsx";
 import ModalEditarProducto from "./ModalEditarProducto.jsx";
 import Escaner from "./Escaner.jsx";
 import IngresarMercaderia from "./IngresarMercaderia.jsx";
+import { contiene, normalizar } from "../texto.js";
 
 // Un producto es del inventario 2025 si le quedan unidades del 2025, o si ya se agotó
 // y lo último que se vendió de él era del 2025. Si tiene de los dos, sale en ambas pestañas.
@@ -22,6 +22,33 @@ const PARTES = [
     { valor: "2025", texto: "📦 Del 2025", incluye: es2025 }
 ];
 
+// Ventana con la tarjeta completa de un producto (se abre con el botón ⓘ de la búsqueda).
+function VentanaInfo({ onCerrar, children }) {
+    const dialogo = useRef(null);
+
+    useEffect(() => {
+        dialogo.current?.showModal();
+    }, []);
+
+    return (
+        <dialog
+            ref={dialogo}
+            className="modal ventana-info"
+            onClose={onCerrar}
+            onClick={(e) => e.target === dialogo.current && onCerrar()}
+            aria-label="Información del producto"
+        >
+            <div className="modal-contenido">
+                <div className="modal-encabezado">
+                    <h2>Información del producto</h2>
+                    <button type="button" className="boton-cerrar-modal" onClick={onCerrar} aria-label="Cerrar">✕</button>
+                </div>
+                {children}
+            </div>
+        </dialog>
+    );
+}
+
 export default function Inventario({
     esJefe,
     productos,
@@ -34,6 +61,8 @@ export default function Inventario({
     const [busqueda, setBusqueda] = useState("");
     // Producto abierto en la lista (se ve su tarjeta completa debajo de la fila).
     const [abiertoId, setAbiertoId] = useState(null);
+    // Producto cuya información completa se ve en una ventana (desde la búsqueda).
+    const [infoId, setInfoId] = useState(null);
     const [productoEditando, setProductoEditando] = useState(null);
     const [escaneando, setEscaneando] = useState(false);
     const [ingresando, setIngresando] = useState(null);
@@ -46,11 +75,8 @@ export default function Inventario({
 
     const parteActual = PARTES.find((p) => p.valor === parte);
     const deLaParte = (productos ?? []).filter(parteActual.incluye);
-    const texto = busqueda.trim().toLowerCase();
-    const filtrados = deLaParte.filter((producto) =>
-        producto.nombre.toLowerCase().includes(texto) ||
-        (producto.codigo ?? "").toLowerCase().includes(texto)
-    );
+    const texto = normalizar(busqueda);
+    const filtrados = deLaParte.filter((producto) => contiene(texto, producto.nombre, producto.codigo));
 
     function tarjeta(producto, retraso) {
         return (
@@ -147,7 +173,7 @@ export default function Inventario({
                 ) : filtrados.length === 0 ? (
                     <p>
                         No se encontraron productos con ese código o nombre en el {parte === "2025" ? "inventario 2025" : "inventario nuevo"}.
-                        {(productos ?? []).some((p) => !parteActual.incluye(p) && (p.nombre.toLowerCase().includes(texto) || (p.codigo ?? "").toLowerCase().includes(texto))) && (
+                        {(productos ?? []).some((p) => !parteActual.incluye(p) && contiene(texto, p.nombre, p.codigo)) && (
                             <>
                                 {" "}
                                 <button type="button" className="boton-enlace" onClick={() => setParte(parte === "2025" ? "nuevo" : "2025")}>
@@ -164,9 +190,40 @@ export default function Inventario({
                                 : `${deLaParte.length} ${deLaParte.length === 1 ? "producto" : "productos"}`}
                         </p>
                         {texto ? (
-                            <div className="lista-productos">
-                                {filtrados.map((producto, indice) => tarjeta(producto, Math.min(indice * 70, 490)))}
-                            </div>
+                            // Al buscar: solo las fotos; el botón ⓘ muestra toda la información.
+                            <ul className="galeria-inventario">
+                                {filtrados.map((producto) => {
+                                    const foto = urlFoto(producto);
+                                    return (
+                                        <li key={producto.id}>
+                                            <button
+                                                type="button"
+                                                className="galeria-foto"
+                                                onClick={() => setInfoId(producto.id)}
+                                                aria-label={`Ver la información de ${producto.nombre}`}
+                                                title={producto.nombre}
+                                            >
+                                                {foto ? (
+                                                    <img src={foto} alt={producto.nombre} loading="lazy" />
+                                                ) : (
+                                                    <span className="galeria-sin-foto">
+                                                        <span aria-hidden="true">📦</span>
+                                                        {producto.nombre}
+                                                    </span>
+                                                )}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className="galeria-info"
+                                                onClick={() => setInfoId(producto.id)}
+                                                aria-label={`Información de ${producto.nombre}`}
+                                            >
+                                                i
+                                            </button>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
                         ) : (
                             // Sin búsqueda: lista compacta; al tocar una fila se ve su tarjeta.
                             <ul className="lista-inventario">
@@ -226,6 +283,12 @@ export default function Inventario({
 
             {escaneando && (
                 <Escaner onLeido={codigoLeido} onCerrar={() => setEscaneando(false)} />
+            )}
+
+            {infoId && (productos ?? []).some((p) => p.id === infoId) && (
+                <VentanaInfo onCerrar={() => setInfoId(null)}>
+                    {tarjeta((productos ?? []).find((p) => p.id === infoId), 0)}
+                </VentanaInfo>
             )}
 
             {productoEditando && (

@@ -7,8 +7,8 @@ export default function Resumen({ resumen, esJefe }) {
         esJefe && { titulo: "Valor del inventario nuevo", icono: "💰", valor: resumen?.valorInventarioNuevo, formato: "moneda" },
         esJefe && { titulo: "Valor del inventario 2025", icono: "📦", valor: resumen?.valorInventario2025, formato: "moneda" },
         { titulo: "Productos con stock bajo", icono: "⚠️", valor: resumen?.productosStockBajo },
-        esJefe && { titulo: "Ganancia por ventas", icono: "📈", valor: resumen?.gananciaVentasNuevas, formato: "moneda" },
-        esJefe && { titulo: "Ganancia inventario 2025", icono: "📦", valor: resumen?.ganancia2025, formato: "moneda" },
+        // Toda la mercadería cuenta igual: la ganancia por ventas incluye la del inventario 2025.
+        esJefe && { titulo: "Ganancia por ventas", icono: "📈", valor: resumen?.gananciaTotal, formato: "moneda" },
         esJefe && { titulo: "Gastos", icono: "💸", valor: resumen?.gastosTotales, formato: "moneda" },
         esJefe && Number(resumen?.porCobrar) > 0 && { titulo: "Por cobrar (fiados)", icono: "📝", valor: resumen?.porCobrar, formato: "moneda" },
         esJefe && {
