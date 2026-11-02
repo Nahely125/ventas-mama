@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { moneda } from "../api.js";
-import { BILLETERAS, CUENTAS_BANCARIAS } from "../datosPago.js";
+import { BILLETERAS, CUENTAS_BANCARIAS, RECARGO_TARJETA, cobroConTarjeta } from "../datosPago.js";
 
 function BotonCopiar({ texto, etiqueta }) {
     const [copiado, setCopiado] = useState(false);
@@ -59,13 +59,33 @@ export default function DatosPago({ metodoPago, total }) {
     }
 
     if (metodoPago === "tarjeta") {
+        const { base, recargo, cobrar } = cobroConTarjeta(total);
+
         return (
             <div className="contenedor-qr-yape aviso-tarjeta">
                 <h3>💳 Cobra con el POS de Izipay</h3>
-                <p>
-                    Marca <strong>{moneda(total)}</strong> en la maquinita y pide al cliente que pase o acerque su tarjeta.
+                <p className="monto-pos">
+                    Marca en la maquinita
+                    <strong>{moneda(cobrar)}</strong>
                 </p>
-                <p className="ayuda-comprobante">Entrega los productos cuando el POS imprima o muestre el pago aprobado.</p>
+                <dl className="detalle-recargo">
+                    <div>
+                        <dt>Total de la venta</dt>
+                        <dd>{moneda(base)}</dd>
+                    </div>
+                    <div>
+                        <dt>+ {RECARGO_TARJETA}% por pago con tarjeta (Izipay)</dt>
+                        <dd>{moneda(recargo)}</dd>
+                    </div>
+                    <div className="total-pos">
+                        <dt>Total a cobrar en el POS</dt>
+                        <dd>{moneda(cobrar)}</dd>
+                    </div>
+                </dl>
+                <p className="ayuda-comprobante">
+                    Avísale al cliente antes de cobrar que con tarjeta se suma el {RECARGO_TARJETA}%. Entrega los productos
+                    cuando el POS muestre el pago aprobado. La venta se guarda por {moneda(base)}: el {RECARGO_TARJETA}% es lo que se queda Izipay.
+                </p>
             </div>
         );
     }

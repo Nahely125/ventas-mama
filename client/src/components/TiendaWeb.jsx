@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { moneda } from "../api.js";
 import { urlFoto } from "../fotos.js";
 import { iconoTema } from "../secciones.js";
-import { BILLETERAS } from "../datosPago.js";
+import { BILLETERAS, RECARGO_TARJETA } from "../datosPago.js";
 import { enlaceWhatsApp, telefonoLegible } from "../tienda.js";
 
 /* Partes de la página web del catálogo (inspirada en las tiendas de moda en línea):
@@ -280,7 +280,8 @@ export function Nosotros({ tienda, apartado }) {
                     <li><strong>Envía</strong> tu pedido por WhatsApp: te confirmamos la disponibilidad y el total.</li>
                     <li>
                         <strong>Paga</strong> con {Object.values(BILLETERAS).map((b) => b.nombre).join(", ")}, transferencia o
-                        tarjeta de débito o crédito (con nuestro POS Izipay, al recoger o al recibir tu pedido), y coordinamos la entrega.
+                        tarjeta de débito o crédito (con nuestro POS Izipay, al recoger o al recibir tu pedido; con tarjeta
+                        se suma {RECARGO_TARJETA}%), y coordinamos la entrega.
                     </li>
                 </ol>
             </section>
@@ -394,7 +395,7 @@ export function PieTienda({ tienda, secciones, onIr }) {
                 </nav>
             </div>
             <p className="cat-pie-pagos">
-                <strong>Aceptamos:</strong> {Object.values(BILLETERAS).map((b) => b.nombre).join(" · ")} · Transferencia · 💳 Tarjetas de débito y crédito
+                <strong>Aceptamos:</strong> {Object.values(BILLETERAS).map((b) => b.nombre).join(" · ")} · Transferencia · 💳 Tarjetas de débito y crédito (+{RECARGO_TARJETA}%)
             </p>
             <p className="cat-pie-legal">
                 © {new Date().getFullYear()} Mil Deseos

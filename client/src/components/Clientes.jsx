@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { moneda, pedir } from "../api.js";
 import { formatearFecha } from "../venta.js";
 import { contiene, normalizar } from "../texto.js";
+import { RECARGO_TARJETA, cobroConTarjeta } from "../datosPago.js";
 
 function mostrarTelefono(telefono) {
     return telefono ? telefono.replace(/^51(?=9\d{8}$)/, "") : "";
@@ -186,6 +187,12 @@ function DetalleCliente({ clienteId, esJefe, onCerrar, onCambio, onError }) {
                                         </select>
                                     </div>
                                 </div>
+                                {abono.metodoPago === "tarjeta" && Number(abono.monto) > 0 && (
+                                    <p className="aviso-recargo" role="status">
+                                        💳 Marca en el POS <strong>{moneda(cobroConTarjeta(abono.monto).cobrar)}</strong> ({moneda(abono.monto)} + {RECARGO_TARJETA}% de Izipay).
+                                        Se descuentan {moneda(abono.monto)} de la deuda.
+                                    </p>
+                                )}
                                 <div className="campo">
                                     <label htmlFor="abono-nota">Nota (opcional)</label>
                                     <input id="abono-nota" maxLength={200} value={abono.nota} onChange={(e) => setAbono((v) => ({ ...v, nota: e.target.value }))} />

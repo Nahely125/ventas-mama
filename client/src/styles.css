@@ -1898,6 +1898,57 @@ input[aria-invalid="true"] {
     image-rendering: pixelated;
 }
 
+/* Pago con tarjeta: total + recargo de Izipay */
+.monto-pos {
+    display: grid;
+    gap: 2px;
+    margin: 6px 0 10px;
+    font-size: 0.95rem;
+}
+
+.monto-pos strong {
+    color: var(--morado-900);
+    font-size: 2rem;
+    line-height: 1.1;
+}
+
+.detalle-recargo {
+    display: grid;
+    gap: 6px;
+    margin: 0 0 10px;
+    padding: 12px 14px;
+    border: 1px solid var(--morado-200);
+    border-radius: 12px;
+    background: var(--morado-50);
+    text-align: left;
+}
+
+.detalle-recargo div {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 0.9rem;
+}
+
+.detalle-recargo dd {
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.detalle-recargo .total-pos {
+    padding-top: 6px;
+    border-top: 1px dashed var(--morado-300);
+    color: var(--morado-900);
+    font-weight: 700;
+}
+
+.aviso-recargo {
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: var(--morado-50);
+    font-size: 0.9rem;
+}
+
 .cuenta-bancaria {
     display: grid;
     gap: 10px;
