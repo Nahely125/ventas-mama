@@ -3,6 +3,7 @@ require("dotenv").config();
 const express = require("express");
 const compression = require("compression");
 const path = require("path");
+const fs = require("fs");
 const session = require("express-session");
 const AlmacenSesiones = require("connect-pg-simple")(session);
 const bcrypt = require("bcrypt");
@@ -189,7 +190,8 @@ app.use("/api/compras", require("./rutas/compras"));
 app.use("/api/inversiones", require("./rutas/inversiones"));
 app.use("/api/ajustes", require("./rutas/ajustes").router);
 app.use("/api/reportes", require("./rutas/reportes"));
-app.use("/api/tienda", require("./rutas/tienda"));
+const tienda = require("./rutas/tienda");
+app.use("/api/tienda", tienda.router);
 
 /* Frontend en React: archivos compilados con "npm run build" en client/dist.
    La propia app decide si mostrar el login o el panel según /api/sesion. */
@@ -211,9 +213,52 @@ app.get("/imagenes/:archivo", requiereSesion, (req, res) => {
 
 app.use(express.static(carpetaFrontend, { index: false }));
 
-// Páginas de la app React: el panel, el catálogo público y las boletas.
-app.get(["/", "/catalogo", "/boleta/:token"], (req, res) => {
+// Páginas de la app React: el panel y las boletas.
+app.get(["/", "/boleta/:token"], (req, res) => {
     res.sendFile(path.join(carpetaFrontend, "index.html"));
+});
+
+function escaparHtml(texto) {
+    return String(texto).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+}
+
+/* Catálogo: la misma página, pero con la vista previa para cuando se comparte el enlace
+   por WhatsApp o redes (título, descripción con las promociones vigentes e imagen). */
+app.get("/catalogo", async (req, res) => {
+    try {
+        const html = await fs.promises.readFile(path.join(carpetaFrontend, "index.html"), "utf8");
+        const datos = await tienda.leerTienda();
+        const origen = process.env.URL_PUBLICA || `${req.protocol}://${req.get("host")}`;
+        const promociones = [
+            datos.cupon.activo && `${datos.cupon.porcentaje}% OFF en tu primera compra con el código ${datos.cupon.codigo}`,
+            datos.envio.activo && `envío gratis en compras mayores a S/ ${Number(datos.envio.gratisDesde).toString()}`
+        ].filter(Boolean).join(" · ");
+        const titulo = "Mil Deseos | Adornos, luces, útiles y regalos";
+        const descripcion = `${promociones ? `${promociones[0].toUpperCase()}${promociones.slice(1)}. ` : ""}Precios por unidad, media docena y docena. Arma tu pedido y envíalo por WhatsApp.`;
+        const etiquetas = [
+            `<meta name="description" content="${escaparHtml(descripcion)}">`,
+            `<meta property="og:type" content="website">`,
+            `<meta property="og:site_name" content="Mil Deseos">`,
+            `<meta property="og:locale" content="es_PE">`,
+            `<meta property="og:title" content="${escaparHtml(titulo)}">`,
+            `<meta property="og:description" content="${escaparHtml(descripcion)}">`,
+            `<meta property="og:url" content="${escaparHtml(`${origen}/catalogo`)}">`,
+            `<meta property="og:image" content="${escaparHtml(`${origen}/compartir.jpg`)}">`,
+            `<meta property="og:image:width" content="1200">`,
+            `<meta property="og:image:height" content="630">`,
+            `<meta property="og:image:alt" content="Mil Deseos: adornos, luces, útiles y regalos">`,
+            `<meta name="twitter:card" content="summary_large_image">`
+        ].join("\n    ");
+
+        res.type("html").send(
+            html
+                .replace("<title>Mil Deseos</title>", `<title>${escaparHtml(titulo)}</title>`)
+                .replace("<!--vista-previa-->", etiquetas)
+        );
+    } catch (error) {
+        console.error("Error al preparar el catálogo:", error.message);
+        res.sendFile(path.join(carpetaFrontend, "index.html"));
+    }
 });
 
 // Iniciar servidor (primero se actualiza la estructura de la base de datos).
