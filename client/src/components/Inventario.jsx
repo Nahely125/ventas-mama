@@ -240,7 +240,7 @@ export default function Inventario({
                                     const foto = urlFoto(producto);
 
                                     return (
-                                        <li key={producto.id} className={abierto ? "abierta" : ""}>
+                                        <li key={producto.id} className={`${abierto ? "abierta" : ""} ${esJefe ? "fila-con-accion" : ""}`}>
                                             <button
                                                 type="button"
                                                 className="fila-inventario"
@@ -252,7 +252,10 @@ export default function Inventario({
                                                 </span>
                                                 <span className="fila-nombre">
                                                     <strong>{producto.nombre}</strong>
-                                                    <small>{producto.codigo || "Sin código"}</small>
+                                                    <small>
+                                                        {producto.codigo || "Sin código"}
+                                                        <span className="fila-precio-corto"> · {moneda(producto.precio)}</span>
+                                                    </small>
                                                 </span>
                                                 <span className="fila-precio">
                                                     {moneda(producto.precio)}
@@ -264,6 +267,17 @@ export default function Inventario({
                                                 </span>
                                                 <span className="fila-flecha" aria-hidden="true">{abierto ? "▴" : "▾"}</span>
                                             </button>
+                                            {esJefe && (
+                                                <button
+                                                    type="button"
+                                                    className="fila-descontar"
+                                                    onClick={() => setConteoDe(producto)}
+                                                    aria-label={`Descontar unidades de ${producto.nombre} (rotas, perdidas...)`}
+                                                    title="Descontar unidades"
+                                                >
+                                                    💔
+                                                </button>
+                                            )}
                                             {abierto && tarjeta(producto, 0)}
                                         </li>
                                     );

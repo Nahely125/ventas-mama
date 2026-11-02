@@ -12,6 +12,33 @@ const MOTIVOS = [
     { valor: "otro", texto: "✍️ Otro motivo", pregunta: "¿Cuántas unidades salen?", ayuda: "Explica en la nota qué pasó." }
 ];
 
+// Contador − / + para restar de a una unidad (también se puede escribir el número).
+function ContadorUnidades({ id, valor, maximo, onCambio }) {
+    const numero = Number(valor) || 0;
+
+    return (
+        <div className="contador-unidades" role="group" aria-label="Cantidad">
+            <button type="button" onClick={() => onCambio(numero <= 1 ? "" : String(numero - 1))} disabled={numero <= 0} aria-label="Una menos">
+                −
+            </button>
+            <input
+                id={id}
+                type="number"
+                min="1"
+                max={maximo}
+                step="1"
+                inputMode="numeric"
+                placeholder="0"
+                value={valor}
+                onChange={(e) => onCambio(e.target.value)}
+            />
+            <button type="button" onClick={() => onCambio(String(Math.min(numero + 1, maximo)))} disabled={numero >= maximo} aria-label="Una más">
+                +
+            </button>
+        </div>
+    );
+}
+
 /* Conteo físico o ajuste del stock. En "Conteo físico" escribes cuántas hay de verdad; en roto,
    perdido, regalado, etc., cuántas unidades salen (por ejemplo, 2 rotas). Todo queda en el
    historial de movimientos y en el reporte de pérdidas. Con colores, se indica por color. */
@@ -89,7 +116,7 @@ export default function ConteoProducto({ producto, onGuardado, onCerrar, onError
         <dialog ref={dialogo} className="modal" onClose={onCerrar} aria-labelledby="titulo-conteo">
             <form className="modal-contenido formulario" onSubmit={guardar}>
                 <div className="modal-encabezado">
-                    <h2 id="titulo-conteo">🧮 Dañados, pérdidas y conteo</h2>
+                    <h2 id="titulo-conteo">💔 Descontar unidades</h2>
                     <button type="button" className="boton-cerrar-modal" onClick={onCerrar} aria-label="Cerrar">✕</button>
                 </div>
 
@@ -97,15 +124,24 @@ export default function ConteoProducto({ producto, onGuardado, onCerrar, onError
                     <strong>{producto.nombre}</strong> · en el sistema: <strong>{producto.stock} u.</strong>
                 </p>
 
-                <div className="campo">
-                    <label htmlFor="conteo-motivo">¿Qué pasó?</label>
-                    <select id="conteo-motivo" value={motivo} onChange={(e) => cambiarMotivo(e.target.value)}>
+                <fieldset className="grupo-campos">
+                    <legend>¿Por qué se descuenta?</legend>
+                    <div className="motivos-ajuste" role="radiogroup" aria-label="Motivo">
                         {MOTIVOS.map((m) => (
-                            <option key={m.valor} value={m.valor}>{m.texto}</option>
+                            <button
+                                key={m.valor}
+                                type="button"
+                                role="radio"
+                                aria-checked={motivo === m.valor}
+                                className={motivo === m.valor ? "activo" : ""}
+                                onClick={() => cambiarMotivo(m.valor)}
+                            >
+                                {m.texto}
+                            </button>
                         ))}
-                    </select>
+                    </div>
                     <span className="ayuda-campo">{elegido.ayuda}</span>
-                </div>
+                </fieldset>
 
                 {colores.length > 0 ? (
                     <fieldset className="grupo-campos">
@@ -116,16 +152,24 @@ export default function ConteoProducto({ producto, onGuardado, onCerrar, onError
                                     <label htmlFor={`conteo-color-${color.id}`}>
                                         {color.nombre} <small>(hay {color.stock})</small>
                                     </label>
-                                    <input
-                                        id={`conteo-color-${color.id}`}
-                                        type="number"
-                                        min={esConteo ? 0 : 1}
-                                        max={esConteo ? undefined : color.stock}
-                                        step="1"
-                                        inputMode="numeric"
-                                        value={porColor[color.id] ?? ""}
-                                        onChange={(e) => setPorColor((v) => ({ ...v, [color.id]: e.target.value }))}
-                                    />
+                                    {esConteo ? (
+                                        <input
+                                            id={`conteo-color-${color.id}`}
+                                            type="number"
+                                            min="0"
+                                            step="1"
+                                            inputMode="numeric"
+                                            value={porColor[color.id] ?? ""}
+                                            onChange={(e) => setPorColor((v) => ({ ...v, [color.id]: e.target.value }))}
+                                        />
+                                    ) : (
+                                        <ContadorUnidades
+                                            id={`conteo-color-${color.id}`}
+                                            valor={porColor[color.id] ?? ""}
+                                            maximo={color.stock}
+                                            onCambio={(valor) => setPorColor((v) => ({ ...v, [color.id]: valor }))}
+                                        />
+                                    )}
                                 </div>
                             ))}
                         </div>
@@ -133,17 +177,20 @@ export default function ConteoProducto({ producto, onGuardado, onCerrar, onError
                 ) : (
                     <div className="campo">
                         <label htmlFor="conteo-cantidad">{elegido.pregunta}</label>
-                        <input
-                            id="conteo-cantidad"
-                            type="number"
-                            min={esConteo ? 0 : 1}
-                            max={esConteo ? undefined : producto.stock}
-                            step="1"
-                            inputMode="numeric"
-                            value={cantidad}
-                            onChange={(e) => setCantidad(e.target.value)}
-                            required
-                        />
+                        {esConteo ? (
+                            <input
+                                id="conteo-cantidad"
+                                type="number"
+                                min="0"
+                                step="1"
+                                inputMode="numeric"
+                                value={cantidad}
+                                onChange={(e) => setCantidad(e.target.value)}
+                                required
+                            />
+                        ) : (
+                            <ContadorUnidades id="conteo-cantidad" valor={cantidad} maximo={producto.stock} onCambio={setCantidad} />
+                        )}
                     </div>
                 )}
 

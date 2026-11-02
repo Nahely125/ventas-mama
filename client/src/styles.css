@@ -58,6 +58,19 @@ select {
     font: inherit;
 }
 
+/* Los recuadros con título (fieldset) no se estiran con un texto largo: así nada se sale
+   de la pantalla en celulares angostos (por ejemplo, una lista con nombres largos). */
+fieldset {
+    min-width: 0;
+}
+
+select {
+    max-width: 100%;
+    /* En Safari el texto largo de una opción puede ensanchar la página aunque no se vea:
+       se recorta dentro de la caja (overflow no sirve en las listas desplegables de Safari). */
+    contain: paint;
+}
+
 button {
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
@@ -5226,6 +5239,108 @@ textarea {
 /* ========================================
    MOVIMIENTOS DEL STOCK, CONTEO Y PÉRDIDAS
 ======================================== */
+
+.motivos-ajuste {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.motivos-ajuste button {
+    min-height: 46px;
+    padding: 8px 10px;
+    border: 1px solid var(--morado-200);
+    border-radius: 12px;
+    background: #ffffff;
+    color: var(--morado-900);
+    font: inherit;
+    font-size: 0.88rem;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+}
+
+.motivos-ajuste button.activo {
+    border-color: var(--morado-600);
+    background: var(--morado-100);
+    box-shadow: inset 0 0 0 1px var(--morado-600);
+}
+
+.contador-unidades {
+    display: grid;
+    grid-template-columns: 52px minmax(0, 1fr) 52px;
+    align-items: center;
+    gap: 8px;
+}
+
+.contador-unidades button {
+    height: 48px;
+    border: 1px solid var(--morado-300);
+    border-radius: 12px;
+    background: var(--morado-50);
+    color: var(--morado-900);
+    font-size: 1.5rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.contador-unidades button:disabled {
+    opacity: 0.4;
+}
+
+.contador-unidades input {
+    text-align: center;
+    font-weight: 700;
+}
+
+.fila-precio-corto {
+    display: none;
+}
+
+/* En pantallas angostas el precio va debajo del nombre, para que el nombre se lea entero. */
+@media (max-width: 480px) {
+    .fila-inventario {
+        grid-template-columns: 40px minmax(0, 1fr) auto 12px;
+        gap: 8px;
+    }
+
+    .fila-foto {
+        width: 40px;
+        height: 40px;
+    }
+
+    .fila-inventario .fila-precio {
+        display: none;
+    }
+
+    .fila-precio-corto {
+        display: inline;
+    }
+}
+
+/* Fila del inventario con botón para descontar unidades */
+.lista-inventario > li.fila-con-accion {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 48px;
+    gap: 6px;
+}
+
+.lista-inventario > li.fila-con-accion > .producto {
+    grid-column: 1 / -1;
+}
+
+.fila-descontar {
+    border: 1px solid var(--morado-150);
+    border-radius: 12px;
+    background: #ffffff;
+    font-size: 1.2rem;
+    cursor: pointer;
+}
+
+.fila-descontar:hover {
+    border-color: #fda4af;
+    background: #fff1f2;
+}
 
 .acciones-stock {
     display: grid;
