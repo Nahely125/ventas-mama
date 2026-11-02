@@ -6,7 +6,8 @@ const { requiereJefe } = require("../autenticacion");
 const router = express.Router();
 
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
-const METODOS_CAJA = ["efectivo", "yape", "plin", "transferencia"];
+// La tarjeta (POS de Izipay) se muestra aparte: no entra al efectivo que debe haber en la caja.
+const METODOS_CAJA = ["efectivo", "yape", "plin", "tarjeta", "transferencia"];
 
 // Ganancia de cada fila de ventas (igual que en el historial): lo del 2025 no resta costo.
 const GANANCIA = `(ventas.total - COALESCE(ventas.costo_unitario, 0) * (ventas.cantidad - ventas.unidades_2025))`;

@@ -134,7 +134,7 @@ CREATE TABLE IF NOT EXISTS ventas (
     precio_unitario  NUMERIC(10,2) NOT NULL CHECK (precio_unitario >= 0),
     costo_unitario   NUMERIC(14,4),
     total            NUMERIC(10,2) NOT NULL CHECK (total >= 0),
-    metodo_pago      VARCHAR(20)   NOT NULL DEFAULT 'efectivo',         -- efectivo, yape, plin, transferencia
+    metodo_pago      VARCHAR(20)   NOT NULL DEFAULT 'efectivo',         -- efectivo, yape, plin, tarjeta (POS Izipay), transferencia, fiado
     token            UUID          NOT NULL DEFAULT gen_random_uuid(),
     grupo            UUID          NOT NULL,                            -- une los productos de una misma venta; es la clave del enlace de la boleta
     autorizado_por   INTEGER       REFERENCES usuarios(id),             -- jefe que autorizó un precio bajo el mínimo

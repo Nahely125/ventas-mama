@@ -58,6 +58,18 @@ export default function DatosPago({ metodoPago, total }) {
         );
     }
 
+    if (metodoPago === "tarjeta") {
+        return (
+            <div className="contenedor-qr-yape aviso-tarjeta">
+                <h3>💳 Cobra con el POS de Izipay</h3>
+                <p>
+                    Marca <strong>{moneda(total)}</strong> en la maquinita y pide al cliente que pase o acerque su tarjeta.
+                </p>
+                <p className="ayuda-comprobante">Entrega los productos cuando el POS imprima o muestre el pago aprobado.</p>
+            </div>
+        );
+    }
+
     if (metodoPago === "fiado") {
         return (
             <div className="contenedor-qr-yape aviso-fiado">

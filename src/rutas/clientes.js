@@ -5,7 +5,7 @@ const { requiereSesion, requiereJefe, leerId } = require("../autenticacion");
 // Clientes frecuentes y fiados: lo que debe cada cliente = ventas fiadas (no anuladas) − abonos.
 const router = express.Router();
 
-const METODOS_ABONO = ["efectivo", "yape", "plin", "transferencia"];
+const METODOS_ABONO = ["efectivo", "yape", "plin", "tarjeta", "transferencia"];
 
 const SALDO = `
     COALESCE((SELECT SUM(v.total) FROM ventas v

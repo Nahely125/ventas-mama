@@ -279,7 +279,8 @@ export function Nosotros({ tienda, apartado }) {
                     <li><strong>Aplica</strong> tu cupón de primera compra, si lo tienes.</li>
                     <li><strong>Envía</strong> tu pedido por WhatsApp: te confirmamos la disponibilidad y el total.</li>
                     <li>
-                        <strong>Paga</strong> con {Object.values(BILLETERAS).map((b) => b.nombre).join(", ")} o transferencia, y coordinamos la entrega.
+                        <strong>Paga</strong> con {Object.values(BILLETERAS).map((b) => b.nombre).join(", ")}, transferencia o
+                        tarjeta de débito o crédito (con nuestro POS Izipay, al recoger o al recibir tu pedido), y coordinamos la entrega.
                     </li>
                 </ol>
             </section>
@@ -392,6 +393,9 @@ export function PieTienda({ tienda, secciones, onIr }) {
                     </ul>
                 </nav>
             </div>
+            <p className="cat-pie-pagos">
+                <strong>Aceptamos:</strong> {Object.values(BILLETERAS).map((b) => b.nombre).join(" · ")} · Transferencia · 💳 Tarjetas de débito y crédito
+            </p>
             <p className="cat-pie-legal">
                 © {new Date().getFullYear()} Mil Deseos
                 {empresa?.razonSocial ? ` · ${empresa.razonSocial}` : ""}

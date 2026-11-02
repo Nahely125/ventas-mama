@@ -2652,7 +2652,7 @@ input[aria-invalid="true"] {
 
 @media (min-width: 600px) {
     .opciones-pago {
-        grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
     }
 }
 
@@ -4747,6 +4747,21 @@ textarea {
     border: 1px solid rgba(255, 255, 255, 0.35);
     border-radius: 999px;
     font-size: 0.8rem;
+}
+
+.cat-pie-pagos {
+    max-width: 1320px;
+    margin: 28px auto 0;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 0.85rem;
+    text-align: center;
+}
+
+.cat-pie-pagos strong {
+    color: #ffffff;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-size: 0.75rem;
 }
 
 .cat-pie-legal {

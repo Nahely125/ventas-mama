@@ -1,4 +1,4 @@
-const METODOS_PAGO = ["efectivo", "yape", "plin", "transferencia", "fiado"];
+const METODOS_PAGO = ["efectivo", "yape", "plin", "tarjeta", "transferencia", "fiado"];
 const MODALIDADES = ["unidad", "media", "docena"];
 // Unidades que trae cada modalidad (media = media docena).
 const UNIDADES_MODALIDAD = { unidad: 1, media: 6, docena: 12 };

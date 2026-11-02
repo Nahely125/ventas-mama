@@ -11,6 +11,7 @@ const METODOS_ABONO = [
     { valor: "efectivo", texto: "💵 Efectivo" },
     { valor: "yape", texto: "💜 Yape" },
     { valor: "plin", texto: "💚 Plin" },
+    { valor: "tarjeta", texto: "💳 Tarjeta (Izipay)" },
     { valor: "transferencia", texto: "🏦 Transferencia" }
 ];
 

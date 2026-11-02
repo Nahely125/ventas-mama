@@ -4,6 +4,7 @@ export const METODOS_PAGO = [
     { valor: "efectivo", nombre: "Efectivo", icono: "💵" },
     { valor: "yape", nombre: "Yape", icono: "💜" },
     { valor: "plin", nombre: "Plin", icono: "💚" },
+    { valor: "tarjeta", nombre: "Tarjeta (Izipay)", icono: "💳" },
     { valor: "transferencia", nombre: "Transferencia", icono: "🏦" },
     { valor: "fiado", nombre: "Fiado", icono: "📝" }
 ];
