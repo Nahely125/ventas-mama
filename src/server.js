@@ -53,6 +53,11 @@ app.get("/api/salud", async (req, res) => {
     }
 });
 
+// Fotos de los productos: públicas, así que van antes de las sesiones (no se lee ni se
+// renueva la sesión en cada foto: eran 2 consultas de más a la base por cada imagen).
+const { enviarFoto, crearMiniaturasPendientes } = require("./fotosServidor");
+app.get("/api/productos/:id/foto", enviarFoto);
+
 // Las sesiones se guardan en PostgreSQL (tabla "session") para que no se
 // pierdan cuando el servidor se reinicia.
 app.use(session({
@@ -285,6 +290,8 @@ ejecutarMigraciones()
         console.log(`Base de datos lista en ${Date.now() - inicio} ms.`);
         app.listen(PORT, "0.0.0.0", () => {
             console.log(`Servidor iniciado en http://localhost:${PORT}`);
+            // Miniaturas de las fotos antiguas, de a una y sin apuro.
+            setTimeout(crearMiniaturasPendientes, 5000);
         });
     })
     .catch((error) => {

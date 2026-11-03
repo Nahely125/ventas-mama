@@ -4,6 +4,7 @@ const { requiereSesion, requiereJefe, leerId } = require("../autenticacion");
 const { OBSEQUIABLE } = require("./ajustes");
 const { COLORES_JSON, validarColores, guardarColores } = require("./colores");
 const { MOTIVOS_AJUSTE, anotarMovimiento } = require("../movimientos");
+const { crearMiniatura, olvidarFoto } = require("../fotosServidor");
 
 const router = express.Router();
 
@@ -378,72 +379,9 @@ router.delete("/:id", requiereJefe, async (req, res) => {
    El navegador reduce la imagen antes de enviarla (JPEG o WEBP, ~600 px). */
 
 const TIPOS_FOTO = ["image/jpeg", "image/png", "image/webp"];
-// Miniatura: hasta 480 × 640 px (las tarjetas son 3:4). Pesa 3 a 4 veces menos que la foto.
-const LADO_MINI = { width: 480, height: 640 };
-
-let sharp = null;
-try {
-    sharp = require("sharp");
-} catch (error) {
-    console.error("No se pudo cargar sharp: las miniaturas usarán la foto completa.", error.message);
-}
-
-async function crearMiniatura(foto) {
-    return sharp(foto)
-        .rotate()
-        .resize({ ...LADO_MINI, fit: "inside", withoutEnlargement: true })
-        .jpeg({ quality: 78, mozjpeg: true })
-        .toBuffer();
-}
 const TAMANO_MAXIMO_FOTO = 1.5 * 1024 * 1024;
 
-// Pública: la usan el inventario y el catálogo. Con ?tam=mini envía la miniatura.
-router.get("/:id/foto", async (req, res) => {
-    const id = leerId(req);
-    const mini = req.query.tam === "mini";
-
-    if (!id) {
-        return res.status(404).end();
-    }
-
-    try {
-        const resultado = await pool.query(
-            `SELECT foto, foto_tipo, ${mini ? "foto_mini" : "NULL::BYTEA"} AS foto_mini,
-                    foto_actualizada
-             FROM productos WHERE id = $1 AND foto IS NOT NULL`,
-            [id]
-        );
-
-        const fila = resultado.rows[0];
-
-        if (!fila) {
-            return res.status(404).end();
-        }
-
-        // La URL lleva ?v=<versión>, así que se puede guardar en caché mucho tiempo.
-        res.set("Cache-Control", "public, max-age=31536000, immutable");
-
-        if (mini && sharp) {
-            let miniatura = fila.foto_mini;
-
-            if (!miniatura) {
-                miniatura = await crearMiniatura(fila.foto);
-                // Se guarda para la próxima vez (si nadie cambió la foto mientras tanto).
-                await pool.query(
-                    `UPDATE productos SET foto_mini = $1 WHERE id = $2 AND foto_actualizada IS NOT DISTINCT FROM $3`,
-                    [miniatura, id, fila.foto_actualizada]
-                );
-            }
-
-            return res.type("image/jpeg").send(miniatura);
-        }
-
-        res.type(fila.foto_tipo).send(fila.foto);
-    } catch (error) {
-        console.error("Error al enviar la foto:", error.message);
-        res.status(500).end();
-    }
-});
+// La foto (GET /:id/foto) la envía fotosServidor.js, antes de las sesiones (ver server.js).
 
 // Lee una imagen enviada como data URL: { tipo, datos } o { error }.
 function leerImagen(texto) {
@@ -514,16 +452,19 @@ router.put("/:id/foto", requiereJefe, async (req, res) => {
     }
 
     try {
+        // La miniatura se crea al subir la foto: así la primera vez que se mira ya está lista.
+        const miniatura = await crearMiniatura(foto.datos).catch(() => null);
         const resultado = await pool.query(
             `UPDATE productos
-             SET foto = $1, foto_tipo = $2, foto_editada = $4, foto_mini = NULL,
+             SET foto = $1, foto_tipo = $2, foto_editada = $4, foto_mini = $7,
                  foto_original = CASE WHEN $5::BYTEA IS NOT NULL THEN $5 WHEN $4 THEN foto_original END,
                  foto_original_tipo = CASE WHEN $5::BYTEA IS NOT NULL THEN $6 WHEN $4 THEN foto_original_tipo END,
                  foto_actualizada = CURRENT_TIMESTAMP
              WHERE id = $3
              RETURNING id`,
-            [foto.datos, foto.tipo, id, editada, original?.datos ?? null, original?.tipo ?? null]
+            [foto.datos, foto.tipo, id, editada, original?.datos ?? null, original?.tipo ?? null, miniatura]
         );
+        olvidarFoto(id);
 
         if (resultado.rows.length === 0) {
             return res.status(404).json({ error: "Producto no encontrado" });
@@ -552,6 +493,7 @@ router.delete("/:id/foto", requiereJefe, async (req, res) => {
             [id]
         );
 
+        olvidarFoto(id);
         res.json({ mensaje: "Foto eliminada." });
     } catch (error) {
         console.error("Error al eliminar la foto:", error.message);

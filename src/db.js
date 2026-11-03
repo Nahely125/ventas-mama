@@ -9,7 +9,7 @@ const { Pool } = require("pg");
 // Tiempos límite: si la base no responde, se devuelve un error en vez de quedarse colgado.
 const TIEMPOS = {
     connectionTimeoutMillis: 10000,
-    idleTimeoutMillis: 30000,
+    idleTimeoutMillis: 5 * 60 * 1000,
     query_timeout: 20000
 };
 
