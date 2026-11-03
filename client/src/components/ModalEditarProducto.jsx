@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { pedir } from "../api.js";
 import { validarProducto } from "../producto.js";
 import CamposProducto from "./CamposProducto.jsx";
-import { guardarFoto, urlFoto, urlFotoOriginal } from "../fotos.js";
+import { guardarFoto, urlFoto } from "../fotos.js";
 
 export default function ModalEditarProducto({ producto, onCerrar, onGuardado, onError }) {
     const dialogo = useRef(null);
@@ -38,8 +38,7 @@ export default function ModalEditarProducto({ producto, onCerrar, onGuardado, on
         // Al editar no se cambia la ubicación sola: ya fue elegida.
         ubicacionManual: true,
         foto: undefined,
-        fotoActual: urlFoto(producto),
-        fotoOriginal: producto.tieneFoto ? urlFotoOriginal(producto) : null
+        fotoActual: urlFoto(producto)
     });
     const [error, setError] = useState("");
     const [guardando, setGuardando] = useState(false);

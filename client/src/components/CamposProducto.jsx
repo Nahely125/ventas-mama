@@ -4,7 +4,6 @@ import { moneda } from "../api.js";
 import CampoFoto from "./CampoFoto.jsx";
 import Escaner from "./Escaner.jsx";
 import { iconoTema, useSecciones } from "../secciones.js";
-import { estiloAutomatico } from "../escenas.js";
 import { sugerirCategoria } from "../categoriasAuto.js";
 
 // Ganancia que deja cada precio (se actualiza mientras se escribe).
@@ -450,8 +449,6 @@ export default function CamposProducto({ valores, onCambio, prefijo, etiquetaCom
                 id={id("foto")}
                 foto={valores.foto}
                 fotoActual={valores.fotoActual}
-                fotoOriginal={valores.fotoOriginal}
-                estiloAuto={estiloAutomatico(secciones.find((s) => String(s.id) === String(valores.seccionId))?.tema)}
                 onCambio={(foto, { editada = false, original = null } = {}) =>
                     onCambio((anteriores) => ({ ...anteriores, foto, fotoEditada: editada, fotoOriginalNueva: original }))}
                 onProcesando={(fotoProcesando) => onCambio((anteriores) => ({ ...anteriores, fotoProcesando }))}
