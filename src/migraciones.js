@@ -257,6 +257,8 @@ const MIGRACIONES = `
         usuario_id     INTEGER REFERENCES usuarios(id) ON DELETE SET NULL
     );
     CREATE UNIQUE INDEX IF NOT EXISTS reposicion_producto_color ON reposicion (producto_id, (COALESCE(color_id, 0)));
+    -- Se cuenta por cajas (la cantidad sigue guardada en unidades: cajas × unidades por caja).
+    ALTER TABLE reposicion ADD COLUMN IF NOT EXISTS por_caja BOOLEAN NOT NULL DEFAULT FALSE;
 
     -- Historial de movimientos del stock (kardex): cada cambio del stock de un producto queda anotado
     -- con su tipo (venta, compra, devolución, ajuste...), quién lo hizo y el costo de ese momento.

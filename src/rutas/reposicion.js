@@ -31,6 +31,7 @@ const COLUMNAS = `
     COALESCE(reposicion.costo_unitario, productos.precio_compra) AS "costoUnitario",
     reposicion.costo_unitario IS NOT NULL AS "costoPropio",
     reposicion.comprar,
+    reposicion.por_caja AS "porCaja",
     (SELECT COALESCE(json_agg(json_build_object('id', c.id, 'nombre', c.nombre, 'stock', c.stock) ORDER BY c.orden, c.id), '[]'::json)
      FROM producto_colores c WHERE c.producto_id = productos.id) AS colores,
     (SELECT COALESCE(SUM(ventas.cantidad), 0) FROM ventas
@@ -109,13 +110,14 @@ router.post("/", async (req, res) => {
             }
         }
 
+        // Si el producto viene en cajas, se cuenta por cajas de entrada.
         await pool.query(
-            `INSERT INTO reposicion (producto_id, color_id, cantidad, costo_unitario, usuario_id)
-             VALUES ($1, $2, $3, $4, $5)
+            `INSERT INTO reposicion (producto_id, color_id, cantidad, costo_unitario, usuario_id, por_caja)
+             VALUES ($1, $2, $3, $4, $5, $6)
              ON CONFLICT (producto_id, (COALESCE(color_id, 0)))
              DO UPDATE SET cantidad = EXCLUDED.cantidad, comprar = TRUE,
                            costo_unitario = COALESCE(EXCLUDED.costo_unitario, reposicion.costo_unitario)`,
-            [productoId, colorId, cantidad ?? cantidadSugerida(producto), costoUnitario, req.session.usuario.id]
+            [productoId, colorId, cantidad ?? cantidadSugerida(producto), costoUnitario, req.session.usuario.id, producto.unidades_por_caja > 1]
         );
 
         res.status(201).json({ mensaje: "Agregado a la lista de reposición.", ...(await leerLista()) });
@@ -129,8 +131,9 @@ router.post("/", async (req, res) => {
 router.post("/sugerir", async (req, res) => {
     try {
         const resultado = await pool.query(
-            `INSERT INTO reposicion (producto_id, cantidad, usuario_id)
-             SELECT id, CASE WHEN unidades_por_caja > 1 THEN unidades_por_caja ELSE GREATEST(12 - stock, 1) END, $2
+            `INSERT INTO reposicion (producto_id, cantidad, usuario_id, por_caja)
+             SELECT id, CASE WHEN unidades_por_caja > 1 THEN unidades_por_caja ELSE GREATEST(12 - stock, 1) END, $2,
+                    unidades_por_caja > 1
              FROM productos
              WHERE stock < $1 AND NOT EXISTS (SELECT 1 FROM reposicion WHERE reposicion.producto_id = productos.id)
              ON CONFLICT DO NOTHING`,
@@ -159,6 +162,7 @@ router.put("/:id", async (req, res) => {
     if (("cantidad" in cambios && !esCantidad(cambios.cantidad)) ||
         ("costoUnitario" in cambios && !esCosto(cambios.costoUnitario)) ||
         ("comprar" in cambios && typeof cambios.comprar !== "boolean") ||
+        ("porCaja" in cambios && typeof cambios.porCaja !== "boolean") ||
         ("colorId" in cambios && cambios.colorId !== null && !Number.isInteger(cambios.colorId))) {
         return res.status(400).json({ error: "Revisa la cantidad, el costo o el color." });
     }
@@ -175,12 +179,13 @@ router.put("/:id", async (req, res) => {
         }
 
         await pool.query(
-            `UPDATE reposicion SET cantidad = $1, costo_unitario = $2, comprar = $3, color_id = $4 WHERE id = $5`,
+            `UPDATE reposicion SET cantidad = $1, costo_unitario = $2, comprar = $3, color_id = $4, por_caja = $5 WHERE id = $6`,
             [
                 cambios.cantidad ?? fila.cantidad,
                 "costoUnitario" in cambios ? cambios.costoUnitario : fila.costo_unitario,
                 cambios.comprar ?? fila.comprar,
                 "colorId" in cambios ? cambios.colorId : fila.color_id,
+                cambios.porCaja ?? fila.por_caja,
                 id
             ]
         );
@@ -226,7 +231,7 @@ router.post("/adquirir", async (req, res) => {
         await client.query("BEGIN");
 
         const filas = await client.query(
-            `SELECT reposicion.*, productos.nombre, productos.precio_compra
+            `SELECT reposicion.*, productos.nombre, productos.precio_compra, productos.unidades_por_caja
              FROM reposicion INNER JOIN productos ON productos.id = reposicion.producto_id
              WHERE reposicion.id = ANY($1::int[])
              FOR UPDATE OF reposicion`,
@@ -254,7 +259,9 @@ router.post("/adquirir", async (req, res) => {
                     proveedor,
                     fecha,
                     contabilizar,
-                    detalle: "Reposición adquirida"
+                    detalle: fila.por_caja && fila.unidades_por_caja > 1
+                        ? `Reposición adquirida (${fila.cantidad / fila.unidades_por_caja} ${fila.cantidad === fila.unidades_por_caja ? "caja" : "cajas"} de ${fila.unidades_por_caja})`
+                        : "Reposición adquirida"
                 }, req.session.usuario.id));
             } catch (error) {
                 if (error instanceof ErrorCompra) {

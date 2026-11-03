@@ -285,6 +285,7 @@ CREATE TABLE IF NOT EXISTS reposicion (
     cantidad       INTEGER NOT NULL CHECK (cantidad > 0),
     costo_unitario NUMERIC(14,4) CHECK (costo_unitario >= 0),            -- vacío = costo actual del producto
     comprar        BOOLEAN NOT NULL DEFAULT TRUE,                         -- false = no se adquirirá por ahora
+    por_caja       BOOLEAN NOT NULL DEFAULT FALSE,                        -- se cuenta por cajas (cantidad en unidades)
     creado_en      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     usuario_id     INTEGER REFERENCES usuarios(id) ON DELETE SET NULL
 );

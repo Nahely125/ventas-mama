@@ -11,27 +11,50 @@ const CONTABILIZAR = [
 
 // Una fila de la lista: cantidad, costo, color y "¿se adquirió?".
 function ItemReposicion({ item, onCambiar, onQuitar, onAdquirir, ocupado }) {
-    const [cantidad, setCantidad] = useState(String(item.cantidad));
-    const [costo, setCosto] = useState(item.costoUnitario === null ? "" : String(Number(item.costoUnitario)));
+    // Por cajas: se escriben cajas y el costo por caja; se guarda en unidades y costo por unidad.
+    const porCajaUnidades = Math.max(Number(item.unidadesPorCaja) || 1, 1);
+    const puedeCaja = porCajaUnidades > 1;
+    const porCaja = puedeCaja && item.porCaja;
+    const factor = porCaja ? porCajaUnidades : 1;
 
-    useEffect(() => setCantidad(String(item.cantidad)), [item.cantidad]);
-    useEffect(() => setCosto(item.costoUnitario === null ? "" : String(Number(item.costoUnitario))), [item.costoUnitario]);
+    const mostrarCantidad = () => String(porCaja ? item.cantidad / porCajaUnidades : item.cantidad);
+    // Por caja se muestra al céntimo (S/ 70, no S/ 69.9996 por el redondeo del costo por unidad).
+    const mostrarCosto = () => (item.costoUnitario === null
+        ? ""
+        : String(Number((Number(item.costoUnitario) * factor).toFixed(porCaja ? 2 : 4))));
 
+    const [cantidad, setCantidad] = useState(mostrarCantidad);
+    const [costo, setCosto] = useState(mostrarCosto);
+
+    useEffect(() => setCantidad(mostrarCantidad()), [item.cantidad, porCaja]); // eslint-disable-line react-hooks/exhaustive-deps
+    useEffect(() => setCosto(mostrarCosto()), [item.costoUnitario, porCaja]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const unidades = (Number(cantidad) || 0) * factor;
     const subtotal = (Number(cantidad) || 0) * (Number(costo) || 0);
     const faltaColor = item.colores.length > 0 && !item.colorId;
+    const nombreCaja = (n) => (n === 1 ? "caja" : "cajas");
 
     function guardarCantidad() {
         const numero = Number(cantidad);
-        if (Number.isInteger(numero) && numero > 0 && numero !== item.cantidad) onCambiar({ cantidad: numero });
-        else setCantidad(String(item.cantidad));
+        if (Number.isInteger(numero) && numero > 0 && numero * factor !== item.cantidad) onCambiar({ cantidad: numero * factor });
+        else setCantidad(mostrarCantidad());
     }
 
     function guardarCosto() {
         if (costo === "") return;
         const numero = Number(costo);
-        if (Number.isFinite(numero) && numero >= 0 && numero !== Number(item.costoUnitario)) {
-            onCambiar({ costoUnitario: Number(numero.toFixed(4)) });
+        const porUnidad = Number((numero / factor).toFixed(4));
+        if (Number.isFinite(numero) && numero >= 0 && porUnidad !== Number(item.costoUnitario)) {
+            onCambiar({ costoUnitario: porUnidad });
         }
+    }
+
+    // Al pasar a cajas, la cantidad se redondea a cajas completas.
+    function cambiarModo(nuevo) {
+        if (nuevo === porCaja) return;
+        onCambiar(nuevo
+            ? { porCaja: true, cantidad: Math.max(Math.ceil(item.cantidad / porCajaUnidades), 1) * porCajaUnidades }
+            : { porCaja: false });
     }
 
     return (
@@ -58,8 +81,19 @@ function ItemReposicion({ item, onCambiar, onQuitar, onAdquirir, ocupado }) {
 
             <small className="ayuda-campo">
                 {item.vendidas30 > 0 ? `Se vendieron ${item.vendidas30} en los últimos 30 días` : "Sin ventas en 30 días"}
-                {item.unidadesPorCaja > 1 ? ` · viene en cajas de ${item.unidadesPorCaja}` : ""}
+                {puedeCaja ? ` · viene en cajas de ${porCajaUnidades}` : ""}
             </small>
+
+            {puedeCaja && (
+                <div className="selector-modalidad selector-pequeno modo-reposicion" role="radiogroup" aria-label={`Comprar ${item.nombre} por`}>
+                    <button type="button" role="radio" aria-checked={!porCaja} className={!porCaja ? "activo" : ""} onClick={() => cambiarModo(false)} disabled={ocupado}>
+                        Por unidad
+                    </button>
+                    <button type="button" role="radio" aria-checked={porCaja} className={porCaja ? "activo" : ""} onClick={() => cambiarModo(true)} disabled={ocupado}>
+                        Por caja ({porCajaUnidades} u.)
+                    </button>
+                </div>
+            )}
 
             <div className="item-reposicion-campos">
                 {item.colores.length > 0 && (
@@ -80,7 +114,7 @@ function ItemReposicion({ item, onCambiar, onQuitar, onAdquirir, ocupado }) {
                     </div>
                 )}
                 <div className="campo">
-                    <label htmlFor={`repo-cantidad-${item.id}`}>Cantidad</label>
+                    <label htmlFor={`repo-cantidad-${item.id}`}>{porCaja ? "Cajas" : "Unidades"}</label>
                     <input
                         id={`repo-cantidad-${item.id}`}
                         type="number"
@@ -92,9 +126,10 @@ function ItemReposicion({ item, onCambiar, onQuitar, onAdquirir, ocupado }) {
                         onBlur={guardarCantidad}
                         disabled={ocupado}
                     />
+                    {porCaja && <span className="ayuda-campo">= {unidades} unidades</span>}
                 </div>
                 <div className="campo">
-                    <label htmlFor={`repo-costo-${item.id}`}>Costo c/u (S/)</label>
+                    <label htmlFor={`repo-costo-${item.id}`}>{porCaja ? "Costo por caja (S/)" : "Costo c/u (S/)"}</label>
                     <input
                         id={`repo-costo-${item.id}`}
                         type="number"
@@ -107,13 +142,18 @@ function ItemReposicion({ item, onCambiar, onQuitar, onAdquirir, ocupado }) {
                         onBlur={guardarCosto}
                         disabled={ocupado}
                     />
+                    {porCaja && costo !== "" && <span className="ayuda-campo">= {monedaCosto(Number(costo) / porCajaUnidades)} c/u</span>}
                 </div>
             </div>
 
             <div className="item-reposicion-pie">
                 <span>
                     Subtotal <strong>{moneda(subtotal)}</strong>
-                    {costo !== "" && <small> ({cantidad || 0} × {monedaCosto(costo)})</small>}
+                    {costo !== "" && (
+                        <small>
+                            {" "}({cantidad || 0} {porCaja ? nombreCaja(Number(cantidad)) : "u."} × {monedaCosto(costo)})
+                        </small>
+                    )}
                 </span>
                 <div className="item-reposicion-acciones">
                     <span className="pregunta-adquirido">¿Se adquirió?</span>
@@ -138,6 +178,16 @@ function ItemReposicion({ item, onCambiar, onQuitar, onAdquirir, ocupado }) {
             {!item.comprar && <small className="ayuda-campo">No se adquirirá por ahora: no cuenta en el total.</small>}
         </li>
     );
+}
+
+// "2 cajas (24 u.)" o "15 u.".
+function textoCantidad(item) {
+    const caja = Number(item.unidadesPorCaja) || 1;
+    if (item.porCaja && caja > 1) {
+        const cajas = item.cantidad / caja;
+        return `${cajas} ${cajas === 1 ? "caja" : "cajas"} (${item.cantidad} u.)`;
+    }
+    return `${item.cantidad} u.`;
 }
 
 /* Lista de reposición: productos por comprar, cuánto costaría todo lo marcado y,
@@ -261,7 +311,7 @@ export default function Reposicion({ productos, onCambio, onError }) {
                                 ocupado={ocupado}
                                 onCambiar={(cambios) => cambiar(item, cambios)}
                                 onQuitar={() => quitar(item)}
-                                onAdquirir={() => adquirir([item.id], `¿Se adquirieron ${item.cantidad} u. de ${item.nombre}? Se sumarán al stock y se registrarán como ${CONTABILIZAR.find((c) => c.valor === compra.contabilizar).texto.replace(/^\S+ /, "").toLowerCase()}.`)}
+                                onAdquirir={() => adquirir([item.id], `¿Se adquirieron ${textoCantidad(item)} de ${item.nombre}? Se sumarán al stock y se registrarán como ${CONTABILIZAR.find((c) => c.valor === compra.contabilizar).texto.replace(/^\S+ /, "").toLowerCase()}.`)}
                             />
                         ))}
                     </ul>
