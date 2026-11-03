@@ -43,18 +43,124 @@ router.get("/", requiereJefe, async (req, res) => {
     }
 });
 
-router.post("/", requiereJefe, async (req, res) => {
-    const { productoId, cantidad, costoTotal, proveedor = "", fecha, contabilizar = "inversion", colorId = null } = req.body ?? {};
+// Error esperado al registrar una compra (datos inválidos, producto inexistente...).
+class ErrorCompra extends Error {
+    constructor(mensaje, estado = 400) {
+        super(mensaje);
+        this.estado = estado;
+    }
+}
 
-    if (
-        !Number.isInteger(productoId) || productoId <= 0 ||
-        !Number.isInteger(cantidad) || cantidad <= 0 || cantidad > 100000 ||
-        typeof costoTotal !== "number" || !Number.isFinite(costoTotal) || costoTotal < 0 ||
-        typeof proveedor !== "string" || proveedor.length > 120 ||
-        typeof fecha !== "string" || !FECHA.test(fecha) || Number.isNaN(Date.parse(fecha)) ||
-        !CONTABILIZAR.includes(contabilizar) ||
-        (colorId !== null && (!Number.isInteger(colorId) || colorId <= 0))
-    ) {
+function validarCompra({ productoId, cantidad, costoTotal, proveedor = "", fecha, contabilizar = "inversion", colorId = null }) {
+    return (
+        Number.isInteger(productoId) && productoId > 0 &&
+        Number.isInteger(cantidad) && cantidad > 0 && cantidad <= 100000 &&
+        typeof costoTotal === "number" && Number.isFinite(costoTotal) && costoTotal >= 0 &&
+        typeof proveedor === "string" && proveedor.length <= 120 &&
+        typeof fecha === "string" && FECHA.test(fecha) && !Number.isNaN(Date.parse(fecha)) &&
+        CONTABILIZAR.includes(contabilizar) &&
+        (colorId === null || (Number.isInteger(colorId) && colorId > 0))
+    );
+}
+
+/* Registra una compra dentro de una transacción ya abierta: suma al stock (y al color),
+   recalcula el costo promedio y la anota como inversión o gasto. La usan "Ingresar
+   mercadería" y la lista de reposición. Lanza ErrorCompra si algo no cuadra. */
+async function registrarCompra(client, datos, usuarioId) {
+    const { productoId, cantidad, costoTotal, fecha, contabilizar = "inversion", colorId = null } = datos;
+    const proveedor = (datos.proveedor ?? "").trim();
+
+    if (!validarCompra({ ...datos, proveedor })) {
+        throw new ErrorCompra("Revisa el producto, la cantidad, el costo, la fecha y cómo contabilizarlo.");
+    }
+
+    const fila = await client.query(
+        `SELECT id, nombre, stock, stock_2025, precio_compra FROM productos WHERE id = $1 FOR UPDATE`,
+        [productoId]
+    );
+    const producto = fila.rows[0];
+
+    if (!producto) {
+        throw new ErrorCompra("El producto no existe.", 404);
+    }
+
+    // Si el producto tiene colores, la mercadería entra a uno de ellos.
+    const filasColores = await client.query(
+        `SELECT id, nombre FROM producto_colores WHERE producto_id = $1 FOR UPDATE`,
+        [producto.id]
+    );
+    const color = filasColores.rows.find((c) => c.id === colorId) ?? null;
+
+    if (filasColores.rows.length > 0 && !color) {
+        throw new ErrorCompra(`Elige a qué color de ${producto.nombre} entra la mercadería.`);
+    }
+
+    if (color) {
+        await client.query(`UPDATE producto_colores SET stock = stock + $1 WHERE id = $2`, [cantidad, color.id]);
+    }
+
+    // Costo promedio de la mercadería de este año (lo del 2025 no entra en el cálculo).
+    // Si no tenía costo registrado, no se mezcla un S/ 0 inventado: vale el de esta compra.
+    const nuevas = producto.precio_compra === null ? 0 : Math.max(producto.stock - producto.stock_2025, 0);
+    const costoActual = Number(producto.precio_compra ?? 0);
+    const costoPromedio = (nuevas * costoActual + costoTotal) / (nuevas + cantidad);
+
+    await anotarMovimiento(client, {
+        tipo: "compra",
+        usuarioId,
+        detalle: [datos.detalle ?? "Ingreso de mercadería", color?.nombre, proveedor ? `proveedor ${proveedor}` : null]
+            .filter(Boolean).join(" · ")
+    });
+    await client.query(
+        `UPDATE productos SET stock = stock + $1, precio_compra = $2 WHERE id = $3`,
+        [cantidad, Number(costoPromedio.toFixed(4)), producto.id]
+    );
+
+    // Se registra como inversión o gasto (si costó algo).
+    let gastoId = null;
+    let inversionId = null;
+    const texto = descripcion(color ? `${producto.nombre} · ${color.nombre}` : producto.nombre, cantidad, proveedor);
+
+    if (costoTotal > 0 && contabilizar === "gasto") {
+        const gasto = await client.query(
+            `INSERT INTO gastos (descripcion, categoria, monto, fecha, usuario_id)
+             VALUES ($1, 'Mercadería', $2, $3, $4) RETURNING id`,
+            [texto, Number(costoTotal.toFixed(2)), fecha, usuarioId]
+        );
+        gastoId = gasto.rows[0].id;
+    }
+
+    if (costoTotal > 0 && contabilizar === "inversion") {
+        const inversion = await client.query(
+            `INSERT INTO inversiones (descripcion, monto, fecha, usuario_id)
+             VALUES ($1, $2, $3, $4) RETURNING id`,
+            [texto, Number(costoTotal.toFixed(2)), fecha, usuarioId]
+        );
+        inversionId = inversion.rows[0].id;
+    }
+
+    const compra = await client.query(
+        `INSERT INTO compras (producto_id, cantidad, costo_total, proveedor, fecha, contabilizar,
+                              gasto_id, inversion_id, usuario_id, color_id, color)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
+        [producto.id, cantidad, Number(costoTotal.toFixed(4)), proveedor || null, fecha,
+         contabilizar, gastoId, inversionId, usuarioId, color?.id ?? null, color?.nombre ?? null]
+    );
+
+    return {
+        id: compra.rows[0].id,
+        producto: producto.nombre,
+        color: color?.nombre ?? null,
+        cantidad,
+        stock: producto.stock + cantidad,
+        costoUnitario: costoPromedio.toFixed(4)
+    };
+}
+
+router.post("/", requiereJefe, async (req, res) => {
+    const datos = req.body ?? {};
+
+    if (!validarCompra(datos)) {
         return res.status(400).json({ error: "Revisa el producto, la cantidad, el costo, la fecha y cómo contabilizarlo." });
     }
 
@@ -63,92 +169,20 @@ router.post("/", requiereJefe, async (req, res) => {
     try {
         client = await pool.connect();
         await client.query("BEGIN");
-
-        const fila = await client.query(
-            `SELECT id, nombre, stock, stock_2025, precio_compra FROM productos WHERE id = $1 FOR UPDATE`,
-            [productoId]
-        );
-        const producto = fila.rows[0];
-
-        if (!producto) {
-            await client.query("ROLLBACK");
-            return res.status(404).json({ error: "El producto no existe." });
-        }
-
-        // Si el producto tiene colores, la mercadería entra a uno de ellos.
-        const filasColores = await client.query(
-            `SELECT id, nombre FROM producto_colores WHERE producto_id = $1 FOR UPDATE`,
-            [producto.id]
-        );
-        const color = filasColores.rows.find((c) => c.id === colorId) ?? null;
-
-        if (filasColores.rows.length > 0 && !color) {
-            await client.query("ROLLBACK");
-            return res.status(400).json({ error: `Elige a qué color de ${producto.nombre} entra la mercadería.` });
-        }
-
-        if (color) {
-            await client.query(`UPDATE producto_colores SET stock = stock + $1 WHERE id = $2`, [cantidad, color.id]);
-        }
-
-        // Costo promedio de la mercadería de este año (lo del 2025 no entra en el cálculo).
-        // Si no tenía costo registrado, no se mezcla un S/ 0 inventado: vale el de esta compra.
-        const nuevas = producto.precio_compra === null ? 0 : Math.max(producto.stock - producto.stock_2025, 0);
-        const costoActual = Number(producto.precio_compra ?? 0);
-        const costoPromedio = (nuevas * costoActual + costoTotal) / (nuevas + cantidad);
-
-        await anotarMovimiento(client, {
-            tipo: "compra",
-            usuarioId: req.session.usuario.id,
-            detalle: ["Ingreso de mercadería", color?.nombre, proveedor.trim() ? `proveedor ${proveedor.trim()}` : null]
-                .filter(Boolean).join(" · ")
-        });
-        await client.query(
-            `UPDATE productos SET stock = stock + $1, precio_compra = $2 WHERE id = $3`,
-            [cantidad, Number(costoPromedio.toFixed(4)), producto.id]
-        );
-
-        // Se registra como inversión o gasto (si costó algo).
-        let gastoId = null;
-        let inversionId = null;
-        const texto = descripcion(color ? `${producto.nombre} · ${color.nombre}` : producto.nombre, cantidad, proveedor.trim());
-
-        if (costoTotal > 0 && contabilizar === "gasto") {
-            const gasto = await client.query(
-                `INSERT INTO gastos (descripcion, categoria, monto, fecha, usuario_id)
-                 VALUES ($1, 'Mercadería', $2, $3, $4) RETURNING id`,
-                [texto, Number(costoTotal.toFixed(2)), fecha, req.session.usuario.id]
-            );
-            gastoId = gasto.rows[0].id;
-        }
-
-        if (costoTotal > 0 && contabilizar === "inversion") {
-            const inversion = await client.query(
-                `INSERT INTO inversiones (descripcion, monto, fecha, usuario_id)
-                 VALUES ($1, $2, $3, $4) RETURNING id`,
-                [texto, Number(costoTotal.toFixed(2)), fecha, req.session.usuario.id]
-            );
-            inversionId = inversion.rows[0].id;
-        }
-
-        const compra = await client.query(
-            `INSERT INTO compras (producto_id, cantidad, costo_total, proveedor, fecha, contabilizar,
-                                  gasto_id, inversion_id, usuario_id, color_id, color)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
-            [producto.id, cantidad, Number(costoTotal.toFixed(4)), proveedor.trim() || null, fecha,
-             contabilizar, gastoId, inversionId, req.session.usuario.id, color?.id ?? null, color?.nombre ?? null]
-        );
-
+        const compra = await registrarCompra(client, datos, req.session.usuario.id);
         await client.query("COMMIT");
 
         res.status(201).json({
-            mensaje: `Se ingresaron ${cantidad} unidades de ${producto.nombre}${color ? ` (${color.nombre})` : ""}.`,
-            id: compra.rows[0].id,
-            stock: producto.stock + cantidad,
-            costoUnitario: costoPromedio.toFixed(4)
+            mensaje: `Se ingresaron ${compra.cantidad} unidades de ${compra.producto}${compra.color ? ` (${compra.color})` : ""}.`,
+            id: compra.id,
+            stock: compra.stock,
+            costoUnitario: compra.costoUnitario
         });
     } catch (error) {
         if (client) await client.query("ROLLBACK").catch(() => {});
+        if (error instanceof ErrorCompra) {
+            return res.status(error.estado).json({ error: error.message });
+        }
         console.error("Error al registrar la compra:", error.message);
         res.status(500).json({ error: "No se pudo registrar la compra." });
     } finally {
@@ -234,3 +268,5 @@ router.delete("/:id", requiereJefe, async (req, res) => {
 });
 
 module.exports = router;
+module.exports.registrarCompra = registrarCompra;
+module.exports.ErrorCompra = ErrorCompra;

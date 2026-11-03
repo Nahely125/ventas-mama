@@ -242,6 +242,20 @@ const MIGRACIONES = `
     -- El precio mínimo solo limita a los empleados al vender: el jefe puede fijar cualquier precio.
     ALTER TABLE productos DROP CONSTRAINT IF EXISTS productos_check;
 
+    -- Lista de reposición: productos por comprar (cantidad y costo). Al adquirirlos se registran
+    -- como compra (stock nuevo + inversión) y salen de la lista. Un producto (o color) una sola vez.
+    CREATE TABLE IF NOT EXISTS reposicion (
+        id             SERIAL PRIMARY KEY,
+        producto_id    INTEGER NOT NULL REFERENCES productos(id) ON DELETE CASCADE,
+        color_id       INTEGER REFERENCES producto_colores(id) ON DELETE CASCADE,
+        cantidad       INTEGER NOT NULL CHECK (cantidad > 0),
+        costo_unitario NUMERIC(14, 4) CHECK (costo_unitario >= 0),
+        comprar        BOOLEAN NOT NULL DEFAULT TRUE,
+        creado_en      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        usuario_id     INTEGER REFERENCES usuarios(id) ON DELETE SET NULL
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS reposicion_producto_color ON reposicion (producto_id, (COALESCE(color_id, 0)));
+
     -- Historial de movimientos del stock (kardex): cada cambio del stock de un producto queda anotado
     -- con su tipo (venta, compra, devolución, ajuste...), quién lo hizo y el costo de ese momento.
     CREATE TABLE IF NOT EXISTS movimientos_stock (

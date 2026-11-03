@@ -190,6 +190,7 @@ app.use("/api/compras", require("./rutas/compras"));
 app.use("/api/inversiones", require("./rutas/inversiones"));
 app.use("/api/ajustes", require("./rutas/ajustes").router);
 app.use("/api/reportes", require("./rutas/reportes"));
+app.use("/api/reposicion", require("./rutas/reposicion"));
 const tienda = require("./rutas/tienda");
 app.use("/api/tienda", tienda.router);
 

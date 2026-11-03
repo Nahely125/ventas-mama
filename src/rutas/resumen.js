@@ -1,7 +1,7 @@
 const express = require("express");
 const pool = require("../db");
 const { requiereSesion, requiereJefe } = require("../autenticacion");
-const { STOCK_BAJO } = require("./productos");
+const { STOCK_ALERTA } = require("./productos");
 const { SALDO } = require("./clientes");
 
 const router = express.Router();
@@ -21,9 +21,9 @@ router.get("/", requiereSesion, async (req, res) => {
             `SELECT
                 COUNT(*) AS "totalProductos",
                 COALESCE(SUM(stock), 0) AS "unidadesTotales",
-                COUNT(*) FILTER (WHERE stock <= $1) AS "productosStockBajo"
+                COUNT(*) FILTER (WHERE stock < $1) AS "productosStockBajo"
              FROM productos`,
-            [STOCK_BAJO]
+            [STOCK_ALERTA]
         );
 
         const resumen = resultado.rows[0];

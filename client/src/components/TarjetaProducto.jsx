@@ -1,5 +1,6 @@
 import { moneda, monedaCosto } from "../api.js";
 import { urlFoto } from "../fotos.js";
+import { STOCK_ALERTA } from "../producto.js";
 
 // Si tiene mercadería nueva y del 2025, cada pestaña muestra su parte del stock.
 export function stockDeLaParte(producto, parte) {
@@ -9,11 +10,11 @@ export function stockDeLaParte(producto, parte) {
     return { stock, esMixto };
 }
 
-export default function TarjetaProducto({ producto, parte, esJefe, retraso, onEditar, onEliminar, onIngresar, onMovimientos, onConteo }) {
+export default function TarjetaProducto({ producto, parte, esJefe, retraso, onEditar, onEliminar, onIngresar, onMovimientos, onConteo, onReponer }) {
     const precio = Number(producto.precio);
     // Media docena: la mitad de la docena (igual que al vender).
     const mediaDocena = Number((Number(producto.precioDocena) / 2).toFixed(2));
-    const stockBajo = producto.stock <= 5;
+    const stockBajo = producto.stock < STOCK_ALERTA;
     const { stock: stockParte, esMixto } = stockDeLaParte(producto, parte);
 
     let detallesJefe = null;
@@ -63,6 +64,9 @@ export default function TarjetaProducto({ producto, parte, esJefe, retraso, onEd
                     </button>
                     <button type="button" className="boton-secundario boton-pequeno" onClick={onConteo}>
                         💔 Descontar / contar
+                    </button>
+                    <button type="button" className="boton-secundario boton-pequeno boton-reponer" onClick={onReponer}>
+                        📝 Agregar a la lista de reposición
                     </button>
                 </div>
 
@@ -128,7 +132,7 @@ export default function TarjetaProducto({ producto, parte, esJefe, retraso, onEd
             {(producto.colores ?? []).length > 0 && (
                 <ul className="colores-producto" aria-label="Stock por color">
                     {producto.colores.map((color) => (
-                        <li key={color.id} className={color.stock === 0 ? "agotado" : color.stock <= 5 ? "bajo" : ""}>
+                        <li key={color.id} className={color.stock === 0 ? "agotado" : color.stock < STOCK_ALERTA ? "bajo" : ""}>
                             {color.nombre} <strong>{color.stock}</strong>
                         </li>
                     ))}

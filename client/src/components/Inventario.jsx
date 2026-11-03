@@ -8,6 +8,8 @@ import IngresarMercaderia from "./IngresarMercaderia.jsx";
 import MovimientosProducto from "./MovimientosProducto.jsx";
 import ConteoProducto from "./ConteoProducto.jsx";
 import { contiene, normalizar } from "../texto.js";
+import { STOCK_ALERTA } from "../producto.js";
+import { useSecciones } from "../secciones.js";
 
 // Un producto es del inventario 2025 si le quedan unidades del 2025, o si ya se agotó
 // y lo último que se vendió de él era del 2025. Si tiene de los dos, sale en ambas pestañas.
@@ -17,6 +19,50 @@ function es2025(producto) {
 
 function esNuevo(producto) {
     return !es2025(producto) || producto.stock > Number(producto.stock2025 ?? 0);
+}
+
+const FILTRO_STOCK = [
+    { valor: "", texto: "Todo el stock" },
+    { valor: "agotado", texto: "⛔ Agotados" },
+    { valor: "bajo", texto: `⚠️ Poco stock (menos de ${STOCK_ALERTA})` },
+    { valor: "con", texto: "✅ Con stock" },
+    { valor: "sin-foto", texto: "🖼️ Sin foto" }
+];
+
+const ORDENES = [
+    { valor: "", texto: "Nombre (A a Z)" },
+    { valor: "stock-menor", texto: "Menos stock primero" },
+    { valor: "stock-mayor", texto: "Más stock primero" },
+    { valor: "precio-menor", texto: "Precio: menor a mayor" },
+    { valor: "precio-mayor", texto: "Precio: mayor a menor" },
+    { valor: "nuevos", texto: "Recién registrados" }
+];
+
+const SIN_FILTROS = { categoria: "", stock: "", orden: "" };
+
+// Aplica los filtros del inventario (la categoría puede ser "s12" = toda una feria, "c34" = una categoría o "sin").
+function filtrarProductos(lista, filtros) {
+    const [tipo, numero] = [filtros.categoria.charAt(0), Number(filtros.categoria.slice(1))];
+    const filtrados = lista.filter((p) => {
+        if (filtros.categoria === "sin" && p.categoriaId) return false;
+        if (tipo === "s" && p.seccionId !== numero) return false;
+        if (tipo === "c" && p.categoriaId !== numero) return false;
+        if (filtros.stock === "agotado" && p.stock !== 0) return false;
+        if (filtros.stock === "bajo" && !(p.stock > 0 && p.stock < STOCK_ALERTA)) return false;
+        if (filtros.stock === "con" && p.stock === 0) return false;
+        if (filtros.stock === "sin-foto" && p.tieneFoto) return false;
+        return true;
+    });
+
+    const orden = {
+        "stock-menor": (a, b) => a.stock - b.stock,
+        "stock-mayor": (a, b) => b.stock - a.stock,
+        "precio-menor": (a, b) => Number(a.precio) - Number(b.precio),
+        "precio-mayor": (a, b) => Number(b.precio) - Number(a.precio),
+        nuevos: (a, b) => b.id - a.id
+    }[filtros.orden];
+
+    return orden ? [...filtrados].sort(orden) : filtrados;
 }
 
 const PARTES = [
@@ -57,8 +103,13 @@ export default function Inventario({
     errorProductos,
     onCambio,
     onRegistrar,
+    onReponer,
     onError
 }) {
+    const secciones = useSecciones();
+    const [filtros, setFiltros] = useState(SIN_FILTROS);
+    const [viendoFiltros, setViendoFiltros] = useState(false);
+    const cantidadFiltros = Object.values(filtros).filter(Boolean).length;
     const [parte, setParte] = useState("nuevo");
     const [busqueda, setBusqueda] = useState("");
     // Producto abierto en la lista (se ve su tarjeta completa debajo de la fila).
@@ -81,7 +132,7 @@ export default function Inventario({
     const parteActual = PARTES.find((p) => p.valor === parte);
     const deLaParte = (productos ?? []).filter(parteActual.incluye);
     const texto = normalizar(busqueda);
-    const filtrados = deLaParte.filter((producto) => contiene(texto, producto.nombre, producto.codigo));
+    const filtrados = filtrarProductos(deLaParte, filtros).filter((producto) => contiene(texto, producto.nombre, producto.codigo));
 
     function tarjeta(producto, retraso) {
         return (
@@ -96,8 +147,18 @@ export default function Inventario({
                 onEliminar={() => eliminar(producto)}
                 onMovimientos={() => setMovimientosDe(producto)}
                 onConteo={() => setConteoDe(producto)}
+                onReponer={() => agregarAReponer(producto)}
             />
         );
+    }
+
+    async function agregarAReponer(producto) {
+        try {
+            await pedir("/api/reposicion", { method: "POST", cuerpo: { productoId: producto.id } });
+            setAviso(`${producto.nombre} se agregó a la lista de reposición.`);
+        } catch (error) {
+            onError(error, () => alert(error.message));
+        }
     }
 
     async function eliminar(producto) {
@@ -169,6 +230,61 @@ export default function Inventario({
                     </div>
                 </div>
 
+                <div className="filtros-inventario">
+                    <button
+                        type="button"
+                        className={`boton-secundario boton-pequeno ${cantidadFiltros ? "con-filtros" : ""}`}
+                        onClick={() => setViendoFiltros((v) => !v)}
+                        aria-expanded={viendoFiltros}
+                    >
+                        ⚙️ Filtros{cantidadFiltros ? ` (${cantidadFiltros})` : ""}
+                    </button>
+                    {cantidadFiltros > 0 && (
+                        <button type="button" className="boton-enlace" onClick={() => setFiltros(SIN_FILTROS)}>
+                            Quitar filtros
+                        </button>
+                    )}
+                    {esJefe && onReponer && (
+                        <button type="button" className="boton-enlace" onClick={onReponer}>
+                            📝 Lista de reposición
+                        </button>
+                    )}
+                </div>
+
+                {viendoFiltros && (
+                    <div className="panel-filtros-inventario">
+                        <div className="campo">
+                            <label htmlFor="filtro-categoria">Categoría</label>
+                            <select id="filtro-categoria" value={filtros.categoria} onChange={(e) => setFiltros((f) => ({ ...f, categoria: e.target.value }))}>
+                                <option value="">Todas</option>
+                                {secciones.map((seccion) => (
+                                    <optgroup key={seccion.id} label={seccion.nombre}>
+                                        <option value={`s${seccion.id}`}>Toda la {seccion.nombre}</option>
+                                        {seccion.categorias.map((categoria) => (
+                                            <option key={categoria.id} value={`c${categoria.id}`}>
+                                                {categoria.icono} {categoria.nombre}
+                                            </option>
+                                        ))}
+                                    </optgroup>
+                                ))}
+                                <option value="sin">Sin categoría</option>
+                            </select>
+                        </div>
+                        <div className="campo">
+                            <label htmlFor="filtro-stock">Stock</label>
+                            <select id="filtro-stock" value={filtros.stock} onChange={(e) => setFiltros((f) => ({ ...f, stock: e.target.value }))}>
+                                {FILTRO_STOCK.map((o) => <option key={o.valor || "todo"} value={o.valor}>{o.texto}</option>)}
+                            </select>
+                        </div>
+                        <div className="campo">
+                            <label htmlFor="filtro-orden">Ordenar por</label>
+                            <select id="filtro-orden" value={filtros.orden} onChange={(e) => setFiltros((f) => ({ ...f, orden: e.target.value }))}>
+                                {ORDENES.map((o) => <option key={o.valor || "nombre"} value={o.valor}>{o.texto}</option>)}
+                            </select>
+                        </div>
+                    </div>
+                )}
+
                 {errorProductos ? (
                     <p className="mensaje mensaje-error">{errorProductos}</p>
                 ) : productos === null ? (
@@ -176,6 +292,11 @@ export default function Inventario({
                 ) : deLaParte.length === 0 ? (
                     <p className="aviso-busqueda">
                         {parte === "2025" ? "No hay productos del inventario 2025." : "Todavía no hay productos nuevos registrados."}
+                    </p>
+                ) : filtrados.length === 0 && !texto ? (
+                    <p className="aviso-busqueda">
+                        Ningún producto cumple con estos filtros.{" "}
+                        <button type="button" className="boton-enlace" onClick={() => setFiltros(SIN_FILTROS)}>Quitar filtros</button>
                     </p>
                 ) : filtrados.length === 0 ? (
                     <p>
@@ -192,7 +313,7 @@ export default function Inventario({
                 ) : (
                     <>
                         <p className="conteo-productos">
-                            {texto
+                            {texto || cantidadFiltros
                                 ? `${filtrados.length} de ${deLaParte.length} ${deLaParte.length === 1 ? "producto" : "productos"}`
                                 : `${deLaParte.length} ${deLaParte.length === 1 ? "producto" : "productos"}`}
                         </p>
@@ -261,7 +382,7 @@ export default function Inventario({
                                                     {moneda(producto.precio)}
                                                     <small>Doc. {moneda(producto.precioDocena)}</small>
                                                 </span>
-                                                <span className={`fila-stock ${stock === 0 ? "agotado" : stock <= 5 ? "bajo" : ""}`}>
+                                                <span className={`fila-stock ${stock === 0 ? "agotado" : stock < STOCK_ALERTA ? "bajo" : ""}`}>
                                                     {stock}
                                                     <small>u.</small>
                                                 </span>

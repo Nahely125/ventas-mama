@@ -5610,6 +5610,196 @@ textarea {
 }
 
 /* ========================================
+   FILTROS DEL INVENTARIO Y LISTA DE REPOSICIÓN
+======================================== */
+
+.filtros-inventario {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 14px;
+    margin: 10px 0 4px;
+}
+
+.filtros-inventario .con-filtros {
+    border-color: var(--morado-600);
+    background: var(--morado-100);
+}
+
+.panel-filtros-inventario {
+    display: grid;
+    gap: 10px;
+    margin: 8px 0 12px;
+    padding: 12px;
+    border: 1px solid var(--morado-150);
+    border-radius: 12px;
+    background: var(--morado-50);
+}
+
+@media (min-width: 640px) {
+    .panel-filtros-inventario {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+.acciones-stock .boton-reponer {
+    grid-column: 1 / -1;
+}
+
+.total-venta.total-tarjeta {
+    margin-top: 6px;
+    padding: 10px 12px;
+    border: 1px dashed var(--morado-400);
+    border-radius: 12px;
+    background: var(--morado-50);
+    color: var(--morado-900);
+}
+
+.total-venta.total-tarjeta strong {
+    color: var(--morado-900);
+    font-size: 1.6rem;
+}
+
+.totales-reposicion {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1.4fr;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.totales-reposicion > div {
+    display: grid;
+    gap: 2px;
+    padding: 12px;
+    border-radius: 12px;
+    background: var(--morado-50);
+    text-align: center;
+}
+
+.totales-reposicion span {
+    color: var(--texto-suave);
+    font-size: 0.78rem;
+}
+
+.totales-reposicion strong {
+    color: var(--morado-900);
+    font-size: 1.3rem;
+}
+
+.totales-reposicion .total-reposicion {
+    background: var(--morado-700);
+}
+
+.totales-reposicion .total-reposicion span,
+.totales-reposicion .total-reposicion strong {
+    color: #ffffff;
+}
+
+.boton-sugerir {
+    width: 100%;
+    margin: 6px 0 12px;
+}
+
+.agregar-reposicion {
+    display: grid;
+    gap: 8px;
+}
+
+.lista-reposicion {
+    list-style: none;
+    display: grid;
+    gap: 10px;
+    margin: 0;
+    padding: 0;
+}
+
+.item-reposicion {
+    display: grid;
+    gap: 8px;
+    padding: 12px 14px;
+    border: 1px solid var(--morado-200);
+    border-radius: 14px;
+    background: #ffffff;
+}
+
+.item-reposicion.no-comprar {
+    background: #f8fafc;
+    opacity: 0.75;
+}
+
+.item-reposicion-cabecera {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.item-reposicion-cabecera .casilla {
+    min-width: 0;
+}
+
+.item-reposicion-cabecera strong {
+    color: var(--morado-900);
+}
+
+.item-reposicion-campos {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 8px;
+}
+
+.item-reposicion-campos select.falta {
+    border-color: #f43f5e;
+}
+
+.item-reposicion-pie {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.item-reposicion-pie strong {
+    color: var(--morado-900);
+}
+
+.item-reposicion-acciones {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 8px;
+}
+
+.pregunta-adquirido {
+    color: var(--texto-suave);
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.boton-adquirido {
+    min-height: 38px;
+    padding: 6px 14px;
+    border: none;
+    border-radius: 10px;
+    background: #059669;
+    color: #ffffff;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.boton-adquirido:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.registrar-reposicion {
+    display: grid;
+    gap: 10px;
+}
+
+/* ========================================
    SECCIONES DEL CATÁLOGO (administración)
 ======================================== */
 

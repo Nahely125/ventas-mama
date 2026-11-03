@@ -7,7 +7,8 @@ const { MOTIVOS_AJUSTE, anotarMovimiento } = require("../movimientos");
 
 const router = express.Router();
 
-const STOCK_BAJO = 5;
+// Alerta de inventario: productos con menos de 10 unidades.
+const STOCK_ALERTA = 10;
 
 // Columnas visibles para todos (el precio mínimo también lo ven los empleados)
 // y columnas exclusivas del jefe (costos).
@@ -188,9 +189,9 @@ router.get("/stock-bajo", requiereSesion, async (req, res) => {
                  WHERE ventas.producto_id = productos.id AND ventas.anulada_en IS NULL
                    AND ventas.fecha >= (CURRENT_TIMESTAMP AT TIME ZONE 'America/Lima')::DATE - 29)::INT AS "vendidas30"
              FROM productos
-             WHERE stock <= $1
+             WHERE stock < $1
              ORDER BY stock ASC, "vendidas30" DESC, nombre`,
-            [STOCK_BAJO]
+            [STOCK_ALERTA]
         );
 
         res.json(resultado.rows);
@@ -730,4 +731,4 @@ router.post("/:id/conteo", requiereJefe, async (req, res) => {
     }
 });
 
-module.exports = { router, STOCK_BAJO };
+module.exports = { router, STOCK_ALERTA };

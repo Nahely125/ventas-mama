@@ -1,5 +1,8 @@
 import { monedaCosto } from "./api.js";
 
+// Alerta de inventario: productos con menos de 10 unidades (igual que en el servidor).
+export const STOCK_ALERTA = 10;
+
 const CAMPOS_NUMERICOS = [
     "precio",
     "precioMinimo",

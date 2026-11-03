@@ -276,6 +276,19 @@ CREATE TABLE IF NOT EXISTS compras (
 ALTER TABLE compras ADD COLUMN IF NOT EXISTS color_id INTEGER REFERENCES producto_colores(id) ON DELETE SET NULL;
 ALTER TABLE compras ADD COLUMN IF NOT EXISTS color VARCHAR(40);
 
+-- Lista de reposición: productos por comprar (al adquirirlos se registran como compra).
+CREATE TABLE IF NOT EXISTS reposicion (
+    id             SERIAL PRIMARY KEY,
+    producto_id    INTEGER NOT NULL REFERENCES productos(id) ON DELETE CASCADE,
+    color_id       INTEGER REFERENCES producto_colores(id) ON DELETE CASCADE,
+    cantidad       INTEGER NOT NULL CHECK (cantidad > 0),
+    costo_unitario NUMERIC(14,4) CHECK (costo_unitario >= 0),            -- vacío = costo actual del producto
+    comprar        BOOLEAN NOT NULL DEFAULT TRUE,                         -- false = no se adquirirá por ahora
+    creado_en      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    usuario_id     INTEGER REFERENCES usuarios(id) ON DELETE SET NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS reposicion_producto_color ON reposicion (producto_id, (COALESCE(color_id, 0)));
+
 -- Página web del catálogo: quiénes somos, valores, datos de la empresa y promociones (una sola fila).
 CREATE TABLE IF NOT EXISTS tienda (
     id          INTEGER PRIMARY KEY CHECK (id = 1),

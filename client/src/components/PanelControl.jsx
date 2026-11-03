@@ -17,8 +17,8 @@ export default function PanelControl({ esJefe, resumen, alertas, errorAlertas, o
                 <div className="encabezado-seccion">
                     <h2>Alertas de inventario</h2>
                     {esJefe && alertas?.length > 0 && (
-                        <button type="button" className="boton-secundario boton-pequeno" onClick={() => onIrA("compras")}>
-                            🚚 Ingresar mercadería
+                        <button type="button" className="boton-secundario boton-pequeno" onClick={() => onIrA("reposicion")}>
+                            📝 Armar lista de reposición
                         </button>
                     )}
                 </div>
@@ -26,9 +26,9 @@ export default function PanelControl({ esJefe, resumen, alertas, errorAlertas, o
                 {errorAlertas ? (
                     <p>{errorAlertas}</p>
                 ) : alertas === null ? (
-                    <p>Consultando productos con stock bajo...</p>
+                    <p>Consultando productos con poco stock...</p>
                 ) : alertas.length === 0 ? (
-                    <p>¡Excelente! No hay productos con stock bajo.</p>
+                    <p>¡Excelente! Todos los productos tienen 10 unidades o más.</p>
                 ) : (
                     [
                         { titulo: "⛔ Agotados", productos: alertas.filter((p) => p.stock === 0) },

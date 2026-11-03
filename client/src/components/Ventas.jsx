@@ -4,6 +4,7 @@ import { METODOS_PAGO, UNIDADES_MODALIDAD, nombreModalidad } from "../venta.js";
 import BuscadorProducto from "./BuscadorProducto.jsx";
 import Comprobante from "./Comprobante.jsx";
 import DatosPago from "./DatosPago.jsx";
+import { RECARGO_TARJETA, cobroConTarjeta } from "../datosPago.js";
 import DictadoVenta from "./DictadoVenta.jsx";
 import SelectorCliente from "./SelectorCliente.jsx";
 
@@ -895,9 +896,15 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                         )}
 
                         <div className="total-venta">
-                            <span>Total a cobrar</span>
+                            <span>{metodoPago === "tarjeta" ? "Total normal" : "Total a cobrar"}</span>
                             <strong>{moneda(total)}</strong>
                         </div>
+                        {metodoPago === "tarjeta" && (
+                            <div className="total-venta total-tarjeta">
+                                <span>💳 Total con tarjeta (+{RECARGO_TARJETA}%)</span>
+                                <strong>{moneda(cobroConTarjeta(total).cobrar)}</strong>
+                            </div>
+                        )}
                     </div>
 
                     <div className="campo campo-cliente">
@@ -940,7 +947,9 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                             ? "Registrando..."
                             : carrito.length === 0
                                 ? "Registrar venta"
-                                : `Registrar venta · ${moneda(total)}`}
+                                : metodoPago === "tarjeta"
+                                    ? `Registrar venta · cobrar ${moneda(cobroConTarjeta(total).cobrar)} en el POS`
+                                    : `Registrar venta · ${moneda(total)}`}
                     </button>
 
                     {mensaje && (

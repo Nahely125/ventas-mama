@@ -17,6 +17,7 @@ const CodigosAjuste = lazy(() => import("./CodigosAjuste.jsx"));
 const Reportes = lazy(() => import("./Reportes.jsx"));
 const Empleados = lazy(() => import("./Empleados.jsx"));
 const SeccionesCatalogo = lazy(() => import("./SeccionesCatalogo.jsx"));
+const Reposicion = lazy(() => import("./Reposicion.jsx"));
 
 function CargandoVista() {
     return (
@@ -76,6 +77,13 @@ const VISTAS = [
         icono: "🚚",
         nombre: "Compras",
         descripcion: "Ingresa la mercadería que llega: suma al stock y queda como inversión o gasto.",
+        soloJefe: true
+    },
+    {
+        clave: "reposicion",
+        icono: "📝",
+        nombre: "Por reponer",
+        descripcion: "Arma la lista de lo que hay que comprar, mira cuánto costaría y marca lo que se adquirió.",
         soloJefe: true
     },
     {
@@ -242,6 +250,7 @@ export default function Panel({ usuario, onSalir, onActualizarUsuario }) {
                             errorProductos={errorProductos}
                             onCambio={recargarInventario}
                             onRegistrar={() => cambiarVista("registrar")}
+                            onReponer={() => cambiarVista("reposicion")}
                             onError={manejarError}
                         />
                     )}
@@ -272,6 +281,10 @@ export default function Panel({ usuario, onSalir, onActualizarUsuario }) {
 
                     {vistaActual.clave === "compras" && (
                         <Compras productos={productos} onCambio={recargarInventario} onError={manejarError} />
+                    )}
+
+                    {vistaActual.clave === "reposicion" && (
+                        <Reposicion productos={productos} onCambio={recargarInventario} onError={manejarError} />
                     )}
 
                     {vistaActual.clave === "gastos" && (
