@@ -12,10 +12,13 @@ const CONTABILIZAR = [
 // Una fila de la lista: cantidad, costo, color y "¿se adquirió?".
 function ItemReposicion({ item, onCambiar, onQuitar, onAdquirir, ocupado }) {
     // Por cajas: se escriben cajas y el costo por caja; se guarda en unidades y costo por unidad.
+    // Cualquier producto se puede comprar por caja: si va suelto, se escribe cuántas trae la caja.
     const porCajaUnidades = Math.max(Number(item.unidadesPorCaja) || 1, 1);
-    const puedeCaja = porCajaUnidades > 1;
-    const porCaja = puedeCaja && item.porCaja;
+    const porCaja = item.porCaja && porCajaUnidades > 1;
     const factor = porCaja ? porCajaUnidades : 1;
+    const [tamanoCaja, setTamanoCaja] = useState(String(porCajaUnidades));
+
+    useEffect(() => setTamanoCaja(String(porCajaUnidades)), [porCajaUnidades]);
 
     const mostrarCantidad = () => String(porCaja ? item.cantidad / porCajaUnidades : item.cantidad);
     // Por caja se muestra al céntimo (S/ 70, no S/ 69.9996 por el redondeo del costo por unidad).
@@ -49,12 +52,29 @@ function ItemReposicion({ item, onCambiar, onQuitar, onAdquirir, ocupado }) {
         }
     }
 
-    // Al pasar a cajas, la cantidad se redondea a cajas completas.
+    // Al pasar a cajas, la cantidad se redondea a cajas completas. Si el producto va suelto,
+    // la caja empieza con 12 unidades (se puede cambiar).
     function cambiarModo(nuevo) {
         if (nuevo === porCaja) return;
-        onCambiar(nuevo
-            ? { porCaja: true, cantidad: Math.max(Math.ceil(item.cantidad / porCajaUnidades), 1) * porCajaUnidades }
-            : { porCaja: false });
+        if (!nuevo) return onCambiar({ porCaja: false });
+
+        const tamano = porCajaUnidades > 1 ? porCajaUnidades : 12;
+        onCambiar({
+            porCaja: true,
+            ...(porCajaUnidades > 1 ? {} : { unidadesCaja: tamano }),
+            cantidad: Math.max(Math.ceil(item.cantidad / tamano), 1) * tamano
+        });
+    }
+
+    // Cambiar cuántas unidades trae la caja: se mantienen las cajas y cambia el total de unidades.
+    function guardarTamanoCaja() {
+        const numero = Number(tamanoCaja);
+        if (!Number.isInteger(numero) || numero < 2 || numero > 10000 || numero === porCajaUnidades) {
+            setTamanoCaja(String(porCajaUnidades));
+            return;
+        }
+        const cajas = Math.max(Math.round(item.cantidad / porCajaUnidades), 1);
+        onCambiar({ unidadesCaja: numero, cantidad: cajas * numero });
     }
 
     return (
@@ -81,19 +101,17 @@ function ItemReposicion({ item, onCambiar, onQuitar, onAdquirir, ocupado }) {
 
             <small className="ayuda-campo">
                 {item.vendidas30 > 0 ? `Se vendieron ${item.vendidas30} en los últimos 30 días` : "Sin ventas en 30 días"}
-                {puedeCaja ? ` · viene en cajas de ${porCajaUnidades}` : ""}
+                {porCajaUnidades > 1 ? ` · caja de ${porCajaUnidades}` : ""}
             </small>
 
-            {puedeCaja && (
-                <div className="selector-modalidad selector-pequeno modo-reposicion" role="radiogroup" aria-label={`Comprar ${item.nombre} por`}>
-                    <button type="button" role="radio" aria-checked={!porCaja} className={!porCaja ? "activo" : ""} onClick={() => cambiarModo(false)} disabled={ocupado}>
-                        Por unidad
-                    </button>
-                    <button type="button" role="radio" aria-checked={porCaja} className={porCaja ? "activo" : ""} onClick={() => cambiarModo(true)} disabled={ocupado}>
-                        Por caja ({porCajaUnidades} u.)
-                    </button>
-                </div>
-            )}
+            <div className="selector-modalidad selector-pequeno modo-reposicion" role="radiogroup" aria-label={`Comprar ${item.nombre} por`}>
+                <button type="button" role="radio" aria-checked={!porCaja} className={!porCaja ? "activo" : ""} onClick={() => cambiarModo(false)} disabled={ocupado}>
+                    Por unidad
+                </button>
+                <button type="button" role="radio" aria-checked={porCaja} className={porCaja ? "activo" : ""} onClick={() => cambiarModo(true)} disabled={ocupado}>
+                    Por caja{porCajaUnidades > 1 ? ` (${porCajaUnidades} u.)` : ""}
+                </button>
+            </div>
 
             <div className="item-reposicion-campos">
                 {item.colores.length > 0 && (
@@ -111,6 +129,22 @@ function ItemReposicion({ item, onCambiar, onQuitar, onAdquirir, ocupado }) {
                                 <option key={c.id} value={c.id}>{c.nombre} (hay {c.stock})</option>
                             ))}
                         </select>
+                    </div>
+                )}
+                {porCaja && (
+                    <div className="campo">
+                        <label htmlFor={`repo-caja-${item.id}`}>Unidades por caja</label>
+                        <input
+                            id={`repo-caja-${item.id}`}
+                            type="number"
+                            min="2"
+                            step="1"
+                            inputMode="numeric"
+                            value={tamanoCaja}
+                            onChange={(e) => setTamanoCaja(e.target.value)}
+                            onBlur={guardarTamanoCaja}
+                            disabled={ocupado}
+                        />
                     </div>
                 )}
                 <div className="campo">
@@ -242,6 +276,11 @@ export default function Reposicion({ productos, onCambio, onError }) {
         if (resultado) await onCambio();
     }
 
+    async function vaciar() {
+        if (!confirm(`¿Quitar los ${datos.items.length} productos de la lista? No se registra ninguna compra.`)) return;
+        await hacer(() => pedir("/api/reposicion", { method: "DELETE" }));
+    }
+
     async function agregar() {
         if (!agregando) return;
         const resultado = await hacer(() => pedir("/api/reposicion", { method: "POST", cuerpo: { productoId: agregando.id } }));
@@ -299,7 +338,14 @@ export default function Reposicion({ productos, onCambio, onError }) {
             </section>
 
             <section className="tarjeta">
-                <h2>Lista de reposición</h2>
+                <div className="encabezado-seccion">
+                    <h2>Lista de reposición</h2>
+                    {datos.items.length > 0 && (
+                        <button type="button" className="boton-secundario boton-pequeno boton-vaciar" onClick={vaciar} disabled={ocupado}>
+                            🗑️ Vaciar la lista
+                        </button>
+                    )}
+                </div>
                 {datos.items.length === 0 ? (
                     <p className="aviso-busqueda">La lista está vacía. Agrega los productos con poco stock o busca uno.</p>
                 ) : (

@@ -22,7 +22,8 @@ const COLUMNAS = `
     productos.nombre,
     productos.codigo,
     productos.stock,
-    productos.unidades_por_caja AS "unidadesPorCaja",
+    -- Unidades de la caja que se compra: la escrita en la lista o, si no, la del producto.
+    COALESCE(reposicion.unidades_caja, productos.unidades_por_caja) AS "unidadesPorCaja",
     reposicion.color_id AS "colorId",
     producto_colores.nombre AS color,
     producto_colores.stock AS "stockColor",
@@ -163,6 +164,8 @@ router.put("/:id", async (req, res) => {
         ("costoUnitario" in cambios && !esCosto(cambios.costoUnitario)) ||
         ("comprar" in cambios && typeof cambios.comprar !== "boolean") ||
         ("porCaja" in cambios && typeof cambios.porCaja !== "boolean") ||
+        ("unidadesCaja" in cambios && cambios.unidadesCaja !== null &&
+            !(Number.isInteger(cambios.unidadesCaja) && cambios.unidadesCaja > 1 && cambios.unidadesCaja <= 10000)) ||
         ("colorId" in cambios && cambios.colorId !== null && !Number.isInteger(cambios.colorId))) {
         return res.status(400).json({ error: "Revisa la cantidad, el costo o el color." });
     }
@@ -179,13 +182,14 @@ router.put("/:id", async (req, res) => {
         }
 
         await pool.query(
-            `UPDATE reposicion SET cantidad = $1, costo_unitario = $2, comprar = $3, color_id = $4, por_caja = $5 WHERE id = $6`,
+            `UPDATE reposicion SET cantidad = $1, costo_unitario = $2, comprar = $3, color_id = $4, por_caja = $5, unidades_caja = $6 WHERE id = $7`,
             [
                 cambios.cantidad ?? fila.cantidad,
                 "costoUnitario" in cambios ? cambios.costoUnitario : fila.costo_unitario,
                 cambios.comprar ?? fila.comprar,
                 "colorId" in cambios ? cambios.colorId : fila.color_id,
                 cambios.porCaja ?? fila.por_caja,
+                "unidadesCaja" in cambios ? cambios.unidadesCaja : fila.unidades_caja,
                 id
             ]
         );
@@ -197,6 +201,22 @@ router.put("/:id", async (req, res) => {
         }
         console.error("Error al cambiar la reposición:", error.message);
         res.status(500).json({ error: "No se pudo guardar el cambio." });
+    }
+});
+
+// Vaciar toda la lista.
+router.delete("/", async (req, res) => {
+    try {
+        const resultado = await pool.query(`DELETE FROM reposicion`);
+        res.json({
+            mensaje: resultado.rowCount === 0
+                ? "La lista ya estaba vacía."
+                : `Se vació la lista (${resultado.rowCount} ${resultado.rowCount === 1 ? "producto" : "productos"}).`,
+            ...(await leerLista())
+        });
+    } catch (error) {
+        console.error("Error al vaciar la reposición:", error.message);
+        res.status(500).json({ error: "No se pudo vaciar la lista." });
     }
 });
 
@@ -231,7 +251,8 @@ router.post("/adquirir", async (req, res) => {
         await client.query("BEGIN");
 
         const filas = await client.query(
-            `SELECT reposicion.*, productos.nombre, productos.precio_compra, productos.unidades_por_caja
+            `SELECT reposicion.*, productos.nombre, productos.precio_compra,
+                    COALESCE(reposicion.unidades_caja, productos.unidades_por_caja) AS unidades_por_caja
              FROM reposicion INNER JOIN productos ON productos.id = reposicion.producto_id
              WHERE reposicion.id = ANY($1::int[])
              FOR UPDATE OF reposicion`,

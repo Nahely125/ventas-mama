@@ -5794,6 +5794,10 @@ textarea {
     cursor: not-allowed;
 }
 
+.boton-vaciar {
+    color: #be123c;
+}
+
 .registrar-reposicion {
     display: grid;
     gap: 10px;
