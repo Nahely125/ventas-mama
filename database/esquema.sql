@@ -81,6 +81,7 @@ CREATE TABLE IF NOT EXISTS productos (
     foto               BYTEA,                                               -- foto reducida (JPEG)
     foto_tipo          VARCHAR(30),
     foto_editada       BOOLEAN       NOT NULL DEFAULT FALSE,                -- la foto ya tiene el estilo del catálogo
+    foto_mini          BYTEA,                                               -- miniatura (se crea sola al pedirla)
     foto_original      BYTEA,                                               -- la foto sin editar (para cambiar de escena)
     foto_original_tipo VARCHAR(30),
     foto_actualizada   TIMESTAMP

@@ -149,6 +149,8 @@ const MIGRACIONES = `
 
     -- La foto ya tiene el estilo del catálogo (fondo blanco): no se vuelve a editar.
     ALTER TABLE productos ADD COLUMN IF NOT EXISTS foto_editada BOOLEAN NOT NULL DEFAULT FALSE;
+    -- Miniatura de la foto (para listas y tarjetas pequeñas): se crea sola la primera vez que se pide.
+    ALTER TABLE productos ADD COLUMN IF NOT EXISTS foto_mini BYTEA;
     -- Foto sin editar (para poder cambiar de escena sin perder calidad).
     ALTER TABLE productos ADD COLUMN IF NOT EXISTS foto_original BYTEA;
     ALTER TABLE productos ADD COLUMN IF NOT EXISTS foto_original_tipo VARCHAR(30);

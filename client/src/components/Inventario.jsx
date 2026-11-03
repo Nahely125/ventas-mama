@@ -321,7 +321,7 @@ export default function Inventario({
                             // Al buscar: solo las fotos; el botón ⓘ muestra toda la información.
                             <ul className="galeria-inventario">
                                 {filtrados.map((producto) => {
-                                    const foto = urlFoto(producto);
+                                    const foto = urlFoto(producto, "mini");
                                     return (
                                         <li key={producto.id}>
                                             <button
@@ -358,7 +358,7 @@ export default function Inventario({
                                 {filtrados.map((producto) => {
                                     const { stock } = stockDeLaParte(producto, parte);
                                     const abierto = abiertoId === producto.id;
-                                    const foto = urlFoto(producto);
+                                    const foto = urlFoto(producto, "mini");
 
                                     return (
                                         <li key={producto.id} className={`${abierto ? "abierta" : ""} ${esJefe ? "fila-con-accion" : ""}`}>

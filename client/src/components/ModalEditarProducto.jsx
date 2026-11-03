@@ -38,7 +38,7 @@ export default function ModalEditarProducto({ producto, onCerrar, onGuardado, on
         // Al editar no se cambia la ubicación sola: ya fue elegida.
         ubicacionManual: true,
         foto: undefined,
-        fotoActual: urlFoto(producto)
+        fotoActual: urlFoto(producto, "mini")
     });
     const [error, setError] = useState("");
     const [guardando, setGuardando] = useState(false);

@@ -136,7 +136,7 @@ export function Portada({ tienda, secciones, destacados, grilla, onIr, onAplicar
                 {fotos.length > 0 && (
                     <div className={`cat-heroe-fotos cat-heroe-fotos-${fotos.length}`} aria-hidden="true">
                         {fotos.map((producto) => (
-                            <img key={producto.id} src={urlFoto(producto)} alt="" />
+                            <img key={producto.id} src={urlFoto(producto, "mini")} alt="" />
                         ))}
                     </div>
                 )}

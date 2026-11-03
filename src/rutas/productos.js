@@ -378,11 +378,29 @@ router.delete("/:id", requiereJefe, async (req, res) => {
    El navegador reduce la imagen antes de enviarla (JPEG o WEBP, ~600 px). */
 
 const TIPOS_FOTO = ["image/jpeg", "image/png", "image/webp"];
+// Miniatura: hasta 480 × 640 px (las tarjetas son 3:4). Pesa 3 a 4 veces menos que la foto.
+const LADO_MINI = { width: 480, height: 640 };
+
+let sharp = null;
+try {
+    sharp = require("sharp");
+} catch (error) {
+    console.error("No se pudo cargar sharp: las miniaturas usarán la foto completa.", error.message);
+}
+
+async function crearMiniatura(foto) {
+    return sharp(foto)
+        .rotate()
+        .resize({ ...LADO_MINI, fit: "inside", withoutEnlargement: true })
+        .jpeg({ quality: 78, mozjpeg: true })
+        .toBuffer();
+}
 const TAMANO_MAXIMO_FOTO = 1.5 * 1024 * 1024;
 
-// Pública: la usan el inventario y el catálogo.
+// Pública: la usan el inventario y el catálogo. Con ?tam=mini envía la miniatura.
 router.get("/:id/foto", async (req, res) => {
     const id = leerId(req);
+    const mini = req.query.tam === "mini";
 
     if (!id) {
         return res.status(404).end();
@@ -390,7 +408,9 @@ router.get("/:id/foto", async (req, res) => {
 
     try {
         const resultado = await pool.query(
-            `SELECT foto, foto_tipo FROM productos WHERE id = $1 AND foto IS NOT NULL`,
+            `SELECT foto, foto_tipo, ${mini ? "foto_mini" : "NULL::BYTEA"} AS foto_mini,
+                    foto_actualizada
+             FROM productos WHERE id = $1 AND foto IS NOT NULL`,
             [id]
         );
 
@@ -402,6 +422,22 @@ router.get("/:id/foto", async (req, res) => {
 
         // La URL lleva ?v=<versión>, así que se puede guardar en caché mucho tiempo.
         res.set("Cache-Control", "public, max-age=31536000, immutable");
+
+        if (mini && sharp) {
+            let miniatura = fila.foto_mini;
+
+            if (!miniatura) {
+                miniatura = await crearMiniatura(fila.foto);
+                // Se guarda para la próxima vez (si nadie cambió la foto mientras tanto).
+                await pool.query(
+                    `UPDATE productos SET foto_mini = $1 WHERE id = $2 AND foto_actualizada IS NOT DISTINCT FROM $3`,
+                    [miniatura, id, fila.foto_actualizada]
+                );
+            }
+
+            return res.type("image/jpeg").send(miniatura);
+        }
+
         res.type(fila.foto_tipo).send(fila.foto);
     } catch (error) {
         console.error("Error al enviar la foto:", error.message);
@@ -480,7 +516,7 @@ router.put("/:id/foto", requiereJefe, async (req, res) => {
     try {
         const resultado = await pool.query(
             `UPDATE productos
-             SET foto = $1, foto_tipo = $2, foto_editada = $4,
+             SET foto = $1, foto_tipo = $2, foto_editada = $4, foto_mini = NULL,
                  foto_original = CASE WHEN $5::BYTEA IS NOT NULL THEN $5 WHEN $4 THEN foto_original END,
                  foto_original_tipo = CASE WHEN $5::BYTEA IS NOT NULL THEN $6 WHEN $4 THEN foto_original_tipo END,
                  foto_actualizada = CURRENT_TIMESTAMP
@@ -510,7 +546,7 @@ router.delete("/:id/foto", requiereJefe, async (req, res) => {
     try {
         await pool.query(
             `UPDATE productos
-             SET foto = NULL, foto_tipo = NULL, foto_editada = FALSE,
+             SET foto = NULL, foto_tipo = NULL, foto_editada = FALSE, foto_mini = NULL,
                  foto_original = NULL, foto_original_tipo = NULL, foto_actualizada = CURRENT_TIMESTAMP
              WHERE id = $1`,
             [id]

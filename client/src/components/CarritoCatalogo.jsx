@@ -205,7 +205,7 @@ export default function CarritoCatalogo({ carrito, productos, tienda, cupon, onC
                     <>
                         <ul className="cat-carrito-lista">
                             {items.map((item) => {
-                                const foto = urlFoto(item.producto);
+                                const foto = urlFoto(item.producto, "mini");
                                 const clave = `${item.id}-${item.modalidad}`;
 
                                 return (

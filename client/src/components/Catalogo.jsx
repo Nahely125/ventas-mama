@@ -92,7 +92,7 @@ function BotonAgregar({ producto, enPedido, onAgregar, grande = false }) {
 }
 
 function TarjetaProductoCatalogo({ producto, onAbrir, enPedido, onAgregar }) {
-    const foto = urlFoto(producto);
+    const foto = urlFoto(producto, "mini");
 
     return (
         <li className={`cat-producto ${producto.disponible ? "" : "cat-agotado"}`}>
@@ -713,7 +713,7 @@ function DetalleProducto({ producto, relacionados = [], enPedido, onAgregar, onA
                     <h3>También te puede gustar</h3>
                     <ul>
                         {relacionados.map((p) => {
-                            const fotoRelacionado = urlFoto(p);
+                            const fotoRelacionado = urlFoto(p, "mini");
                             return (
                                 <li key={p.id}>
                                     <button type="button" onClick={() => onAbrir(p)}>

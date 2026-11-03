@@ -10,9 +10,10 @@ const ALTO_CATALOGO = 1000;
 
 // Dirección de la foto de un producto, o null si no tiene.
 // La versión cambia cada vez que se sube una foto nueva, así no se queda la vieja en caché.
-export function urlFoto(producto) {
+// tamaño "mini": miniatura liviana para listas y tarjetas pequeñas.
+export function urlFoto(producto, tamaño = null) {
     return producto?.tieneFoto
-        ? `/api/productos/${producto.id}/foto?v=${producto.fotoVersion}`
+        ? `/api/productos/${producto.id}/foto?v=${producto.fotoVersion}${tamaño === "mini" ? "&tam=mini" : ""}`
         : null;
 }
 
