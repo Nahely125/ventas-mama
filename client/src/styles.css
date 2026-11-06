@@ -5799,6 +5799,40 @@ textarea {
     margin-bottom: 0;
 }
 
+/* Que el monto no se parta en dos líneas en el celular */
+.totales-prestamos {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.totales-prestamos > div {
+    padding: 12px 6px;
+}
+
+.totales-prestamos strong {
+    white-space: nowrap;
+    font-size: clamp(0.95rem, 4.2vw, 1.4rem);
+}
+
+/* Pantallas angostas (iPhone SE): un total por fila, el nombre a la izquierda y el monto a la derecha */
+@media (max-width: 380px) {
+    .totales-prestamos {
+        grid-template-columns: 1fr;
+        gap: 6px;
+    }
+
+    .totales-prestamos > div {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 14px;
+        text-align: left;
+    }
+
+    .totales-prestamos strong {
+        font-size: 1.1rem;
+    }
+}
+
 .lista-prestamos {
     list-style: none;
     display: grid;
@@ -5983,7 +6017,15 @@ textarea {
     font-weight: 600;
 }
 
-.filtro-mes-prestamos {
+.filtros-prestamos {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+    gap: 10px;
+    margin-bottom: 14px;
+}
+
+.filtros-prestamos select {
+    width: 100%;
     max-width: 100%;
 }
 

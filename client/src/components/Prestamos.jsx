@@ -230,6 +230,7 @@ export default function Prestamos({ onCambio, onError }) {
     const [ocupado, setOcupado] = useState(false);
     const [nuevo, setNuevo] = useState({ prestamista: "", monto: "", fecha: hoy(), nota: "" });
     const [mes, setMes] = useState("");
+    const [orden, setOrden] = useState("recientes");
 
     const cargar = useCallback(async () => {
         try {
@@ -275,11 +276,24 @@ export default function Prestamos({ onCambio, onError }) {
         if (listo) setNuevo({ prestamista: "", monto: "", fecha: hoy(), nota: "" });
     }
 
-    // Del más reciente al más antiguo, agrupados por mes ("2026-11").
+    // Meses con préstamos ("2026-11"), del más reciente al más antiguo.
     const meses = [...new Set((prestamos ?? []).map((p) => String(p.fecha).slice(0, 7)))];
-    const grupos = meses
-        .filter((m) => !mes || m === mes)
-        .map((m) => ({ mes: m, prestamos: prestamos.filter((p) => String(p.fecha).startsWith(m)) }));
+    const delMes = (prestamos ?? []).filter((p) => !mes || String(p.fecha).startsWith(mes));
+    const porFecha = orden === "recientes" || orden === "antiguos";
+    // Por fecha: agrupados por mes. Por monto o por lo que falta pagar: una sola lista.
+    const grupos = porFecha
+        ? (orden === "antiguos" ? [...meses].reverse() : meses)
+            .filter((m) => !mes || m === mes)
+            .map((m) => {
+                const lista = delMes.filter((p) => String(p.fecha).startsWith(m));
+                return { mes: m, prestamos: orden === "antiguos" ? lista.reverse() : lista };
+            })
+        : [{
+            mes: null,
+            prestamos: [...delMes].sort((a, b) => orden === "monto"
+                ? Number(b.monto) - Number(a.monto)
+                : Number(b.porPagar) - Number(a.porPagar))
+        }];
 
     const totales = (prestamos ?? []).reduce(
         (t, p) => ({ recibido: t.recibido + Number(p.monto), porPagar: t.porPagar + Number(p.porPagar), sinUsar: t.sinUsar + Number(p.sinUsar) }),
@@ -329,25 +343,43 @@ export default function Prestamos({ onCambio, onError }) {
 
             <section className="tarjeta">
                 <div className="encabezado-seccion">
-                    <h2>Préstamos por fecha</h2>
-                    {meses.length > 1 && (
-                        <select className="filtro-mes-prestamos" aria-label="Ver préstamos del mes" value={mes} onChange={(e) => setMes(e.target.value)}>
-                            <option value="">Todos los meses</option>
-                            {meses.map((m) => <option key={m} value={m}>{nombreMes(m)}</option>)}
-                        </select>
-                    )}
+                    <h2>Préstamos</h2>
                 </div>
+                {prestamos?.length > 1 && (
+                    <div className="filtros-prestamos">
+                        <div className="campo">
+                            <label htmlFor="prestamos-orden">Ordenar por</label>
+                            <select id="prestamos-orden" value={orden} onChange={(e) => setOrden(e.target.value)}>
+                                <option value="recientes">Fecha: más recientes primero</option>
+                                <option value="antiguos">Fecha: más antiguos primero</option>
+                                <option value="monto">Mayor monto recibido</option>
+                                <option value="porPagar">Más por pagar</option>
+                            </select>
+                        </div>
+                        {meses.length > 1 && (
+                            <div className="campo">
+                                <label htmlFor="prestamos-mes">Mes</label>
+                                <select id="prestamos-mes" value={mes} onChange={(e) => setMes(e.target.value)}>
+                                    <option value="">Todos los meses</option>
+                                    {meses.map((m) => <option key={m} value={m}>{nombreMes(m)}</option>)}
+                                </select>
+                            </div>
+                        )}
+                    </div>
+                )}
                 {prestamos === null ? (
                     <p>Cargando...</p>
                 ) : prestamos.length === 0 ? (
                     <p className="aviso-busqueda">Todavía no hay préstamos registrados.</p>
                 ) : (
                     grupos.map((grupo) => (
-                        <div key={grupo.mes} className="grupo-prestamos">
-                            <h3 className="titulo-mes-prestamos">
-                                {nombreMes(grupo.mes)}
-                                <small>{grupo.prestamos.length} {grupo.prestamos.length === 1 ? "préstamo" : "préstamos"} · {moneda(grupo.prestamos.reduce((s, p) => s + Number(p.monto), 0))}</small>
-                            </h3>
+                        <div key={grupo.mes ?? "todos"} className="grupo-prestamos">
+                            {grupo.mes && (
+                                <h3 className="titulo-mes-prestamos">
+                                    {nombreMes(grupo.mes)}
+                                    <small>{grupo.prestamos.length} {grupo.prestamos.length === 1 ? "préstamo" : "préstamos"} · {moneda(grupo.prestamos.reduce((s, p) => s + Number(p.monto), 0))}</small>
+                                </h3>
+                            )}
                             <ul className="lista-prestamos">
                                 {grupo.prestamos.map((p) => <TarjetaPrestamo key={p.id} prestamo={p} ocupado={ocupado} accion={accion} />)}
                             </ul>
