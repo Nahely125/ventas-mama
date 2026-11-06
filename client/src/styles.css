@@ -5960,6 +5960,33 @@ textarea {
     color: var(--texto-suave);
 }
 
+.grupo-prestamos + .grupo-prestamos {
+    margin-top: 18px;
+}
+
+.titulo-mes-prestamos {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 4px 10px;
+    margin: 0 0 10px;
+    padding-bottom: 6px;
+    border-bottom: 2px solid var(--morado-150);
+    color: var(--morado-900);
+    font-size: 1rem;
+}
+
+.titulo-mes-prestamos small {
+    color: var(--texto-suave);
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+
+.filtro-mes-prestamos {
+    max-width: 100%;
+}
+
 .boton-eliminar-prestamo {
     justify-self: start;
     color: #be123c;

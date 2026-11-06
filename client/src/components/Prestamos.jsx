@@ -215,6 +215,13 @@ function TarjetaPrestamo({ prestamo, ocupado, accion }) {
     );
 }
 
+// "2026-11" → "Noviembre de 2026"
+function nombreMes(mes) {
+    const [anio, numero] = mes.split("-").map(Number);
+    const texto = new Date(anio, numero - 1, 1).toLocaleDateString("es-PE", { month: "long", year: "numeric" });
+    return texto.charAt(0).toUpperCase() + texto.slice(1);
+}
+
 /* Préstamos (capital financiado): cuánto se recibió, en qué se usó (inversión en productos
    o gasto) y cuánto falta pagar. Solo el jefe. */
 export default function Prestamos({ onCambio, onError }) {
@@ -222,6 +229,7 @@ export default function Prestamos({ onCambio, onError }) {
     const [mensaje, setMensaje] = useState(null);
     const [ocupado, setOcupado] = useState(false);
     const [nuevo, setNuevo] = useState({ prestamista: "", monto: "", fecha: hoy(), nota: "" });
+    const [mes, setMes] = useState("");
 
     const cargar = useCallback(async () => {
         try {
@@ -267,6 +275,12 @@ export default function Prestamos({ onCambio, onError }) {
         if (listo) setNuevo({ prestamista: "", monto: "", fecha: hoy(), nota: "" });
     }
 
+    // Del más reciente al más antiguo, agrupados por mes ("2026-11").
+    const meses = [...new Set((prestamos ?? []).map((p) => String(p.fecha).slice(0, 7)))];
+    const grupos = meses
+        .filter((m) => !mes || m === mes)
+        .map((m) => ({ mes: m, prestamos: prestamos.filter((p) => String(p.fecha).startsWith(m)) }));
+
     const totales = (prestamos ?? []).reduce(
         (t, p) => ({ recibido: t.recibido + Number(p.monto), porPagar: t.porPagar + Number(p.porPagar), sinUsar: t.sinUsar + Number(p.sinUsar) }),
         { recibido: 0, porPagar: 0, sinUsar: 0 }
@@ -274,29 +288,6 @@ export default function Prestamos({ onCambio, onError }) {
 
     return (
         <div className="contenido-vista">
-            {prestamos?.length > 0 && (
-                <section className="totales-reposicion totales-prestamos" aria-label="Resumen de préstamos">
-                    <div><span>Capital financiado</span><strong>{moneda(totales.recibido)}</strong></div>
-                    <div><span>Sin usar</span><strong>{moneda(totales.sinUsar)}</strong></div>
-                    <div className="total-reposicion"><span>Falta pagar</span><strong>{moneda(totales.porPagar)}</strong></div>
-                </section>
-            )}
-
-            {mensaje && <p className={`mensaje mensaje-${mensaje.tipo}`} role="status">{mensaje.texto}</p>}
-
-            <section className="tarjeta">
-                <h2>Préstamos</h2>
-                {prestamos === null ? (
-                    <p>Cargando...</p>
-                ) : prestamos.length === 0 ? (
-                    <p className="aviso-busqueda">Todavía no hay préstamos registrados.</p>
-                ) : (
-                    <ul className="lista-prestamos">
-                        {prestamos.map((p) => <TarjetaPrestamo key={p.id} prestamo={p} ocupado={ocupado} accion={accion} />)}
-                    </ul>
-                )}
-            </section>
-
             <section className="tarjeta">
                 <h2>Registrar préstamo</h2>
                 <form className="formulario" onSubmit={registrar}>
@@ -318,12 +309,51 @@ export default function Prestamos({ onCambio, onError }) {
                         </div>
                     </div>
                     <div className="campo">
-                            <label htmlFor="prestamo-nota">Nota (opcional)</label>
-                            <input id="prestamo-nota" maxLength={200} placeholder="Ej. devolver en 6 meses" value={nuevo.nota}
-                                onChange={(e) => setNuevo((n) => ({ ...n, nota: e.target.value }))} />
+                        <label htmlFor="prestamo-nota">Nota (opcional)</label>
+                        <input id="prestamo-nota" maxLength={200} placeholder="Ej. devolver en 6 meses" value={nuevo.nota}
+                            onChange={(e) => setNuevo((n) => ({ ...n, nota: e.target.value }))} />
                     </div>
                     <button type="submit" className="boton-principal" disabled={ocupado}>Registrar préstamo</button>
                 </form>
+            </section>
+
+            {prestamos?.length > 0 && (
+                <section className="totales-reposicion totales-prestamos" aria-label="Resumen de préstamos">
+                    <div><span>Capital financiado</span><strong>{moneda(totales.recibido)}</strong></div>
+                    <div><span>Sin usar</span><strong>{moneda(totales.sinUsar)}</strong></div>
+                    <div className="total-reposicion"><span>Falta pagar</span><strong>{moneda(totales.porPagar)}</strong></div>
+                </section>
+            )}
+
+            {mensaje && <p className={`mensaje mensaje-${mensaje.tipo}`} role="status">{mensaje.texto}</p>}
+
+            <section className="tarjeta">
+                <div className="encabezado-seccion">
+                    <h2>Préstamos por fecha</h2>
+                    {meses.length > 1 && (
+                        <select className="filtro-mes-prestamos" aria-label="Ver préstamos del mes" value={mes} onChange={(e) => setMes(e.target.value)}>
+                            <option value="">Todos los meses</option>
+                            {meses.map((m) => <option key={m} value={m}>{nombreMes(m)}</option>)}
+                        </select>
+                    )}
+                </div>
+                {prestamos === null ? (
+                    <p>Cargando...</p>
+                ) : prestamos.length === 0 ? (
+                    <p className="aviso-busqueda">Todavía no hay préstamos registrados.</p>
+                ) : (
+                    grupos.map((grupo) => (
+                        <div key={grupo.mes} className="grupo-prestamos">
+                            <h3 className="titulo-mes-prestamos">
+                                {nombreMes(grupo.mes)}
+                                <small>{grupo.prestamos.length} {grupo.prestamos.length === 1 ? "préstamo" : "préstamos"} · {moneda(grupo.prestamos.reduce((s, p) => s + Number(p.monto), 0))}</small>
+                            </h3>
+                            <ul className="lista-prestamos">
+                                {grupo.prestamos.map((p) => <TarjetaPrestamo key={p.id} prestamo={p} ocupado={ocupado} accion={accion} />)}
+                            </ul>
+                        </div>
+                    ))
+                )}
             </section>
         </div>
     );
