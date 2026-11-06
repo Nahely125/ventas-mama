@@ -8119,3 +8119,395 @@ body.sin-desplazamiento {
 .lista-preguntas-web li .boton-enlace {
     justify-self: start;
 }
+
+/* ===== Catálogo con movimiento: carruseles, fotos adaptadas y secciones que aparecen ===== */
+
+/* Foto adaptada: llena el recuadro si es vertical; si no, se ve completa sobre un fondo difuminado */
+.foto-adaptada {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    display: block;
+    overflow: hidden;
+    background: linear-gradient(110deg, #f3eefe 30%, #fbf9ff 50%, #f3eefe 70%) 0 0 / 220% 100%;
+    animation: brilloCarga 1.3s linear infinite;
+}
+
+.foto-adaptada.cargada {
+    background: #ffffff;
+    animation: none;
+}
+
+.foto-adaptada .foto-adaptada-principal {
+    position: relative;
+    z-index: 1;
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    opacity: 0;
+    transition: opacity 0.45s ease, transform 0.6s ease;
+}
+
+.foto-adaptada.foto-llenar .foto-adaptada-principal {
+    object-fit: cover;
+}
+
+.foto-adaptada.cargada .foto-adaptada-principal {
+    opacity: 1;
+}
+
+.foto-adaptada .foto-adaptada-fondo {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    object-fit: cover;
+    transform: scale(1.35);
+    filter: blur(16px) saturate(1.15);
+    opacity: 0.6;
+}
+
+@keyframes brilloCarga {
+    to {
+        background-position: -220% 0;
+    }
+}
+
+/* Al pasar el dedo o el mouse, la foto se acerca un poco */
+.cat-producto-boton:hover .foto-adaptada-principal,
+.cat-relacionados button:hover .foto-adaptada-principal {
+    transform: scale(1.06);
+}
+
+.cat-relacionado-foto,
+.cat-detalle-foto {
+    position: relative;
+}
+
+/* Las etiquetas siempre por encima de la foto */
+.cat-etiquetas,
+.cat-relacionado-foto .cat-etiqueta {
+    z-index: 2;
+}
+
+/* Carrusel de la portada */
+.cat-heroe-con-carrusel {
+    min-height: min(82svh, 660px);
+    align-content: end;
+    padding-bottom: 64px;
+    background: #1e0b3d;
+}
+
+.cat-heroe-con-carrusel .cat-heroe-texto {
+    position: relative;
+    z-index: 2;
+}
+
+.cat-heroe-con-carrusel h1,
+.cat-heroe-con-carrusel .cat-heroe-frase {
+    text-shadow: 0 2px 18px rgba(0, 0, 0, 0.4);
+}
+
+.carrusel-portada {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    touch-action: pan-y;
+    user-select: none;
+}
+
+/* Sombra para que el texto se lea sobre cualquier foto */
+.carrusel-portada::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    background: linear-gradient(180deg, rgba(30, 11, 61, 0.1) 0%, rgba(30, 11, 61, 0.45) 45%, rgba(30, 11, 61, 0.88) 100%);
+    pointer-events: none;
+}
+
+.carrusel-diapositiva {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: opacity 1.1s ease;
+}
+
+.carrusel-diapositiva.activa {
+    opacity: 1;
+}
+
+.carrusel-diapositiva img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    -webkit-user-drag: none;
+}
+
+.carrusel-diapositiva.activa img {
+    animation: acercamientoLento 7s ease-out both;
+}
+
+@keyframes acercamientoLento {
+    from {
+        transform: scale(1.12);
+    }
+
+    to {
+        transform: scale(1);
+    }
+}
+
+.carrusel-leyenda {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    z-index: 3;
+    display: grid;
+    gap: 2px;
+    max-width: 62%;
+    padding: 10px 14px;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 14px;
+    background: rgba(30, 11, 61, 0.45);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    color: #ffffff;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    animation: aparecerSuave 0.6s ease-out 0.4s both;
+}
+
+.carrusel-leyenda span {
+    overflow: hidden;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.carrusel-leyenda strong {
+    font-size: 1rem;
+}
+
+.carrusel-leyenda em {
+    font-size: 0.75rem;
+    font-style: normal;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    opacity: 0.85;
+}
+
+.carrusel-puntos {
+    position: absolute;
+    bottom: 22px;
+    left: 0;
+    right: 0;
+    z-index: 3;
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+}
+
+.carrusel-puntos button {
+    width: 8px;
+    height: 8px;
+    padding: 0;
+    border: none;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.5);
+    transition: width 0.3s ease, background-color 0.3s ease;
+}
+
+/* Área para tocar más grande que el punto */
+.carrusel-puntos button {
+    box-shadow: 0 0 0 10px transparent;
+}
+
+.carrusel-puntos button.activo {
+    width: 26px;
+    background: #ffffff;
+}
+
+/* Filas de productos deslizables (carruseles) */
+.carrusel-fila {
+    position: relative;
+}
+
+.carrusel-fila-lista {
+    list-style: none;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: calc((100% - 12px) / 2.25);
+    gap: 12px;
+    margin: 0 -16px;
+    padding: 4px 16px 12px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+    scroll-padding: 0 16px;
+    scrollbar-width: none;
+}
+
+.carrusel-fila-lista::-webkit-scrollbar {
+    display: none;
+}
+
+.carrusel-fila-lista > li {
+    scroll-snap-align: start;
+}
+
+@media (min-width: 600px) {
+    .carrusel-fila-lista {
+        grid-auto-columns: calc((100% - 36px) / 3.3);
+        gap: 18px;
+    }
+}
+
+@media (min-width: 1024px) {
+    .carrusel-fila-lista {
+        grid-auto-columns: calc((100% - 54px) / 4.3);
+        margin: 0;
+        padding: 4px 0 12px;
+        scroll-padding: 0;
+    }
+}
+
+.carrusel-flecha {
+    position: absolute;
+    top: 38%;
+    z-index: 2;
+    display: none;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 1px solid var(--morado-150);
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.95);
+    box-shadow: 0 6px 18px rgba(76, 29, 149, 0.18);
+    color: var(--morado-900);
+    font-size: 1.6rem;
+    line-height: 1;
+}
+
+.carrusel-flecha-izq {
+    left: -8px;
+}
+
+.carrusel-flecha-der {
+    right: -8px;
+}
+
+@media (hover: hover) and (min-width: 600px) {
+    .carrusel-flecha {
+        display: grid;
+    }
+}
+
+/* Secciones que aparecen al bajar (solo si el navegador lo soporta y no se pidió menos movimiento) */
+.con-revelar .revelar {
+    opacity: 0;
+    transform: translateY(26px);
+    transition: opacity 0.7s ease, transform 0.7s ease;
+}
+
+.con-revelar .revelar.visible {
+    opacity: 1;
+    transform: none;
+}
+
+/* Pasos y categorías: entran uno tras otro */
+.con-revelar .revelar .cat-pasos li,
+.con-revelar .cat-pasos.revelar li,
+.con-revelar .cat-categorias-inicio.revelar li {
+    opacity: 0;
+    transform: translateY(14px);
+    transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+.con-revelar .revelar.visible li {
+    opacity: 1;
+    transform: none;
+}
+
+.con-revelar .revelar.visible li:nth-child(2) { transition-delay: 0.1s; }
+.con-revelar .revelar.visible li:nth-child(3) { transition-delay: 0.2s; }
+.con-revelar .revelar.visible li:nth-child(4) { transition-delay: 0.3s; }
+.con-revelar .revelar.visible li:nth-child(5) { transition-delay: 0.4s; }
+.con-revelar .revelar.visible li:nth-child(n + 6) { transition-delay: 0.5s; }
+
+/* Barra superior: los mensajes pasan de derecha a izquierda */
+.cat-anuncio-movil {
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.cat-anuncio-pista {
+    display: inline-flex;
+    animation: desplazarAnuncio 32s linear infinite;
+}
+
+.cat-anuncio-tramo {
+    display: inline-flex;
+    flex-shrink: 0;
+}
+
+.cat-anuncio-tramo > span {
+    padding: 0 28px;
+}
+
+@keyframes desplazarAnuncio {
+    to {
+        transform: translateX(-50%);
+    }
+}
+
+/* Contador del pedido: rebota al agregar */
+.cat-contador {
+    animation: rebote 0.45s ease;
+}
+
+@keyframes rebote {
+    0% { transform: scale(0.6); }
+    55% { transform: scale(1.25); }
+    100% { transform: scale(1); }
+}
+
+/* Botón de WhatsApp: un latido suave de vez en cuando */
+.cat-whatsapp-flotante {
+    animation: latido 6s ease-in-out 3s infinite;
+}
+
+@keyframes latido {
+    0%, 86%, 100% { transform: scale(1); }
+    90% { transform: scale(1.12); }
+    94% { transform: scale(0.96); }
+}
+
+/* Rendimiento: las secciones del listado que no se ven no se dibujan hasta acercarse */
+.cat-resultados .cat-bloque {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 900px;
+}
+
+/* Sin animaciones si el cliente las desactivó en su celular */
+@media (prefers-reduced-motion: reduce) {
+    .foto-adaptada,
+    .carrusel-diapositiva.activa img,
+    .cat-anuncio-pista,
+    .cat-contador,
+    .cat-whatsapp-flotante,
+    .carrusel-leyenda {
+        animation: none;
+    }
+
+    .carrusel-diapositiva,
+    .foto-adaptada .foto-adaptada-principal {
+        transition: none;
+    }
+}

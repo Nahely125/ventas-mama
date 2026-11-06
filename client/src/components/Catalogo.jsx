@@ -5,6 +5,7 @@ import { iconoTema } from "../secciones.js";
 import { WHATSAPP_NEGOCIO } from "../datosPago.js";
 import CarritoCatalogo, { detalleCarrito, precioCatalogo, useCarrito } from "./CarritoCatalogo.jsx";
 import { PanelFiltros, VentanaFiltros, aplicarFiltros, cantidadFiltros } from "./FiltrosCatalogo.jsx";
+import { CarruselFila, FotoAdaptada, useRevelar } from "./Carrusel.jsx";
 import { BarraPromociones, BotonWhatsAppFlotante, Nosotros, PieTienda, Portada, VentanaBienvenida } from "./TiendaWeb.jsx";
 import { totalesPedido, urlImagenTienda, useCupon, useTienda } from "../tienda.js";
 import { contiene, normalizar } from "../texto.js";
@@ -131,7 +132,7 @@ function TarjetaProductoCatalogo({ producto, onAbrir, enPedido, onAgregar }) {
             <button type="button" className="cat-producto-boton" onClick={() => onAbrir(producto)}>
                 <span className="cat-foto">
                     {foto ? (
-                        <img src={foto} alt="" loading="lazy" />
+                        <FotoAdaptada src={foto} />
                     ) : (
                         <span className="cat-sin-foto" aria-hidden="true">✦</span>
                     )}
@@ -287,7 +288,7 @@ export default function Catalogo() {
         () => [...(datos?.productos ?? [])]
             .filter((p) => p.disponible)
             .sort((a, b) => Number(b.tieneFoto) - Number(a.tieneFoto) || b.id - a.id)
-            .slice(0, 8),
+            .slice(0, 12),
         [datos]
     );
 
@@ -347,6 +348,7 @@ export default function Catalogo() {
 
     const texto = normalizar(busqueda);
     const filtrar = (productos) => aplicarFiltros(productos, filtros);
+    useRevelar([pagina, datos, seccionClave, texto, tienda]);
 
     // Búsqueda: nombre, código o categoría, en todas las secciones.
     const resultados = texto
@@ -406,6 +408,20 @@ export default function Catalogo() {
         />
     );
     const grilla = (productos) => <Grilla productos={productos} onAbrir={setDetalle} enPedido={enPedido} onAgregar={agregar} />;
+    // Fila deslizable de productos (avanza sola): «Los más vendidos» y «Novedades».
+    const carrusel = (productos, etiqueta) => (
+        <CarruselFila etiqueta={etiqueta}>
+            {productos.map((producto) => (
+                <TarjetaProductoCatalogo
+                    key={producto.id}
+                    producto={producto}
+                    onAbrir={setDetalle}
+                    enPedido={enPedido(producto.id)}
+                    onAgregar={agregar}
+                />
+            ))}
+        </CarruselFila>
+    );
     const tituloListado = texto
         ? `Resultados para “${busqueda.trim()}”`
         : seccionClave === TODO
@@ -447,7 +463,7 @@ export default function Catalogo() {
                             <path d="M5 8h14l-1.2 11.2a2 2 0 0 1-2 1.8H8.2a2 2 0 0 1-2-1.8z" />
                             <path d="M9 8V6.5a3 3 0 0 1 6 0V8" />
                         </svg>
-                        {pedido.piezas > 0 && <span className="cat-contador">{pedido.piezas}</span>}
+                        {pedido.piezas > 0 && <span className="cat-contador" key={pedido.piezas}>{pedido.piezas}</span>}
                     </button>
                 </div>
 
@@ -558,6 +574,8 @@ export default function Catalogo() {
                         masVendidos={masVendidos}
                         destacados={destacados}
                         grilla={grilla}
+                        carrusel={carrusel}
+                        onAbrir={setDetalle}
                         onIr={ir}
                         onAplicarCupon={aplicarCupon}
                     />
@@ -745,7 +763,7 @@ function DetalleProducto({ producto, relacionados = [], enPedido, onAgregar, onA
                     ✕
                 </button>
                 <div className="cat-detalle-foto">
-                    {foto ? <img src={foto} alt={producto.nombre} /> : <span aria-hidden="true">✦</span>}
+                    {foto ? <FotoAdaptada src={foto} alt={producto.nombre} prioridad /> : <span aria-hidden="true">✦</span>}
                 </div>
                 <div className="cat-detalle-datos">
                     {producto.codigo && <span className="cat-codigo">Código {producto.codigo}</span>}
@@ -806,7 +824,7 @@ function DetalleProducto({ producto, relacionados = [], enPedido, onAgregar, onA
                                 <li key={p.id}>
                                     <button type="button" onClick={() => onAbrir(p)}>
                                         <span className="cat-relacionado-foto">
-                                            {fotoRelacionado ? <img src={fotoRelacionado} alt="" loading="lazy" /> : <span aria-hidden="true">✦</span>}
+                                            {fotoRelacionado ? <FotoAdaptada src={fotoRelacionado} /> : <span aria-hidden="true">✦</span>}
                                             {!p.disponible && <span className="cat-etiqueta">Agotado</span>}
                                         </span>
                                         <span className="cat-relacionado-nombre">{p.nombre}</span>

@@ -4,6 +4,7 @@ import { urlFoto } from "../fotos.js";
 import { iconoTema } from "../secciones.js";
 import { BILLETERAS, RECARGO_TARJETA } from "../datosPago.js";
 import { enlaceWhatsApp, telefonoLegible, urlImagenTienda } from "../tienda.js";
+import { CarruselPortada, prefiereQuieto } from "./Carrusel.jsx";
 
 /* Partes de la página web del catálogo (inspirada en las tiendas de moda en línea):
    barra de promociones, portada, "Nosotros", pie de página y ventana de bienvenida con el cupón. */
@@ -34,12 +35,30 @@ function mensajesPromocion(tienda, feria) {
 export function BarraPromociones({ tienda, feria, onCupon }) {
     const mensajes = mensajesPromocion(tienda, feria);
     const [indice, setIndice] = useState(0);
+    const [quieto] = useState(prefiereQuieto);
+    // Con movimiento (y sin cupón que tocar): los mensajes pasan de derecha a izquierda sin parar.
+    const desplazar = !quieto && !mensajes.some((m) => m.cupon);
 
     useEffect(() => {
-        if (mensajes.length < 2 || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return undefined;
+        if (desplazar || mensajes.length < 2 || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return undefined;
         const reloj = setInterval(() => setIndice((i) => (i + 1) % mensajes.length), 4500);
         return () => clearInterval(reloj);
-    }, [mensajes.length]);
+    }, [mensajes.length, desplazar]);
+
+    if (desplazar) {
+        const vuelta = Array.from({ length: Math.max(2, 4 - mensajes.length) }, () => mensajes).flat();
+        return (
+            <div className="cat-anuncio cat-anuncio-movil" aria-label={mensajes.map((m) => m.texto).join(". ")}>
+                <div className="cat-anuncio-pista" aria-hidden="true">
+                    {[0, 1].map((copia) => (
+                        <span key={copia} className="cat-anuncio-tramo">
+                            {vuelta.map((m, i) => <span key={i}>✦ {m.texto}</span>)}
+                        </span>
+                    ))}
+                </div>
+            </div>
+        );
+    }
 
     const actual = mensajes[indice % mensajes.length];
 
@@ -83,7 +102,7 @@ function BloquesPromocion({ tienda, onAplicarCupon }) {
     if (!tienda || (!tienda.cupon.activo && !tienda.envio.activo)) return null;
 
     return (
-        <section className="cat-promos" aria-label="Promociones">
+        <section className="cat-promos revelar" aria-label="Promociones">
             {tienda.cupon.activo && (
                 <article className="cat-promo cat-promo-cupon">
                     <p className="cat-promo-sobre">Bienvenida a Mil Deseos</p>
@@ -120,7 +139,7 @@ function PasosCompra() {
     ];
 
     return (
-        <section className="cat-pasos" aria-labelledby="titulo-pasos">
+        <section className="cat-pasos revelar" aria-labelledby="titulo-pasos">
             <h2 id="titulo-pasos" className="cat-titulo-centrado">Compra en 3 pasos</h2>
             <ol>
                 {pasos.map((paso, i) => (
@@ -141,7 +160,7 @@ function CategoriasInicio({ categorias, onIr }) {
     if (categorias.length < 2) return null;
 
     return (
-        <section className="cat-categorias-inicio" aria-labelledby="titulo-categorias-inicio">
+        <section className="cat-categorias-inicio revelar" aria-labelledby="titulo-categorias-inicio">
             <h2 id="titulo-categorias-inicio" className="cat-titulo-centrado">Compra por categoría</h2>
             <ul>
                 {categorias.map((categoria) => (
@@ -169,7 +188,7 @@ function Testimonios({ tienda }) {
     if (!tienda?.testimonios?.length) return null;
 
     return (
-        <section className="cat-testimonios" aria-labelledby="titulo-testimonios">
+        <section className="cat-testimonios revelar" aria-labelledby="titulo-testimonios">
             <h2 id="titulo-testimonios" className="cat-titulo-centrado">Lo que dicen de nosotros</h2>
             <ul>
                 {tienda.testimonios.map((t) => (
@@ -189,7 +208,7 @@ export function PreguntasFrecuentes({ tienda, id }) {
     if (!tienda?.preguntas?.length) return null;
 
     return (
-        <section className="cat-preguntas" id={id} aria-labelledby={`${id ?? "inicio"}-titulo-preguntas`}>
+        <section className="cat-preguntas revelar" id={id} aria-labelledby={`${id ?? "inicio"}-titulo-preguntas`}>
             <h2 id={`${id ?? "inicio"}-titulo-preguntas`} className="cat-titulo-centrado">Preguntas frecuentes</h2>
             <div>
                 {tienda.preguntas.map((p) => (
@@ -227,16 +246,27 @@ export function BotonWhatsAppFlotante() {
 }
 
 // Portada: presentación, cómo comprar, categorías, más vendidos, novedades, comentarios y preguntas.
-export function Portada({ tienda, secciones, categorias, destacados, masVendidos, grilla, onIr, onAplicarCupon }) {
+export function Portada({ tienda, secciones, categorias, destacados, masVendidos, grilla, carrusel, onIr, onAbrir, onAplicarCupon }) {
     const portada = urlImagenTienda(tienda, "portada");
-    const fotos = portada ? [] : destacados.filter((p) => p.tieneFoto).slice(0, 3);
+    // Carrusel de la portada: la foto subida en «Página web» y fotos de productos (más vendidos y novedades).
+    const conFoto = [...masVendidos, ...destacados]
+        .filter((p, i, lista) => p.tieneFoto && lista.findIndex((x) => x.id === p.id) === i)
+        .slice(0, portada ? 3 : 4);
+    const diapositivas = [
+        portada && { clave: "portada", src: portada },
+        ...conFoto.map((p) => ({
+            clave: p.id,
+            src: urlFoto(p),
+            titulo: p.nombre,
+            detalle: `${moneda(p.precioMinimo)} c/u`,
+            onVer: () => onAbrir(p)
+        }))
+    ].filter(Boolean);
 
     return (
         <>
-            <section
-                className={`cat-heroe ${portada ? "cat-heroe-con-foto" : ""}`}
-                style={portada ? { "--foto-portada": `url("${portada}")` } : undefined}
-            >
+            <section className={`cat-heroe ${diapositivas.length ? "cat-heroe-con-carrusel" : ""}`}>
+                <CarruselPortada diapositivas={diapositivas} />
                 <div className="cat-heroe-texto">
                     <p className="cat-banner-sobre">Nueva temporada</p>
                     <h1>Haz realidad tus deseos</h1>
@@ -252,13 +282,6 @@ export function Portada({ tienda, secciones, categorias, destacados, masVendidos
                         </a>
                     </div>
                 </div>
-                {fotos.length > 0 && (
-                    <div className={`cat-heroe-fotos cat-heroe-fotos-${fotos.length}`} aria-hidden="true">
-                        {fotos.map((producto) => (
-                            <img key={producto.id} src={urlFoto(producto, "mini")} alt="" />
-                        ))}
-                    </div>
-                )}
             </section>
 
             <PasosCompra />
@@ -266,16 +289,16 @@ export function Portada({ tienda, secciones, categorias, destacados, masVendidos
             <CategoriasInicio categorias={categorias} onIr={onIr} />
 
             {masVendidos.length > 0 && (
-                <section className="cat-bloque" aria-label="Los más vendidos">
+                <section className="cat-bloque cat-bloque-carrusel revelar" aria-label="Los más vendidos">
                     <h2 className="cat-titulo-centrado">Los más vendidos</h2>
-                    {grilla(masVendidos)}
+                    {carrusel(masVendidos, "Los más vendidos")}
                 </section>
             )}
 
             <BloquesPromocion tienda={tienda} onAplicarCupon={onAplicarCupon} />
 
             {secciones.length > 0 && (
-                <section className="cat-ferias" aria-label="Compra por feria">
+                <section className="cat-ferias revelar" aria-label="Compra por feria">
                     <h2 className="cat-titulo-centrado">Compra por feria</h2>
                     <ul>
                         {secciones.map((seccion) => {
@@ -298,9 +321,9 @@ export function Portada({ tienda, secciones, categorias, destacados, masVendidos
             )}
 
             {destacados.length > 0 && (
-                <section className="cat-bloque" aria-label="Novedades">
+                <section className="cat-bloque cat-bloque-carrusel revelar" aria-label="Novedades">
                     <h2 className="cat-titulo-centrado">Novedades</h2>
-                    {grilla(destacados)}
+                    {carrusel(destacados, "Novedades")}
                     <div className="cat-centrado">
                         <button type="button" className="cat-boton-oscuro" onClick={() => onIr("todo")}>
                             Ver todo el catálogo
@@ -314,7 +337,7 @@ export function Portada({ tienda, secciones, categorias, destacados, masVendidos
             <PreguntasFrecuentes tienda={tienda} />
 
             {tienda && (
-                <section className="cat-nosotros-breve">
+                <section className="cat-nosotros-breve revelar">
                     <div>
                         <p className="cat-banner-sobre">¿Quiénes somos?</p>
                         <h2>Un negocio familiar lleno de ilusión</h2>
