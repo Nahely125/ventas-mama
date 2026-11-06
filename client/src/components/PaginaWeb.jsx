@@ -1,5 +1,80 @@
 import { useEffect, useState } from "react";
 import { pedir } from "../api.js";
+import { leerImagen } from "../fotos.js";
+import { urlImagenTienda } from "../tienda.js";
+
+// Reduce la imagen elegida antes de subirla (las fotos del celular pesan varios MB).
+// La portada va en JPEG; el logo en PNG para conservar el fondo transparente.
+async function prepararImagen(archivo, clave) {
+    const imagen = await leerImagen(archivo);
+    const ladoMaximo = clave === "logo" ? 600 : 1600;
+    const escala = Math.min(1, ladoMaximo / Math.max(imagen.width, imagen.height));
+    const lienzo = document.createElement("canvas");
+    lienzo.width = Math.round(imagen.width * escala);
+    lienzo.height = Math.round(imagen.height * escala);
+    lienzo.getContext("2d").drawImage(imagen, 0, 0, lienzo.width, lienzo.height);
+    return clave === "logo" ? lienzo.toDataURL("image/png") : lienzo.toDataURL("image/jpeg", 0.85);
+}
+
+// Foto de portada o logo: vista previa, subir otra o quitarla.
+function ImagenTienda({ clave, titulo, ayuda, tienda, onTienda, onMensaje, onError }) {
+    const [subiendo, setSubiendo] = useState(false);
+    const url = urlImagenTienda(tienda, clave);
+
+    async function subir(evento) {
+        const archivo = evento.target.files?.[0];
+        evento.target.value = "";
+        if (!archivo) return;
+
+        setSubiendo(true);
+        try {
+            const imagen = await prepararImagen(archivo, clave);
+            const resultado = await pedir(`/api/tienda/imagen/${clave}`, { method: "PUT", cuerpo: { imagen } });
+            onTienda(resultado.tienda);
+            onMensaje({ tipo: "exito", texto: `${resultado.mensaje} Ya se ve en el catálogo.` });
+        } catch (error) {
+            onError(error, () => onMensaje({ tipo: "error", texto: error.message }));
+        } finally {
+            setSubiendo(false);
+        }
+    }
+
+    async function quitar() {
+        if (!confirm(`¿Quitar ${clave === "logo" ? "el logo" : "la foto de portada"}?`)) return;
+
+        setSubiendo(true);
+        try {
+            const resultado = await pedir(`/api/tienda/imagen/${clave}`, { method: "DELETE" });
+            onTienda(resultado.tienda);
+            onMensaje({ tipo: "exito", texto: resultado.mensaje });
+        } catch (error) {
+            onError(error, () => onMensaje({ tipo: "error", texto: error.message }));
+        } finally {
+            setSubiendo(false);
+        }
+    }
+
+    return (
+        <div className={`imagen-tienda imagen-tienda-${clave}`}>
+            <span className="imagen-tienda-titulo">{titulo}</span>
+            <div className="imagen-tienda-vista">
+                {url ? <img src={url} alt={titulo} /> : <span>Sin {clave === "logo" ? "logo" : "foto"}</span>}
+            </div>
+            <span className="ayuda-campo">{ayuda}</span>
+            <div className="imagen-tienda-acciones">
+                <label className="boton-secundario boton-pequeno">
+                    {subiendo ? "Guardando..." : url ? "Cambiar" : "Subir"}
+                    <input type="file" accept="image/*" hidden disabled={subiendo} onChange={subir} />
+                </label>
+                {url && (
+                    <button type="button" className="boton-enlace" onClick={quitar} disabled={subiendo}>
+                        Quitar
+                    </button>
+                )}
+            </div>
+        </div>
+    );
+}
 
 const CAMPOS_EMPRESA = [
     { clave: "razonSocial", texto: "Razón social", ejemplo: "Ej. Mil Deseos E.I.R.L." },
@@ -32,6 +107,12 @@ export default function PaginaWeb({ onError }) {
     const cambiarEn = (grupo, cambios) => setValores((v) => ({ ...v, [grupo]: { ...v[grupo], ...cambios } }));
     const cambiarValor = (indice, cambios) =>
         setValores((v) => ({ ...v, valores: v.valores.map((x, i) => (i === indice ? { ...x, ...cambios } : x)) }));
+    // Cambia un elemento de una lista (preguntas o testimonios).
+    const cambiarLista = (lista, indice, cambios) =>
+        setValores((v) => ({ ...v, [lista]: v[lista].map((x, i) => (i === indice ? { ...x, ...cambios } : x)) }));
+    const quitarDeLista = (lista, indice) => setValores((v) => ({ ...v, [lista]: v[lista].filter((_, i) => i !== indice) }));
+    // Al subir una imagen se actualizan solo las imágenes (no se pierde lo que se está escribiendo).
+    const actualizarImagenes = (tienda) => setValores((v) => ({ ...v, imagenes: tienda.imagenes }));
 
     async function guardar(evento) {
         evento.preventDefault();
@@ -65,11 +146,24 @@ export default function PaginaWeb({ onError }) {
                 </a>
             </div>
             <p className="descripcion-seccion">
-                Lo que ven los clientes en el catálogo: quiénes son, sus valores, los datos de la empresa y las promociones.
+                Lo que ven los clientes en el catálogo: portada, logo, quiénes son, sus valores, preguntas frecuentes,
+                comentarios de clientes, los datos de la empresa y las promociones.
                 Lo que dejes vacío no se muestra.
             </p>
 
             <form className="formulario" onSubmit={guardar}>
+                <fieldset className="grupo-campos">
+                    <legend>Portada y logo</legend>
+                    <div className="imagenes-tienda">
+                        <ImagenTienda clave="portada" titulo="Foto de portada" tienda={valores}
+                            ayuda="Una foto horizontal y bonita: la tienda, un árbol armado, luces encendidas. Se ve detrás del título."
+                            onTienda={actualizarImagenes} onMensaje={setMensaje} onError={onError} />
+                        <ImagenTienda clave="logo" titulo="Logo" tienda={valores}
+                            ayuda="Mejor en PNG con fondo transparente. Si no hay logo, se muestra «Mil Deseos» en letra elegante."
+                            onTienda={actualizarImagenes} onMensaje={setMensaje} onError={onError} />
+                    </div>
+                </fieldset>
+
                 <fieldset className="grupo-campos">
                     <legend>¿Quiénes somos?</legend>
                     <div className="campo">
@@ -179,6 +273,62 @@ export default function PaginaWeb({ onError }) {
                         <input id="web-envio-condiciones" maxLength={300} value={valores.envio.condiciones}
                             onChange={(e) => cambiarEn("envio", { condiciones: e.target.value })} />
                     </div>
+                </fieldset>
+
+                <fieldset className="grupo-campos">
+                    <legend>Preguntas frecuentes</legend>
+                    <span className="ayuda-campo">
+                        Se ven en el inicio del catálogo y en «Nosotros». Agrega, por ejemplo, si se puede recoger en tienda,
+                        las zonas de envío y cuánto demora.
+                    </span>
+                    <ul className="lista-preguntas-web">
+                        {valores.preguntas.map((p, indice) => (
+                            <li key={indice}>
+                                <input aria-label={`Pregunta ${indice + 1}`} placeholder="Ej. ¿Puedo recoger en tienda?" maxLength={150}
+                                    value={p.pregunta} onChange={(e) => cambiarLista("preguntas", indice, { pregunta: e.target.value })} />
+                                <textarea aria-label={`Respuesta ${indice + 1}`} placeholder="La respuesta" rows={2} maxLength={600}
+                                    value={p.respuesta} onChange={(e) => cambiarLista("preguntas", indice, { respuesta: e.target.value })} />
+                                <button type="button" className="boton-enlace" onClick={() => quitarDeLista("preguntas", indice)}
+                                    aria-label={`Quitar la pregunta ${p.pregunta || indice + 1}`}>
+                                    Quitar
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
+                    {valores.preguntas.length < 12 && (
+                        <button type="button" className="boton-secundario boton-pequeno"
+                            onClick={() => cambiar({ preguntas: [...valores.preguntas, { pregunta: "", respuesta: "" }] })}>
+                            ➕ Agregar pregunta
+                        </button>
+                    )}
+                </fieldset>
+
+                <fieldset className="grupo-campos">
+                    <legend>Lo que dicen de nosotros</legend>
+                    <span className="ayuda-campo">
+                        Comentarios reales de clientes (por ejemplo, de WhatsApp o Facebook), con su permiso. Si no agregas
+                        ninguno, esta parte no se muestra.
+                    </span>
+                    <ul className="lista-preguntas-web">
+                        {valores.testimonios.map((t, indice) => (
+                            <li key={indice}>
+                                <input aria-label={`Nombre del cliente ${indice + 1}`} placeholder="Ej. Rosa, de Comas" maxLength={60}
+                                    value={t.nombre} onChange={(e) => cambiarLista("testimonios", indice, { nombre: e.target.value })} />
+                                <textarea aria-label={`Comentario ${indice + 1}`} placeholder="Lo que dijo" rows={2} maxLength={400}
+                                    value={t.texto} onChange={(e) => cambiarLista("testimonios", indice, { texto: e.target.value })} />
+                                <button type="button" className="boton-enlace" onClick={() => quitarDeLista("testimonios", indice)}
+                                    aria-label={`Quitar el comentario ${t.nombre || indice + 1}`}>
+                                    Quitar
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
+                    {valores.testimonios.length < 8 && (
+                        <button type="button" className="boton-secundario boton-pequeno"
+                            onClick={() => cambiar({ testimonios: [...valores.testimonios, { nombre: "", texto: "" }] })}>
+                            ➕ Agregar comentario
+                        </button>
+                    )}
                 </fieldset>
 
                 <button type="submit" className="boton-principal" disabled={guardando}>

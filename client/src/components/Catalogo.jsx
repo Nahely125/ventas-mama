@@ -5,8 +5,8 @@ import { iconoTema } from "../secciones.js";
 import { WHATSAPP_NEGOCIO } from "../datosPago.js";
 import CarritoCatalogo, { detalleCarrito, precioCatalogo, useCarrito } from "./CarritoCatalogo.jsx";
 import { PanelFiltros, VentanaFiltros, aplicarFiltros, cantidadFiltros } from "./FiltrosCatalogo.jsx";
-import { BarraPromociones, Nosotros, PieTienda, Portada, VentanaBienvenida } from "./TiendaWeb.jsx";
-import { totalesPedido, useCupon, useTienda } from "../tienda.js";
+import { BarraPromociones, BotonWhatsAppFlotante, Nosotros, PieTienda, Portada, VentanaBienvenida } from "./TiendaWeb.jsx";
+import { totalesPedido, urlImagenTienda, useCupon, useTienda } from "../tienda.js";
 import { contiene, normalizar } from "../texto.js";
 
 // Enlace para pedir un producto por WhatsApp con el mensaje ya escrito.
@@ -20,6 +20,37 @@ function enlacePedido(producto) {
     ].join("\n");
 
     return `https://wa.me/${WHATSAPP_NEGOCIO}?text=${encodeURIComponent(mensaje)}`;
+}
+
+// Cuánto se ahorra al llevar media docena o docena frente a comprar por unidad (0 si no hay ahorro).
+function ahorroPor(producto, modalidad) {
+    const piezas = modalidad === "docena" ? 12 : 6;
+    const ahorro = Number(producto.precioMinimo) * piezas - precioCatalogo(producto, modalidad);
+    return ahorro >= 0.5 ? Math.round(ahorro * 100) / 100 : 0;
+}
+
+// Etiquetas de la tarjeta: «Agotado», «Más vendido», «Nuevo» o «Últimas unidades» (máximo dos).
+function etiquetasDe(producto) {
+    if (!producto.disponible) return [{ clave: "agotado", texto: "Agotado" }];
+
+    return [
+        producto.puestoVendido && { clave: "vendido", texto: "★ Más vendido" },
+        producto.nuevo && { clave: "nuevo", texto: "Nuevo" },
+        producto.ultimasUnidades && { clave: "ultimas", texto: "Últimas unidades" }
+    ].filter(Boolean).slice(0, 2);
+}
+
+function Etiquetas({ producto }) {
+    const etiquetas = etiquetasDe(producto);
+    if (etiquetas.length === 0) return null;
+
+    return (
+        <span className="cat-etiquetas">
+            {etiquetas.map((e) => (
+                <span key={e.clave} className={`cat-etiqueta cat-etiqueta-${e.clave}`}>{e.texto}</span>
+            ))}
+        </span>
+    );
 }
 
 function BotonPedir({ producto, grande = false }) {
@@ -93,6 +124,7 @@ function BotonAgregar({ producto, enPedido, onAgregar, grande = false }) {
 
 function TarjetaProductoCatalogo({ producto, onAbrir, enPedido, onAgregar }) {
     const foto = urlFoto(producto, "mini");
+    const ahorroDocena = ahorroPor(producto, "docena");
 
     return (
         <li className={`cat-producto ${producto.disponible ? "" : "cat-agotado"}`}>
@@ -103,14 +135,17 @@ function TarjetaProductoCatalogo({ producto, onAbrir, enPedido, onAgregar }) {
                     ) : (
                         <span className="cat-sin-foto" aria-hidden="true">✦</span>
                     )}
-                    {!producto.disponible && <span className="cat-etiqueta">Agotado</span>}
+                    <Etiquetas producto={producto} />
                 </span>
                 <span className="cat-producto-datos">
                     <span className="cat-producto-nombre">{producto.nombre}</span>
                     <span className="cat-producto-precio">
                         {moneda(producto.precioMinimo)} <small>c/u</small>
                     </span>
-                    <span className="cat-producto-docena">Docena {moneda(producto.precioMinimoDocena)}</span>
+                    <span className="cat-producto-docena">
+                        Docena {moneda(producto.precioMinimoDocena)}
+                        {ahorroDocena > 0 && <em className="cat-ahorro">Ahorras {moneda(ahorroDocena)}</em>}
+                    </span>
                 </span>
             </button>
             <BotonAgregar producto={producto} enPedido={enPedido} onAgregar={onAgregar} />
@@ -256,6 +291,29 @@ export default function Catalogo() {
         [datos]
     );
 
+    // Los más vendidos (últimos 90 días) que siguen disponibles.
+    const masVendidos = useMemo(
+        () => (datos?.productos ?? [])
+            .filter((p) => p.puestoVendido && p.disponible)
+            .sort((a, b) => a.puestoVendido - b.puestoVendido),
+        [datos]
+    );
+
+    // Categorías de todas las ferias, con la foto de uno de sus productos (para el inicio).
+    const categoriasInicio = useMemo(
+        () => secciones.flatMap((seccion) => seccion.categorias
+            .filter((c) => c.slug !== OTROS)
+            .map((c) => ({
+                seccion: seccion.slug,
+                slug: c.slug,
+                nombre: c.nombre,
+                icono: c.icono,
+                total: c.productos.length,
+                foto: c.productos.find((p) => p.tieneFoto && p.disponible) ?? c.productos.find((p) => p.tieneFoto) ?? null
+            }))),
+        [secciones]
+    );
+
     function ir(seccion, categoria = null, desplazar = true) {
         // "nosotros/valores" → página "nosotros", apartado "valores".
         if (categoria === null && seccion.includes("/")) {
@@ -376,7 +434,7 @@ export default function Catalogo() {
                     </button>
 
                     <a className="cat-logo" href="/catalogo" onClick={(e) => { e.preventDefault(); ir(INICIO); }}>
-                        Mil Deseos
+                        {urlImagenTienda(tienda, "logo") ? <img src={urlImagenTienda(tienda, "logo")} alt="Mil Deseos" /> : "Mil Deseos"}
                     </a>
 
                     <button
@@ -496,6 +554,8 @@ export default function Catalogo() {
                     <Portada
                         tienda={tienda}
                         secciones={secciones}
+                        categorias={categoriasInicio}
+                        masVendidos={masVendidos}
                         destacados={destacados}
                         grilla={grilla}
                         onIr={ir}
@@ -605,11 +665,10 @@ export default function Catalogo() {
             />
 
             {pedido.piezas > 0 && !viendoPedido && (
-                <button type="button" className="cat-barra-pedido" onClick={() => setViendoPedido(true)}>
-                    <span>🛒 Ver mi pedido ({pedido.piezas})</span>
-                    <strong>{moneda(totalesPedido(pedido.total, tienda, cupon).total)}</strong>
-                </button>
+                <BarraPedido pedido={pedido} totales={totalesPedido(pedido.total, tienda, cupon)} onVer={() => setViendoPedido(true)} />
             )}
+
+            {!viendoPedido && !detalle && <BotonWhatsAppFlotante />}
 
             {detalle && (
                 <DetalleProducto
@@ -634,6 +693,23 @@ export default function Catalogo() {
                 />
             )}
         </div>
+    );
+}
+
+// Barra inferior del pedido: total y cuánto falta para el envío gratis.
+function BarraPedido({ pedido, totales, onVer }) {
+    return (
+        <button type="button" className="cat-barra-pedido" onClick={onVer}>
+            <span className="cat-barra-pedido-fila">
+                <span>🛒 Ver mi pedido ({pedido.piezas})</span>
+                <strong>{moneda(totales.total)}</strong>
+            </span>
+            {totales.envioActivo && (
+                <small className="cat-barra-envio">
+                    {totales.envioGratis ? "🚚 ¡Tienes envío gratis!" : `🚚 Te faltan ${moneda(totales.faltaEnvio)} para el envío gratis`}
+                </small>
+            )}
+        </button>
     );
 }
 
@@ -681,13 +757,25 @@ function DetalleProducto({ producto, relacionados = [], enPedido, onAgregar, onA
                         </div>
                         <div>
                             <dt>Por media docena</dt>
-                            <dd>{moneda(precioCatalogo(producto, "media"))}</dd>
+                            <dd>
+                                {moneda(precioCatalogo(producto, "media"))}
+                                {ahorroPor(producto, "media") > 0 && <small className="cat-ahorro">Ahorras {moneda(ahorroPor(producto, "media"))}</small>}
+                            </dd>
                         </div>
                         <div>
                             <dt>Por docena</dt>
-                            <dd>{moneda(producto.precioMinimoDocena)}</dd>
+                            <dd>
+                                {moneda(producto.precioMinimoDocena)}
+                                {ahorroPor(producto, "docena") > 0 && <small className="cat-ahorro">Ahorras {moneda(ahorroPor(producto, "docena"))}</small>}
+                            </dd>
                         </div>
                     </dl>
+                    {ahorroPor(producto, "docena") > 0 && (
+                        <p className="cat-consejo">
+                            💡 Mientras más llevas, menos pagas: por docena, cada uno sale a{" "}
+                            <strong>{moneda(Number(producto.precioMinimoDocena) / 12)}</strong> en vez de {moneda(producto.precioMinimo)}.
+                        </p>
+                    )}
                     <p className={producto.disponible ? "cat-disponible" : "cat-no-disponible"}>
                         {producto.disponible ? "● Disponible" : "● Agotado por ahora"}
                     </p>

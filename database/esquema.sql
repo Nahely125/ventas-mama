@@ -84,7 +84,8 @@ CREATE TABLE IF NOT EXISTS productos (
     foto_mini          BYTEA,                                               -- miniatura (se crea sola al pedirla)
     foto_original      BYTEA,                                               -- la foto sin editar (para cambiar de escena)
     foto_original_tipo VARCHAR(30),
-    foto_actualizada   TIMESTAMP
+    foto_actualizada   TIMESTAMP,
+    creado_en          TIMESTAMP     DEFAULT CURRENT_TIMESTAMP              -- para la etiqueta «Nuevo» del catálogo
 );
 
 -- El código no se puede repetir (sin distinguir mayúsculas/minúsculas).
@@ -322,6 +323,14 @@ CREATE TABLE IF NOT EXISTS tienda (
     id          INTEGER PRIMARY KEY CHECK (id = 1),
     datos       JSONB NOT NULL,
     actualizado TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Imágenes de la página web: foto de portada ('portada') y logo ('logo').
+CREATE TABLE IF NOT EXISTS tienda_imagenes (
+    clave       VARCHAR(20) PRIMARY KEY,
+    datos       BYTEA       NOT NULL,
+    tipo        VARCHAR(30) NOT NULL,
+    actualizada TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 COMMIT;

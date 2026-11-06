@@ -45,8 +45,23 @@ const TIENDA_INICIAL = {
         activo: true,
         gratisDesde: 600,
         condiciones: "Envío gratis en compras mayores a S/ 600 (después del descuento). Para montos menores, el costo del envío se coordina por WhatsApp."
-    }
+    },
+    // Preguntas frecuentes (se muestran en el inicio y en «Nosotros»).
+    preguntas: [
+        { pregunta: "¿Cómo hago mi pedido?", respuesta: "Toca «Agregar» en los productos que quieras, revisa tu pedido y envíalo por WhatsApp. Te confirmamos la disponibilidad y el total antes de que pagues." },
+        { pregunta: "¿Venden por mayor?", respuesta: "Sí. Cada producto tiene precio por unidad, por media docena y por docena: mientras más llevas, menos pagas por cada uno." },
+        { pregunta: "¿Cómo puedo pagar?", respuesta: "Con Yape, Plin, transferencia o tarjeta de débito o crédito (con tarjeta se suma un 5%)." },
+        { pregunta: "¿Hacen envíos?", respuesta: "Sí. Coordinamos el envío por WhatsApp según tu zona. Si tu compra supera el monto de la promoción, el envío es gratis." },
+        { pregunta: "¿Cómo sé si hay stock?", respuesta: "Cada producto indica si está disponible o agotado. Igual te confirmamos las cantidades por WhatsApp antes de cerrar tu pedido." }
+    ],
+    // Comentarios de clientes: solo se muestran si el jefe los agrega.
+    testimonios: []
 };
+
+// Imágenes de la página web que se pueden subir.
+const IMAGENES = { portada: "foto de portada", logo: "logo" };
+const TIPOS_IMAGEN = ["image/jpeg", "image/png", "image/webp"];
+const TAMANO_MAXIMO_IMAGEN = 3 * 1024 * 1024;
 
 const LIMITE_TEXTO = 1200;
 const LIMITE_CORTO = 150;
@@ -93,8 +108,22 @@ function validarTienda(cuerpo) {
             activo: envio.activo === true,
             gratisDesde: Number(envio.gratisDesde),
             condiciones: texto(envio.condiciones, 300)
-        }
+        },
+        preguntas: (Array.isArray(cuerpo?.preguntas) ? cuerpo.preguntas : [])
+            .map((p) => ({ pregunta: texto(p?.pregunta, 150), respuesta: texto(p?.respuesta, 600) }))
+            .filter((p) => p.pregunta && p.respuesta),
+        testimonios: (Array.isArray(cuerpo?.testimonios) ? cuerpo.testimonios : [])
+            .map((t) => ({ nombre: texto(t?.nombre, 60), texto: texto(t?.texto, 400) }))
+            .filter((t) => t.nombre && t.texto)
     };
+
+    if (datos.preguntas.length > 12) {
+        return { error: "Puedes poner hasta 12 preguntas frecuentes." };
+    }
+
+    if (datos.testimonios.length > 8) {
+        return { error: "Puedes poner hasta 8 comentarios de clientes." };
+    }
 
     if (datos.valores.length > 8) {
         return { error: "Puedes poner hasta 8 valores." };
@@ -132,7 +161,10 @@ function validarTienda(cuerpo) {
 
 // Datos guardados combinados con los iniciales (si falta algo, se usa lo inicial).
 async function leerTienda() {
-    const resultado = await pool.query(`SELECT datos FROM tienda WHERE id = 1`);
+    const [resultado, imagenes] = await Promise.all([
+        pool.query(`SELECT datos FROM tienda WHERE id = 1`),
+        pool.query(`SELECT clave, EXTRACT(EPOCH FROM actualizada)::BIGINT AS version FROM tienda_imagenes`)
+    ]);
     const guardado = resultado.rows[0]?.datos ?? {};
 
     return {
@@ -140,7 +172,9 @@ async function leerTienda() {
         ...guardado,
         empresa: { ...TIENDA_INICIAL.empresa, ...guardado.empresa },
         cupon: { ...TIENDA_INICIAL.cupon, ...guardado.cupon },
-        envio: { ...TIENDA_INICIAL.envio, ...guardado.envio }
+        envio: { ...TIENDA_INICIAL.envio, ...guardado.envio },
+        // Versión de cada imagen subida (cambia al reemplazarla, así no queda la vieja en caché).
+        imagenes: Object.fromEntries(imagenes.rows.map((fila) => [fila.clave, String(fila.version)]))
     };
 }
 
@@ -171,6 +205,77 @@ router.put("/", requiereJefe, async (req, res) => {
     } catch (err) {
         console.error("Error al guardar la página web:", err.message);
         res.status(500).json({ error: "No se pudo guardar la página web." });
+    }
+});
+
+// Foto de portada o logo (pública: la usa el catálogo).
+router.get("/imagen/:clave", async (req, res) => {
+    if (!IMAGENES[req.params.clave]) {
+        return res.status(404).end();
+    }
+
+    try {
+        const resultado = await pool.query(`SELECT datos, tipo FROM tienda_imagenes WHERE clave = $1`, [req.params.clave]);
+        const imagen = resultado.rows[0];
+
+        if (!imagen) {
+            return res.status(404).end();
+        }
+
+        // Con versión en la dirección se guarda en caché mucho tiempo (cambia al subir otra).
+        res.set("Cache-Control", req.query.v ? "public, max-age=31536000, immutable" : "public, max-age=300");
+        res.type(imagen.tipo).send(imagen.datos);
+    } catch (error) {
+        console.error("Error al enviar la imagen de la tienda:", error.message);
+        res.status(500).end();
+    }
+});
+
+router.put("/imagen/:clave", requiereJefe, async (req, res) => {
+    const nombre = IMAGENES[req.params.clave];
+
+    if (!nombre) {
+        return res.status(404).json({ error: "Imagen no encontrada." });
+    }
+
+    const coincidencia = /^data:(image\/[a-z]+);base64,([A-Za-z0-9+/=]+)$/.exec(req.body?.imagen ?? "");
+
+    if (!coincidencia || !TIPOS_IMAGEN.includes(coincidencia[1])) {
+        return res.status(400).json({ error: "La imagen debe ser JPG, PNG o WEBP." });
+    }
+
+    const datos = Buffer.from(coincidencia[2], "base64");
+
+    if (datos.length > TAMANO_MAXIMO_IMAGEN) {
+        return res.status(400).json({ error: "La imagen es demasiado grande." });
+    }
+
+    try {
+        await pool.query(
+            `INSERT INTO tienda_imagenes (clave, datos, tipo, actualizada) VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+             ON CONFLICT (clave) DO UPDATE SET datos = EXCLUDED.datos, tipo = EXCLUDED.tipo, actualizada = CURRENT_TIMESTAMP`,
+            [req.params.clave, datos, coincidencia[1]]
+        );
+        res.json({ mensaje: `Se guardó ${req.params.clave === "logo" ? "el" : "la"} ${nombre}.`, tienda: await leerTienda() });
+    } catch (error) {
+        console.error("Error al guardar la imagen de la tienda:", error.message);
+        res.status(500).json({ error: "No se pudo guardar la imagen." });
+    }
+});
+
+router.delete("/imagen/:clave", requiereJefe, async (req, res) => {
+    const nombre = IMAGENES[req.params.clave];
+
+    if (!nombre) {
+        return res.status(404).json({ error: "Imagen no encontrada." });
+    }
+
+    try {
+        await pool.query(`DELETE FROM tienda_imagenes WHERE clave = $1`, [req.params.clave]);
+        res.json({ mensaje: `Se quitó ${req.params.clave === "logo" ? "el" : "la"} ${nombre}.`, tienda: await leerTienda() });
+    } catch (error) {
+        console.error("Error al quitar la imagen de la tienda:", error.message);
+        res.status(500).json({ error: "No se pudo quitar la imagen." });
     }
 });
 

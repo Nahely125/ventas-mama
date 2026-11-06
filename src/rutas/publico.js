@@ -6,6 +6,9 @@ const { consultarVentas, armarBoleta } = require("./consultasVentas");
 // Nunca devuelven costos, ganancias ni datos internos.
 const router = express.Router();
 
+// Con esta cantidad o menos, el catálogo muestra «Últimas unidades».
+const ULTIMAS_UNIDADES = 5;
+
 // Catálogo: secciones visibles y sus productos (precio mínimo y foto).
 // Los productos de secciones ocultas no se muestran; los que no tienen sección sí.
 router.get("/catalogo", async (req, res) => {
@@ -25,7 +28,16 @@ router.get("/catalogo", async (req, res) => {
         );
 
         const productos = await pool.query(
-            `SELECT
+            `WITH vendidos AS (
+                -- Los 8 más vendidos de los últimos 90 días (unidades, sin anuladas).
+                SELECT producto_id, ROW_NUMBER() OVER (ORDER BY SUM(cantidad) DESC, producto_id) AS puesto
+                FROM ventas
+                WHERE anulada_en IS NULL AND fecha >= CURRENT_DATE - INTERVAL '90 days'
+                GROUP BY producto_id
+                ORDER BY SUM(cantidad) DESC, producto_id
+                LIMIT 8
+             )
+             SELECT
                 productos.id,
                 productos.codigo,
                 productos.nombre,
@@ -35,6 +47,9 @@ router.get("/catalogo", async (req, res) => {
                 productos.seccion_id AS "seccionId",
                 productos.categoria_id AS "categoriaId",
                 (productos.stock > 0) AS disponible,
+                (productos.stock BETWEEN 1 AND ${ULTIMAS_UNIDADES}) AS "ultimasUnidades",
+                COALESCE(productos.creado_en >= CURRENT_TIMESTAMP - INTERVAL '30 days', FALSE) AS nuevo,
+                vendidos.puesto::INT AS "puestoVendido",
                 COALESCE((
                     SELECT JSON_AGG(JSON_BUILD_OBJECT('nombre', pc.nombre, 'disponible', pc.stock > 0) ORDER BY pc.orden, pc.id)
                     FROM producto_colores pc WHERE pc.producto_id = productos.id
@@ -43,6 +58,7 @@ router.get("/catalogo", async (req, res) => {
                 COALESCE(EXTRACT(EPOCH FROM productos.foto_actualizada)::BIGINT, 0)::INT AS "fotoVersion"
              FROM productos
              LEFT JOIN secciones ON productos.seccion_id = secciones.id
+             LEFT JOIN vendidos ON vendidos.producto_id = productos.id
              WHERE productos.seccion_id IS NULL OR secciones.visible
              ORDER BY (productos.stock > 0) DESC, productos.nombre`
         );

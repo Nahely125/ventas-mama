@@ -351,6 +351,19 @@ const MIGRACIONES = `
         actualizado TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
 
+    -- Imágenes de la página web: foto de portada y logo.
+    CREATE TABLE IF NOT EXISTS tienda_imagenes (
+        clave       VARCHAR(20) PRIMARY KEY,
+        datos       BYTEA       NOT NULL,
+        tipo        VARCHAR(30) NOT NULL,
+        actualizada TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- Fecha de registro del producto (para la etiqueta «Nuevo» del catálogo).
+    -- Los productos que ya existían quedan sin fecha: no se marcan como nuevos.
+    ALTER TABLE productos ADD COLUMN IF NOT EXISTS creado_en TIMESTAMP;
+    ALTER TABLE productos ALTER COLUMN creado_en SET DEFAULT CURRENT_TIMESTAMP;
+
     -- Registro de los cambios de datos que solo deben hacerse una vez.
     CREATE TABLE IF NOT EXISTS migraciones_unicas (
         nombre VARCHAR(100) PRIMARY KEY,

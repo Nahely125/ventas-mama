@@ -3,7 +3,7 @@ import { moneda } from "../api.js";
 import { urlFoto } from "../fotos.js";
 import { iconoTema } from "../secciones.js";
 import { BILLETERAS, RECARGO_TARJETA } from "../datosPago.js";
-import { enlaceWhatsApp, telefonoLegible } from "../tienda.js";
+import { enlaceWhatsApp, telefonoLegible, urlImagenTienda } from "../tienda.js";
 
 /* Partes de la página web del catálogo (inspirada en las tiendas de moda en línea):
    barra de promociones, portada, "Nosotros", pie de página y ventana de bienvenida con el cupón. */
@@ -111,13 +111,132 @@ function BloquesPromocion({ tienda, onAplicarCupon }) {
     );
 }
 
-// Portada: presentación, promociones, ferias, productos destacados y "Nosotros" en breve.
-export function Portada({ tienda, secciones, destacados, grilla, onIr, onAplicarCupon }) {
-    const fotos = destacados.filter((p) => p.tieneFoto).slice(0, 3);
+// "Compra en 3 pasos": explica en un vistazo cómo se compra.
+function PasosCompra() {
+    const pasos = [
+        { icono: "🛍️", titulo: "Elige", texto: "Toca «Agregar» en lo que te guste: por unidad, media docena o docena." },
+        { icono: "🧾", titulo: "Revisa tu pedido", texto: "Mira el total y cuánto te falta para el envío gratis." },
+        { icono: "💬", titulo: "Envíalo por WhatsApp", texto: "Te confirmamos stock y total, y coordinamos el pago y la entrega." }
+    ];
+
+    return (
+        <section className="cat-pasos" aria-labelledby="titulo-pasos">
+            <h2 id="titulo-pasos" className="cat-titulo-centrado">Compra en 3 pasos</h2>
+            <ol>
+                {pasos.map((paso, i) => (
+                    <li key={paso.titulo}>
+                        <span className="cat-paso-icono" aria-hidden="true">{paso.icono}</span>
+                        <span className="cat-paso-numero">Paso {i + 1}</span>
+                        <strong>{paso.titulo}</strong>
+                        <p>{paso.texto}</p>
+                    </li>
+                ))}
+            </ol>
+        </section>
+    );
+}
+
+// Categorías de todo el catálogo, con la foto de uno de sus productos.
+function CategoriasInicio({ categorias, onIr }) {
+    if (categorias.length < 2) return null;
+
+    return (
+        <section className="cat-categorias-inicio" aria-labelledby="titulo-categorias-inicio">
+            <h2 id="titulo-categorias-inicio" className="cat-titulo-centrado">Compra por categoría</h2>
+            <ul>
+                {categorias.map((categoria) => (
+                    <li key={`${categoria.seccion}-${categoria.slug}`}>
+                        <button type="button" onClick={() => onIr(categoria.seccion, categoria.slug)}>
+                            <span className="cat-categoria-circulo">
+                                {categoria.foto ? (
+                                    <img src={urlFoto(categoria.foto, "mini")} alt="" loading="lazy" />
+                                ) : (
+                                    <span aria-hidden="true">{categoria.icono ?? "✦"}</span>
+                                )}
+                            </span>
+                            <span className="cat-categoria-nombre">{categoria.nombre}</span>
+                            <small>{categoria.total} {categoria.total === 1 ? "producto" : "productos"}</small>
+                        </button>
+                    </li>
+                ))}
+            </ul>
+        </section>
+    );
+}
+
+// "Lo que dicen de nosotros": comentarios de clientes (solo si el jefe los agregó).
+function Testimonios({ tienda }) {
+    if (!tienda?.testimonios?.length) return null;
+
+    return (
+        <section className="cat-testimonios" aria-labelledby="titulo-testimonios">
+            <h2 id="titulo-testimonios" className="cat-titulo-centrado">Lo que dicen de nosotros</h2>
+            <ul>
+                {tienda.testimonios.map((t) => (
+                    <li key={`${t.nombre}-${t.texto.slice(0, 20)}`}>
+                        <span className="cat-estrellas" aria-hidden="true">★★★★★</span>
+                        <blockquote>“{t.texto}”</blockquote>
+                        <cite>— {t.nombre}</cite>
+                    </li>
+                ))}
+            </ul>
+        </section>
+    );
+}
+
+// Preguntas frecuentes: se abren al tocarlas.
+export function PreguntasFrecuentes({ tienda, id }) {
+    if (!tienda?.preguntas?.length) return null;
+
+    return (
+        <section className="cat-preguntas" id={id} aria-labelledby={`${id ?? "inicio"}-titulo-preguntas`}>
+            <h2 id={`${id ?? "inicio"}-titulo-preguntas`} className="cat-titulo-centrado">Preguntas frecuentes</h2>
+            <div>
+                {tienda.preguntas.map((p) => (
+                    <details key={p.pregunta}>
+                        <summary>{p.pregunta}</summary>
+                        <p>{p.respuesta}</p>
+                    </details>
+                ))}
+            </div>
+            <p className="cat-preguntas-mas">
+                ¿Otra duda?{" "}
+                <a href={enlaceWhatsApp("Hola Mil Deseos 👋 Tengo una consulta.")} target="_blank" rel="noopener">
+                    Escríbenos por WhatsApp
+                </a>
+            </p>
+        </section>
+    );
+}
+
+// Botón redondo de WhatsApp, siempre a la vista.
+export function BotonWhatsAppFlotante() {
+    return (
+        <a
+            className="cat-whatsapp-flotante"
+            href={enlaceWhatsApp("Hola Mil Deseos 👋 Tengo una consulta.")}
+            target="_blank"
+            rel="noopener"
+            aria-label="Escríbenos por WhatsApp"
+        >
+            <svg viewBox="0 0 32 32" aria-hidden="true">
+                <path d="M16 3a13 13 0 0 0-11.2 19.6L3 29l6.6-1.7A13 13 0 1 0 16 3Zm0 23.7a10.7 10.7 0 0 1-5.5-1.5l-.4-.2-3.9 1 1-3.8-.3-.4A10.7 10.7 0 1 1 16 26.7Zm5.9-8c-.3-.2-1.9-.9-2.2-1s-.5-.2-.7.2-.8 1-1 1.2-.4.2-.7 0a8.8 8.8 0 0 1-4.4-3.8c-.3-.6.3-.5 1-1.7.1-.2 0-.4 0-.6l-1-2.4c-.3-.6-.5-.5-.7-.5h-.6a1.2 1.2 0 0 0-.9.4 3.6 3.6 0 0 0-1.1 2.7 6.3 6.3 0 0 0 1.3 3.3 14.4 14.4 0 0 0 5.5 4.9c2 .9 2.8 1 3.9.8a3.3 3.3 0 0 0 2.2-1.5 2.7 2.7 0 0 0 .2-1.6c-.1-.1-.3-.2-.6-.4Z" />
+            </svg>
+        </a>
+    );
+}
+
+// Portada: presentación, cómo comprar, categorías, más vendidos, novedades, comentarios y preguntas.
+export function Portada({ tienda, secciones, categorias, destacados, masVendidos, grilla, onIr, onAplicarCupon }) {
+    const portada = urlImagenTienda(tienda, "portada");
+    const fotos = portada ? [] : destacados.filter((p) => p.tieneFoto).slice(0, 3);
 
     return (
         <>
-            <section className="cat-heroe">
+            <section
+                className={`cat-heroe ${portada ? "cat-heroe-con-foto" : ""}`}
+                style={portada ? { "--foto-portada": `url("${portada}")` } : undefined}
+            >
                 <div className="cat-heroe-texto">
                     <p className="cat-banner-sobre">Nueva temporada</p>
                     <h1>Haz realidad tus deseos</h1>
@@ -141,6 +260,17 @@ export function Portada({ tienda, secciones, destacados, grilla, onIr, onAplicar
                     </div>
                 )}
             </section>
+
+            <PasosCompra />
+
+            <CategoriasInicio categorias={categorias} onIr={onIr} />
+
+            {masVendidos.length > 0 && (
+                <section className="cat-bloque" aria-label="Los más vendidos">
+                    <h2 className="cat-titulo-centrado">Los más vendidos</h2>
+                    {grilla(masVendidos)}
+                </section>
+            )}
 
             <BloquesPromocion tienda={tienda} onAplicarCupon={onAplicarCupon} />
 
@@ -168,8 +298,8 @@ export function Portada({ tienda, secciones, destacados, grilla, onIr, onAplicar
             )}
 
             {destacados.length > 0 && (
-                <section className="cat-bloque" aria-label="Lo más nuevo">
-                    <h2 className="cat-titulo-centrado">Lo más nuevo</h2>
+                <section className="cat-bloque" aria-label="Novedades">
+                    <h2 className="cat-titulo-centrado">Novedades</h2>
                     {grilla(destacados)}
                     <div className="cat-centrado">
                         <button type="button" className="cat-boton-oscuro" onClick={() => onIr("todo")}>
@@ -178,6 +308,10 @@ export function Portada({ tienda, secciones, destacados, grilla, onIr, onAplicar
                     </div>
                 </section>
             )}
+
+            <Testimonios tienda={tienda} />
+
+            <PreguntasFrecuentes tienda={tienda} />
 
             {tienda && (
                 <section className="cat-nosotros-breve">
@@ -276,7 +410,7 @@ export function Nosotros({ tienda, apartado }) {
                 <h2 className="cat-titulo-centrado">¿Cómo comprar?</h2>
                 <ol>
                     <li><strong>Elige</strong> tus productos y agrégalos a tu pedido (por unidad, media docena o docena).</li>
-                    <li><strong>Aplica</strong> tu cupón de primera compra, si lo tienes.</li>
+                    {tienda.cupon.activo && <li><strong>Aplica</strong> tu cupón de primera compra, si lo tienes.</li>}
                     <li><strong>Envía</strong> tu pedido por WhatsApp: te confirmamos la disponibilidad y el total.</li>
                     <li>
                         <strong>Paga</strong> con {Object.values(BILLETERAS).map((b) => b.nombre).join(", ")}, transferencia o
@@ -307,6 +441,10 @@ export function Nosotros({ tienda, apartado }) {
                     </div>
                 </section>
             )}
+
+            <PreguntasFrecuentes tienda={tienda} id="nosotros-preguntas" />
+
+            <Testimonios tienda={tienda} />
 
             <section className="cat-empresa" id="nosotros-empresa">
                 <h2 className="cat-titulo-centrado">Información corporativa</h2>
@@ -362,7 +500,9 @@ export function PieTienda({ tienda, secciones, onIr }) {
         <footer className="cat-pie">
             <div className="cat-pie-columnas">
                 <div className="cat-pie-marca">
-                    <span className="cat-logo cat-logo-pie">Mil Deseos</span>
+                    <span className="cat-logo cat-logo-pie">
+                        {urlImagenTienda(tienda, "logo") ? <img src={urlImagenTienda(tienda, "logo")} alt="Mil Deseos" /> : "Mil Deseos"}
+                    </span>
                     <p>Adornos, luces, útiles y regalos para cada celebración.</p>
                     {empresa && <RedesSociales empresa={empresa} />}
                 </div>
@@ -385,6 +525,7 @@ export function PieTienda({ tienda, secciones, onIr }) {
                     <h2>Ayuda</h2>
                     <ul>
                         {enlace("nosotros/como-comprar", "¿Cómo comprar?")}
+                        {tienda?.preguntas?.length > 0 && enlace("nosotros/preguntas", "Preguntas frecuentes")}
                         {enlace("nosotros/promociones", "Promociones y envíos")}
                         <li>
                             <a href={enlaceWhatsApp("Hola Mil Deseos 👋 Tengo una consulta.")} target="_blank" rel="noopener">

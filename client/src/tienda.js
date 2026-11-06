@@ -76,6 +76,12 @@ export function telefonoLegible(numero = WHATSAPP_NEGOCIO) {
         : `+${digitos}`;
 }
 
+// Dirección de la foto de portada o del logo subidos en «Página web» (null si no hay).
+export function urlImagenTienda(tienda, clave) {
+    const version = tienda?.imagenes?.[clave];
+    return version ? `/api/tienda/imagen/${clave}?v=${version}` : null;
+}
+
 export function enlaceWhatsApp(mensaje) {
     return `https://wa.me/${WHATSAPP_NEGOCIO}${mensaje ? `?text=${encodeURIComponent(mensaje)}` : ""}`;
 }

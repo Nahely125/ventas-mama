@@ -7505,3 +7505,548 @@ body.sin-desplazamiento {
     color: var(--morado-600);
     font-weight: 600;
 }
+
+/* ===== Catálogo más didáctico y bonito ===== */
+
+/* Más contraste: textos más firmes y menos grises */
+.cat-pagina {
+    font-weight: 500;
+}
+
+.cat-producto-nombre {
+    color: #2a1d3d;
+    font-weight: 600;
+}
+
+.cat-nosotros-breve p,
+.cat-nosotros-cabecera p {
+    color: var(--texto);
+}
+
+.cat-pie-marca p {
+    color: rgba(255, 255, 255, 0.88);
+}
+
+.cat-pie a,
+.cat-pie-pagos {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.cat-pie-legal {
+    color: rgba(255, 255, 255, 0.72);
+}
+
+.cat-heroe-frase {
+    color: #ffffff;
+    font-weight: 500;
+}
+
+/* Logo subido (cabecera y pie) */
+.cat-logo img {
+    display: block;
+    height: 44px;
+    width: auto;
+    max-width: 180px;
+    margin: 0 auto;
+    object-fit: contain;
+}
+
+.cat-logo-pie img {
+    height: 52px;
+    margin: 0;
+    padding: 6px 12px;
+    border-radius: 12px;
+    background: #ffffff;
+}
+
+/* Portada con foto propia */
+.cat-heroe-con-foto {
+    min-height: min(78vh, 620px);
+    align-content: end;
+    background:
+        linear-gradient(180deg, rgba(30, 11, 61, 0.15) 0%, rgba(30, 11, 61, 0.55) 55%, rgba(30, 11, 61, 0.85) 100%),
+        var(--foto-portada) center / cover no-repeat;
+}
+
+.cat-heroe-con-foto h1,
+.cat-heroe-con-foto .cat-heroe-frase {
+    text-shadow: 0 2px 16px rgba(0, 0, 0, 0.35);
+}
+
+/* Compra en 3 pasos */
+.cat-pasos {
+    margin: 28px 0 8px;
+}
+
+.cat-pasos ol {
+    list-style: none;
+    display: grid;
+    gap: 10px;
+    margin: 0;
+    padding: 0;
+}
+
+@media (min-width: 720px) {
+    .cat-pasos ol {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 16px;
+    }
+}
+
+.cat-pasos li {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+        "icono numero"
+        "icono titulo"
+        "icono texto";
+    column-gap: 14px;
+    align-items: start;
+    padding: 16px;
+    border: 1px solid var(--morado-150);
+    border-radius: 16px;
+    background: var(--morado-50);
+}
+
+.cat-paso-icono {
+    grid-area: icono;
+    display: grid;
+    place-items: center;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: #ffffff;
+    box-shadow: 0 4px 12px rgba(76, 29, 149, 0.12);
+    font-size: 1.5rem;
+}
+
+.cat-paso-numero {
+    grid-area: numero;
+    color: var(--morado-600);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+.cat-pasos strong {
+    grid-area: titulo;
+    color: var(--morado-900);
+    font-size: 1.05rem;
+}
+
+.cat-pasos li p {
+    grid-area: texto;
+    margin: 2px 0 0;
+    color: var(--texto);
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+/* Compra por categoría (inicio): círculos con foto */
+.cat-categorias-inicio {
+    margin: 32px 0 8px;
+}
+
+.cat-categorias-inicio ul {
+    list-style: none;
+    display: flex;
+    gap: 14px;
+    margin: 0 -16px;
+    padding: 4px 16px 10px;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+}
+
+.cat-categorias-inicio ul::-webkit-scrollbar {
+    display: none;
+}
+
+@media (min-width: 900px) {
+    .cat-categorias-inicio ul {
+        flex-wrap: wrap;
+        justify-content: center;
+        overflow: visible;
+    }
+}
+
+.cat-categorias-inicio li {
+    flex: 0 0 auto;
+    scroll-snap-align: start;
+}
+
+.cat-categorias-inicio button {
+    display: grid;
+    justify-items: center;
+    gap: 4px;
+    width: 96px;
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--texto);
+    text-align: center;
+}
+
+.cat-categoria-circulo {
+    display: grid;
+    place-items: center;
+    width: 88px;
+    height: 88px;
+    overflow: hidden;
+    border: 3px solid #ffffff;
+    border-radius: 50%;
+    background: var(--morado-100);
+    box-shadow: 0 0 0 2px var(--morado-300);
+    font-size: 2rem;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.cat-categoria-circulo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.cat-categorias-inicio button:hover .cat-categoria-circulo,
+.cat-categorias-inicio button:focus-visible .cat-categoria-circulo {
+    transform: translateY(-3px);
+    box-shadow: 0 0 0 2px var(--morado-600);
+}
+
+.cat-categorias-inicio .cat-categoria-nombre {
+    color: var(--morado-900);
+    font-size: 0.82rem;
+    font-weight: 700;
+    line-height: 1.25;
+}
+
+.cat-categorias-inicio small {
+    color: var(--texto-suave);
+    font-size: 0.72rem;
+}
+
+/* Etiquetas de las tarjetas */
+.cat-etiquetas {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+}
+
+.cat-etiquetas .cat-etiqueta {
+    position: static;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.62rem;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+}
+
+.cat-etiqueta-vendido {
+    background: #fbbf24;
+    color: #3b2300;
+}
+
+.cat-etiqueta-nuevo {
+    background: var(--morado-600);
+    color: #ffffff;
+}
+
+.cat-etiqueta-ultimas {
+    background: #be123c;
+    color: #ffffff;
+}
+
+/* Ahorro por cantidad */
+.cat-producto-docena {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px 6px;
+}
+
+.cat-ahorro {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: #dcfce7;
+    color: #166534;
+    font-size: 0.7rem;
+    font-style: normal;
+    font-weight: 700;
+}
+
+.cat-detalle dd .cat-ahorro {
+    margin-left: 8px;
+    vertical-align: middle;
+}
+
+.cat-consejo {
+    margin: 4px 0 0;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: #fefce8;
+    color: #713f12;
+    font-size: 0.88rem;
+    line-height: 1.45;
+}
+
+/* Lo que dicen de nosotros */
+.cat-testimonios {
+    margin: 36px 0 8px;
+}
+
+.cat-testimonios ul {
+    list-style: none;
+    display: grid;
+    gap: 12px;
+    margin: 0;
+    padding: 0;
+}
+
+@media (min-width: 720px) {
+    .cat-testimonios ul {
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    }
+}
+
+.cat-testimonios li {
+    display: grid;
+    gap: 8px;
+    padding: 18px;
+    border: 1px solid var(--morado-150);
+    border-radius: 16px;
+    background: #ffffff;
+    box-shadow: var(--sombra);
+}
+
+.cat-estrellas {
+    color: #f59e0b;
+    letter-spacing: 0.1em;
+}
+
+.cat-testimonios blockquote {
+    margin: 0;
+    color: var(--texto);
+    font-family: 'Playfair Display', serif;
+    font-size: 1.05rem;
+    line-height: 1.5;
+}
+
+.cat-testimonios cite {
+    color: var(--morado-700);
+    font-size: 0.85rem;
+    font-style: normal;
+    font-weight: 700;
+}
+
+/* Preguntas frecuentes */
+.cat-preguntas {
+    max-width: 760px;
+    margin: 36px auto 8px;
+    width: 100%;
+}
+
+.cat-preguntas > div {
+    display: grid;
+    gap: 8px;
+}
+
+.cat-preguntas details {
+    border: 1px solid var(--morado-150);
+    border-radius: 12px;
+    background: #ffffff;
+}
+
+.cat-preguntas summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 52px;
+    padding: 12px 16px;
+    color: var(--morado-900);
+    font-weight: 700;
+    cursor: pointer;
+    list-style: none;
+}
+
+.cat-preguntas summary::-webkit-details-marker {
+    display: none;
+}
+
+.cat-preguntas summary::after {
+    content: "+";
+    flex: 0 0 auto;
+    color: var(--morado-600);
+    font-size: 1.4rem;
+    font-weight: 500;
+    line-height: 1;
+    transition: transform 0.2s;
+}
+
+.cat-preguntas details[open] summary::after {
+    transform: rotate(45deg);
+}
+
+.cat-preguntas details p {
+    margin: 0;
+    padding: 0 16px 14px;
+    color: var(--texto);
+    line-height: 1.6;
+}
+
+.cat-preguntas-mas {
+    margin-top: 12px;
+    text-align: center;
+}
+
+.cat-preguntas-mas a {
+    color: #128c4a;
+    font-weight: 700;
+}
+
+/* Botón flotante de WhatsApp */
+.cat-whatsapp-flotante {
+    position: fixed;
+    right: 16px;
+    bottom: max(16px, env(safe-area-inset-bottom));
+    z-index: 19;
+    display: grid;
+    place-items: center;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: #25d366;
+    box-shadow: 0 8px 22px rgba(18, 140, 74, 0.4);
+    transition: transform 0.2s;
+}
+
+.cat-whatsapp-flotante:hover {
+    transform: scale(1.06);
+}
+
+.cat-whatsapp-flotante svg {
+    width: 30px;
+    height: 30px;
+    fill: #ffffff;
+}
+
+/* Si está la barra del pedido, el botón sube para no taparla */
+.cat-pagina:has(.cat-barra-pedido) .cat-whatsapp-flotante {
+    bottom: calc(max(16px, env(safe-area-inset-bottom)) + 84px);
+}
+
+/* Barra del pedido con lo que falta para el envío gratis */
+.cat-barra-pedido {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
+    border-radius: 22px;
+    padding: 12px 20px;
+}
+
+.cat-barra-pedido-fila {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.cat-barra-envio {
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-align: left;
+}
+
+.cat-pagina:has(.cat-barra-pedido) .cat-pie {
+    padding-bottom: 170px;
+}
+
+.cat-pie {
+    padding-bottom: 90px;
+}
+
+/* Página web (editor): portada, logo, preguntas y comentarios */
+.imagenes-tienda {
+    display: grid;
+    gap: 14px;
+}
+
+@media (min-width: 640px) {
+    .imagenes-tienda {
+        grid-template-columns: 2fr 1fr;
+    }
+}
+
+.imagen-tienda {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+}
+
+.imagen-tienda-titulo {
+    color: var(--morado-900);
+    font-weight: 700;
+}
+
+.imagen-tienda-vista {
+    display: grid;
+    place-items: center;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    border: 1px dashed var(--morado-300);
+    border-radius: 12px;
+    background: var(--morado-50);
+    color: var(--texto-suave);
+}
+
+.imagen-tienda-logo .imagen-tienda-vista {
+    aspect-ratio: 3 / 1;
+}
+
+.imagen-tienda-vista img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.imagen-tienda-logo .imagen-tienda-vista img {
+    object-fit: contain;
+    padding: 10px;
+}
+
+.imagen-tienda-acciones {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.imagen-tienda-acciones label {
+    cursor: pointer;
+}
+
+.lista-preguntas-web {
+    list-style: none;
+    display: grid;
+    gap: 10px;
+    margin: 0 0 10px;
+    padding: 0;
+}
+
+.lista-preguntas-web li {
+    display: grid;
+    gap: 6px;
+    padding: 10px;
+    border: 1px solid var(--morado-150);
+    border-radius: 12px;
+    background: var(--morado-50);
+}
+
+.lista-preguntas-web li .boton-enlace {
+    justify-self: start;
+}
