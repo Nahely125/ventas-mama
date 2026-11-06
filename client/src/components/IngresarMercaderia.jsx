@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { moneda, monedaCosto, pedir } from "../api.js";
 import { hoy } from "../fechas.js";
 import BuscadorProducto from "./BuscadorProducto.jsx";
+import SelectorPrestamo, { usePrestamosDisponibles } from "./SelectorPrestamo.jsx";
 
 /* Ventana "Ingresar mercadería": suma unidades al stock, guarda fecha, proveedor y costo,
    y lo registra como inversión o gasto. productoInicial: si se abre desde un producto. */
@@ -15,6 +16,8 @@ export default function IngresarMercaderia({ productos, productoInicial = null, 
     const [proveedor, setProveedor] = useState("");
     const [fecha, setFecha] = useState(hoy());
     const [contabilizar, setContabilizar] = useState("inversion");
+    const [prestamoId, setPrestamoId] = useState(null);
+    const prestamos = usePrestamosDisponibles();
     const [colorId, setColorId] = useState("");
     const [error, setError] = useState("");
     const [enviando, setEnviando] = useState(false);
@@ -60,7 +63,8 @@ export default function IngresarMercaderia({ productos, productoInicial = null, 
                     proveedor: proveedor.trim(),
                     fecha,
                     contabilizar,
-                    colorId: colorId ? Number(colorId) : null
+                    colorId: colorId ? Number(colorId) : null,
+                    prestamoId: contabilizar === "ninguno" ? null : prestamoId
                 }
             });
             await onGuardado(resultado);
@@ -162,6 +166,10 @@ export default function IngresarMercaderia({ productos, productoInicial = null, 
                         </label>
                     ))}
                 </fieldset>
+
+                {contabilizar !== "ninguno" && (
+                    <SelectorPrestamo id="compra-prestamo" valor={prestamoId} onCambio={setPrestamoId} prestamos={prestamos} />
+                )}
 
                 {producto && unidades > 0 && (
                     <p className="costo-calculado">

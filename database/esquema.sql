@@ -277,6 +277,31 @@ CREATE TABLE IF NOT EXISTS compras (
 ALTER TABLE compras ADD COLUMN IF NOT EXISTS color_id INTEGER REFERENCES producto_colores(id) ON DELETE SET NULL;
 ALTER TABLE compras ADD COLUMN IF NOT EXISTS color VARCHAR(40);
 
+-- Préstamos (capital financiado) y sus pagos. En qué se usó el dinero: inversiones.prestamo_id
+-- y gastos.prestamo_id. La parte de interés de cada pago se registra como gasto "Intereses".
+CREATE TABLE IF NOT EXISTS prestamos (
+    id             SERIAL PRIMARY KEY,
+    prestamista    VARCHAR(120) NOT NULL,                                 -- banco, caja o persona
+    monto          NUMERIC(12,2) NOT NULL CHECK (monto > 0),              -- lo que se recibió
+    total_devolver NUMERIC(12,2) CHECK (total_devolver >= monto),         -- con intereses (vacío = monto)
+    fecha          DATE NOT NULL,
+    nota           VARCHAR(200),
+    usuario_id     INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+    creado_en      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+ALTER TABLE inversiones ADD COLUMN IF NOT EXISTS prestamo_id INTEGER REFERENCES prestamos(id) ON DELETE SET NULL;
+ALTER TABLE gastos ADD COLUMN IF NOT EXISTS prestamo_id INTEGER REFERENCES prestamos(id) ON DELETE SET NULL;
+CREATE TABLE IF NOT EXISTS prestamo_pagos (
+    id          SERIAL PRIMARY KEY,
+    prestamo_id INTEGER NOT NULL REFERENCES prestamos(id) ON DELETE CASCADE,
+    monto       NUMERIC(12,2) NOT NULL CHECK (monto > 0),
+    fecha       DATE NOT NULL,
+    nota        VARCHAR(200),
+    gasto_id    INTEGER REFERENCES gastos(id) ON DELETE SET NULL,           -- gasto "Intereses" de este pago
+    usuario_id  INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+    creado_en   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Lista de reposición: productos por comprar (al adquirirlos se registran como compra).
 CREATE TABLE IF NOT EXISTS reposicion (
     id             SERIAL PRIMARY KEY,

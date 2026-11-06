@@ -3,6 +3,9 @@ const pool = require("../db");
 const { requiereJefe, leerId } = require("../autenticacion");
 const { anotarMovimiento } = require("../movimientos");
 
+// Se carga cuando se usa (evita una dependencia circular con prestamos.js).
+const prestamos = () => require("./prestamos");
+
 /* Compras y reposiciones de mercadería (solo el jefe).
    Al ingresar mercadería: se suma al stock, se recalcula el costo por unidad (promedio)
    y, según se elija, se registra como inversión o como gasto. */
@@ -51,7 +54,8 @@ class ErrorCompra extends Error {
     }
 }
 
-function validarCompra({ productoId, cantidad, costoTotal, proveedor = "", fecha, contabilizar = "inversion", colorId = null }) {
+function validarCompra(datos) {
+    const { productoId, cantidad, costoTotal, proveedor = "", fecha, contabilizar = "inversion", colorId = null } = datos;
     return (
         Number.isInteger(productoId) && productoId > 0 &&
         Number.isInteger(cantidad) && cantidad > 0 && cantidad <= 100000 &&
@@ -59,7 +63,8 @@ function validarCompra({ productoId, cantidad, costoTotal, proveedor = "", fecha
         typeof proveedor === "string" && proveedor.length <= 120 &&
         typeof fecha === "string" && FECHA.test(fecha) && !Number.isNaN(Date.parse(fecha)) &&
         CONTABILIZAR.includes(contabilizar) &&
-        (colorId === null || (Number.isInteger(colorId) && colorId > 0))
+        (colorId === null || (Number.isInteger(colorId) && colorId > 0)) &&
+        (datos.prestamoId == null || (Number.isInteger(datos.prestamoId) && datos.prestamoId > 0))
     );
 }
 
@@ -116,6 +121,21 @@ async function registrarCompra(client, datos, usuarioId) {
         [cantidad, Number(costoPromedio.toFixed(4)), producto.id]
     );
 
+    // Pagada con un préstamo: no puede pasar de lo que queda sin usar.
+    const prestamoId = datos.prestamoId ?? null;
+
+    if (prestamoId !== null) {
+        if (contabilizar === "ninguno" || costoTotal <= 0) {
+            throw new ErrorCompra("Para pagar con un préstamo, la compra debe registrarse como inversión o gasto y tener costo.");
+        }
+
+        const prestamo = await prestamos().disponibleDe(client, prestamoId);
+        if (!prestamo) throw new ErrorCompra("Ese préstamo no existe.", 404);
+        if (Math.round(costoTotal * 100) > Math.round(prestamo.disponible * 100)) {
+            throw new ErrorCompra(`Del préstamo de ${prestamo.prestamista} solo quedan S/ ${prestamo.disponible.toFixed(2)} sin usar.`);
+        }
+    }
+
     // Se registra como inversión o gasto (si costó algo).
     let gastoId = null;
     let inversionId = null;
@@ -123,18 +143,18 @@ async function registrarCompra(client, datos, usuarioId) {
 
     if (costoTotal > 0 && contabilizar === "gasto") {
         const gasto = await client.query(
-            `INSERT INTO gastos (descripcion, categoria, monto, fecha, usuario_id)
-             VALUES ($1, 'Mercadería', $2, $3, $4) RETURNING id`,
-            [texto, Number(costoTotal.toFixed(2)), fecha, usuarioId]
+            `INSERT INTO gastos (descripcion, categoria, monto, fecha, usuario_id, prestamo_id)
+             VALUES ($1, 'Mercadería', $2, $3, $4, $5) RETURNING id`,
+            [texto, Number(costoTotal.toFixed(2)), fecha, usuarioId, prestamoId]
         );
         gastoId = gasto.rows[0].id;
     }
 
     if (costoTotal > 0 && contabilizar === "inversion") {
         const inversion = await client.query(
-            `INSERT INTO inversiones (descripcion, monto, fecha, usuario_id)
-             VALUES ($1, $2, $3, $4) RETURNING id`,
-            [texto, Number(costoTotal.toFixed(2)), fecha, usuarioId]
+            `INSERT INTO inversiones (descripcion, monto, fecha, usuario_id, prestamo_id)
+             VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+            [texto, Number(costoTotal.toFixed(2)), fecha, usuarioId, prestamoId]
         );
         inversionId = inversion.rows[0].id;
     }

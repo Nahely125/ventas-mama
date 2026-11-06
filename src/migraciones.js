@@ -244,6 +244,32 @@ const MIGRACIONES = `
     -- El precio mínimo solo limita a los empleados al vender: el jefe puede fijar cualquier precio.
     ALTER TABLE productos DROP CONSTRAINT IF EXISTS productos_check;
 
+    -- Préstamos (capital financiado): quién prestó, cuánto se recibió y cuánto hay que devolver.
+    CREATE TABLE IF NOT EXISTS prestamos (
+        id             SERIAL PRIMARY KEY,
+        prestamista    VARCHAR(120) NOT NULL,
+        monto          NUMERIC(12, 2) NOT NULL CHECK (monto > 0),
+        total_devolver NUMERIC(12, 2) CHECK (total_devolver >= monto),
+        fecha          DATE NOT NULL,
+        nota           VARCHAR(200),
+        usuario_id     INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+        creado_en      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    -- En qué se usó el dinero del préstamo: inversiones y gastos marcados con su préstamo.
+    ALTER TABLE inversiones ADD COLUMN IF NOT EXISTS prestamo_id INTEGER REFERENCES prestamos(id) ON DELETE SET NULL;
+    ALTER TABLE gastos ADD COLUMN IF NOT EXISTS prestamo_id INTEGER REFERENCES prestamos(id) ON DELETE SET NULL;
+    -- Pagos del préstamo (la parte de interés se registra como gasto "Intereses").
+    CREATE TABLE IF NOT EXISTS prestamo_pagos (
+        id          SERIAL PRIMARY KEY,
+        prestamo_id INTEGER NOT NULL REFERENCES prestamos(id) ON DELETE CASCADE,
+        monto       NUMERIC(12, 2) NOT NULL CHECK (monto > 0),
+        fecha       DATE NOT NULL,
+        nota        VARCHAR(200),
+        gasto_id    INTEGER REFERENCES gastos(id) ON DELETE SET NULL,
+        usuario_id  INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+        creado_en   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
     -- Lista de reposición: productos por comprar (cantidad y costo). Al adquirirlos se registran
     -- como compra (stock nuevo + inversión) y salen de la lista. Un producto (o color) una sola vez.
     CREATE TABLE IF NOT EXISTS reposicion (
@@ -367,6 +393,16 @@ async function asignarPorNombre(client, condicionProductos, parametros, reglas, 
 /* Cambios de datos que se aplican UNA sola vez (quedan anotados en migraciones_unicas).
    Así, si luego se borra o cambia algo a mano, no vuelve a aparecer. */
 const MIGRACIONES_UNICAS = [
+    {
+        // Se quita el cupón de bienvenida (BIENVENIDA20) del catálogo. Se puede volver a activar en "Página web".
+        nombre: "2026-11-sin-cupon-bienvenida",
+        async aplicar(client) {
+            await client.query(
+                `UPDATE tienda SET datos = jsonb_set(datos, '{cupon,activo}', 'false'::jsonb, true)
+                 WHERE id = 1 AND datos ? 'cupon'`
+            );
+        }
+    },
     {
         // «Ajuste» pasa a llamarse «descuento»: se renombran los códigos iniciales si siguen igual,
         // y también en las ventas que ya los usaron.

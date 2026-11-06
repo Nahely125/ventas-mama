@@ -11,6 +11,7 @@ const CATEGORIAS = [
     "Servicios",
     "Sueldos",
     "Embalaje",
+    "Intereses",
     "Otros"
 ];
 
@@ -19,6 +20,7 @@ const COLUMNAS = `
     gastos.descripcion,
     gastos.categoria,
     gastos.monto,
+    gastos.prestamo_id AS "prestamoId",
     TO_CHAR(gastos.fecha, 'YYYY-MM-DD') AS fecha,
     COALESCE(usuarios.nombre, 'No registrado') AS "registradoPor"
 `;

@@ -39,7 +39,10 @@ router.get("/", requiereSesion, async (req, res) => {
                     (SELECT COALESCE(SUM(${GANANCIA_2025}), 0) FROM ventas WHERE anulada_en IS NULL) AS "ganancia2025",
                     (SELECT COALESCE(SUM(monto), 0) FROM gastos) AS "gastosTotales",
                     (SELECT COALESCE(SUM(monto), 0) FROM inversiones) AS "inversionTotal",
-                    (SELECT COALESCE(SUM(GREATEST(${SALDO}, 0)), 0) FROM clientes) AS "porCobrar"`
+                    (SELECT COALESCE(SUM(GREATEST(${SALDO}, 0)), 0) FROM clientes) AS "porCobrar",
+                    (SELECT COALESCE(SUM(GREATEST(COALESCE(total_devolver, monto)
+                        - COALESCE((SELECT SUM(monto) FROM prestamo_pagos WHERE prestamo_id = prestamos.id), 0), 0)), 0)
+                     FROM prestamos) AS "prestamosPorPagar"`
             );
 
             const fila = datos.rows[0];
@@ -56,6 +59,8 @@ router.get("/", requiereSesion, async (req, res) => {
             resumen.gastosTotales = gastos.toFixed(2);
             // Lo que deben los clientes por ventas fiadas (ya cuenta como venta y ganancia).
             resumen.porCobrar = Number(fila.porCobrar).toFixed(2);
+            // Lo que falta devolver de los préstamos (capital financiado).
+            resumen.prestamosPorPagar = Number(fila.prestamosPorPagar).toFixed(2);
             resumen.ganancia2025 = ganancia2025.toFixed(2);
             resumen.gananciaVentasNuevas = gananciaNueva.toFixed(2);
             resumen.gananciaTotal = (gananciaNueva + ganancia2025).toFixed(2);

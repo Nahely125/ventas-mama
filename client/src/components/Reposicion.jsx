@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { moneda, monedaCosto, pedir } from "../api.js";
 import { hoy } from "../fechas.js";
 import BuscadorProducto from "./BuscadorProducto.jsx";
+import SelectorPrestamo, { usePrestamosDisponibles } from "./SelectorPrestamo.jsx";
 
 const CONTABILIZAR = [
     { valor: "inversion", texto: "💼 Inversión" },
@@ -232,7 +233,8 @@ export default function Reposicion({ productos, onCambio, onError }) {
     const [mensaje, setMensaje] = useState(null);
     const [ocupado, setOcupado] = useState(false);
     const [agregando, setAgregando] = useState(null);
-    const [compra, setCompra] = useState({ proveedor: "", fecha: hoy(), contabilizar: "inversion" });
+    const [compra, setCompra] = useState({ proveedor: "", fecha: hoy(), contabilizar: "inversion", prestamoId: null });
+    const prestamos = usePrestamosDisponibles();
 
     const cargar = useCallback(async () => {
         try {
@@ -271,7 +273,13 @@ export default function Reposicion({ productos, onCambio, onError }) {
         if (!confirm(texto)) return;
         const resultado = await hacer(() => pedir("/api/reposicion/adquirir", {
             method: "POST",
-            cuerpo: { ids, proveedor: compra.proveedor.trim(), fecha: compra.fecha, contabilizar: compra.contabilizar }
+            cuerpo: {
+                ids,
+                proveedor: compra.proveedor.trim(),
+                fecha: compra.fecha,
+                contabilizar: compra.contabilizar,
+                prestamoId: compra.contabilizar === "ninguno" ? null : compra.prestamoId
+            }
         }));
         if (resultado) await onCambio();
     }
@@ -386,6 +394,10 @@ export default function Reposicion({ productos, onCambio, onError }) {
                             {CONTABILIZAR.map((c) => <option key={c.valor} value={c.valor}>{c.texto}</option>)}
                         </select>
                     </div>
+                    {compra.contabilizar !== "ninguno" && (
+                        <SelectorPrestamo id="repo-prestamo" valor={compra.prestamoId}
+                            onCambio={(prestamoId) => setCompra((c) => ({ ...c, prestamoId }))} prestamos={prestamos} />
+                    )}
                     <button
                         type="button"
                         className="boton-principal"

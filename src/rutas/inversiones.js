@@ -8,6 +8,7 @@ const COLUMNAS = `
     inversiones.id,
     inversiones.descripcion,
     inversiones.monto,
+    inversiones.prestamo_id AS "prestamoId",
     TO_CHAR(inversiones.fecha, 'YYYY-MM-DD') AS fecha,
     COALESCE(usuarios.nombre, 'No registrado') AS "registradoPor"
 `;

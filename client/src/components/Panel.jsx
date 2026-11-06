@@ -18,6 +18,7 @@ const Reportes = lazy(() => import("./Reportes.jsx"));
 const Empleados = lazy(() => import("./Empleados.jsx"));
 const SeccionesCatalogo = lazy(() => import("./SeccionesCatalogo.jsx"));
 const Reposicion = lazy(() => import("./Reposicion.jsx"));
+const Prestamos = lazy(() => import("./Prestamos.jsx"));
 
 function CargandoVista() {
     return (
@@ -105,6 +106,13 @@ const VISTAS = [
         icono: "💼",
         nombre: "Inversión",
         descripcion: "Registra lo que invertiste y mira cuánto te falta para recuperarlo.",
+        soloJefe: true
+    },
+    {
+        clave: "prestamos",
+        icono: "🏦",
+        nombre: "Préstamos",
+        descripcion: "Registra el capital financiado, en qué se usó (inversión o gasto) y lo que falta pagar.",
         soloJefe: true
     },
     {
@@ -289,6 +297,10 @@ export default function Panel({ usuario, onSalir, onActualizarUsuario }) {
 
                     {vistaActual.clave === "gastos" && (
                         <Gastos onCambio={cargarResumen} onError={manejarError} />
+                    )}
+
+                    {vistaActual.clave === "prestamos" && (
+                        <Prestamos onCambio={cargarResumen} onError={manejarError} />
                     )}
 
                     {vistaActual.clave === "inversion" && (

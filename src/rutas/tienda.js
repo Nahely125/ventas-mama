@@ -36,7 +36,7 @@ const TIENDA_INICIAL = {
         tiktok: ""
     },
     cupon: {
-        activo: true,
+        activo: false,
         codigo: "BIENVENIDA20",
         porcentaje: 20,
         condiciones: "Válido solo para tu primera compra. No acumulable con otras promociones."

@@ -237,7 +237,7 @@ router.delete("/:id", async (req, res) => {
    (stock nuevo + inversión, o gasto) con su cantidad y costo, y sale de la lista.
    Si uno falla (por ejemplo, falta elegir el color), no se registra ninguno. */
 router.post("/adquirir", async (req, res) => {
-    const { ids, proveedor = "", fecha = hoyLima(), contabilizar = "inversion" } = req.body ?? {};
+    const { ids, proveedor = "", fecha = hoyLima(), contabilizar = "inversion", prestamoId = null } = req.body ?? {};
 
     if (!Array.isArray(ids) || ids.length === 0 || ids.length > 500 || !ids.every((i) => Number.isInteger(i) && i > 0) ||
         typeof proveedor !== "string" || proveedor.length > 120 || !FECHA.test(fecha) || !CONTABILIZAR.includes(contabilizar)) {
@@ -280,6 +280,7 @@ router.post("/adquirir", async (req, res) => {
                     proveedor,
                     fecha,
                     contabilizar,
+                    prestamoId,
                     detalle: fila.por_caja && fila.unidades_por_caja > 1
                         ? `Reposición adquirida (${fila.cantidad / fila.unidades_por_caja} ${fila.cantidad === fila.unidades_por_caja ? "caja" : "cajas"} de ${fila.unidades_por_caja})`
                         : "Reposición adquirida"
