@@ -79,9 +79,17 @@ export function CarruselPortada({ diapositivas, intervalo = 5500 }) {
             }}
         >
             {diapositivas.map((d, i) => (
-                <div key={d.clave} className={`carrusel-diapositiva ${i === actual ? "activa" : ""}`} aria-hidden={i !== actual}>
+                <div
+                    key={d.clave}
+                    className={`carrusel-diapositiva ${d.producto ? "carrusel-diapositiva-producto" : ""} ${i === actual ? "activa" : ""}`}
+                    aria-hidden={i !== actual}
+                >
                     {vistas.has(i) && (
-                        <img src={d.src} alt="" decoding="async" fetchPriority={i === 0 ? "high" : "low"} draggable="false" />
+                        <img className="carrusel-foto" src={d.src} alt="" decoding="async" fetchPriority={i === 0 ? "high" : "low"} draggable="false" />
+                    )}
+                    {/* En pantallas grandes: el producto completo a la derecha, sin estirar la foto. */}
+                    {vistas.has(i) && d.producto && (
+                        <img className="carrusel-producto" src={d.src} alt="" decoding="async" draggable="false" />
                     )}
                     {d.titulo && i === actual && (
                         <button type="button" className="carrusel-leyenda" onClick={d.onVer} tabIndex={-1}>

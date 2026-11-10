@@ -449,6 +449,21 @@ export default function Catalogo() {
                         </svg>
                     </button>
 
+                    {/* En computadora: el buscador siempre a la vista. */}
+                    <label className="cat-busqueda-escritorio">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <circle cx="11" cy="11" r="7" />
+                            <path d="m20 20-3.5-3.5" />
+                        </svg>
+                        <input
+                            type="search"
+                            placeholder="¿Qué estás buscando?"
+                            aria-label="Buscar por nombre, código o categoría"
+                            value={busqueda}
+                            onChange={(e) => setBusqueda(e.target.value)}
+                        />
+                    </label>
+
                     <a className="cat-logo" href="/catalogo" onClick={(e) => { e.preventDefault(); ir(INICIO); }}>
                         {urlImagenTienda(tienda, "logo") ? <img src={urlImagenTienda(tienda, "logo")} alt="Mil Deseos" /> : "Mil Deseos"}
                     </a>
@@ -559,7 +574,7 @@ export default function Catalogo() {
                 )}
             </header>
 
-            <main className="cat-contenido">
+            <main className={`cat-contenido ${pagina === INICIO && !texto ? "cat-contenido-inicio" : ""}`}>
                 {error ? (
                     <p className="mensaje mensaje-error cat-centrado">{error}</p>
                 ) : datos === null ? (

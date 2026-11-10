@@ -4,7 +4,7 @@ import { urlFoto } from "../fotos.js";
 import { iconoTema } from "../secciones.js";
 import { BILLETERAS, RECARGO_TARJETA } from "../datosPago.js";
 import { enlaceWhatsApp, telefonoLegible, urlImagenTienda } from "../tienda.js";
-import { CarruselPortada, prefiereQuieto } from "./Carrusel.jsx";
+import { CarruselPortada, FotoAdaptada, prefiereQuieto } from "./Carrusel.jsx";
 
 /* Partes de la página web del catálogo (inspirada en las tiendas de moda en línea):
    barra de promociones, portada, "Nosotros", pie de página y ventana de bienvenida con el cupón. */
@@ -97,89 +97,168 @@ function CodigoCupon({ codigo }) {
     );
 }
 
-// Promociones (cupón y envío gratis) en dos bloques grandes.
-function BloquesPromocion({ tienda, onAplicarCupon }) {
+// Encabezado de cada sección: palabra pequeña, título y, a la derecha, un enlace («Ver todo»).
+function EncabezadoBanda({ id, sobre, titulo, accion, centrado = false }) {
+    return (
+        <div className={`cat-banda-cabecera ${centrado ? "cat-banda-cabecera-centrada" : ""}`}>
+            <div>
+                {sobre && <p className="cat-sobre">{sobre}</p>}
+                <h2 id={id}>{titulo}</h2>
+            </div>
+            {accion && (
+                <button type="button" className="cat-enlace-subrayado" onClick={accion.onClick}>
+                    {accion.texto}
+                </button>
+            )}
+        </div>
+    );
+}
+
+/* Banda: una sección que ocupa todo el ancho de la pantalla (con su color de fondo)
+   y ordena su contenido en una columna centrada. */
+function Banda({ id, etiqueta, fondo = "blanca", clase = "", children }) {
+    return (
+        <section id={id} className={`cat-banda cat-banda-${fondo} revelar`} aria-labelledby={etiqueta}>
+            <div className={`cat-banda-interior ${clase}`}>{children}</div>
+        </section>
+    );
+}
+
+// Promociones (envío gratis y, si está activo, el cupón) en una franja de todo el ancho.
+function BandaPromociones({ tienda, onAplicarCupon }) {
     if (!tienda || (!tienda.cupon.activo && !tienda.envio.activo)) return null;
 
     return (
-        <section className="cat-promos revelar" aria-label="Promociones">
-            {tienda.cupon.activo && (
-                <article className="cat-promo cat-promo-cupon">
-                    <p className="cat-promo-sobre">Bienvenida a Mil Deseos</p>
-                    <h2>
-                        {tienda.cupon.porcentaje}% <span>OFF</span>
-                    </h2>
-                    <p>en tu primera compra</p>
-                    <CodigoCupon codigo={tienda.cupon.codigo} />
-                    <button type="button" className="cat-boton-claro" onClick={onAplicarCupon}>
-                        Aplicar a mi pedido
-                    </button>
-                </article>
-            )}
-            {tienda.envio.activo && (
-                <article className="cat-promo cat-promo-envio">
-                    <p className="cat-promo-sobre">Te lo llevamos</p>
-                    <h2>
-                        Envío <span>gratis</span>
-                    </h2>
-                    <p>en compras mayores a {montoCorto(tienda.envio.gratisDesde)}</p>
-                    <span className="cat-promo-icono" aria-hidden="true">🚚</span>
-                </article>
-            )}
+        <section className="cat-banda cat-banda-promo revelar" aria-label="Promociones">
+            <div className="cat-banda-interior cat-promos-fila">
+                {tienda.cupon.activo && (
+                    <article className="cat-promo-item">
+                        <span className="cat-promo-item-icono" aria-hidden="true">🏷️</span>
+                        <div>
+                            <p className="cat-sobre">Bienvenida a Mil Deseos</p>
+                            <h2>{tienda.cupon.porcentaje}% <em>OFF</em></h2>
+                            <p>en tu primera compra</p>
+                            <div className="cat-promo-item-acciones">
+                                <CodigoCupon codigo={tienda.cupon.codigo} />
+                                <button type="button" className="cat-enlace-subrayado" onClick={onAplicarCupon}>
+                                    Aplicar a mi pedido
+                                </button>
+                            </div>
+                        </div>
+                    </article>
+                )}
+                {tienda.envio.activo && (
+                    <article className="cat-promo-item">
+                        <span className="cat-promo-item-icono" aria-hidden="true">🚚</span>
+                        <div>
+                            <p className="cat-sobre">Te lo llevamos</p>
+                            <h2>Envío <em>gratis</em></h2>
+                            <p>en compras mayores a {montoCorto(tienda.envio.gratisDesde)}</p>
+                        </div>
+                    </article>
+                )}
+            </div>
         </section>
     );
 }
 
-// "Compra en 3 pasos": explica en un vistazo cómo se compra.
+// "Compra en 3 pasos": una franja corta bajo la portada que explica cómo se compra.
 function PasosCompra() {
     const pasos = [
-        { icono: "🛍️", titulo: "Elige", texto: "Toca «Agregar» en lo que te guste: por unidad, media docena o docena." },
-        { icono: "🧾", titulo: "Revisa tu pedido", texto: "Mira el total y cuánto te falta para el envío gratis." },
-        { icono: "💬", titulo: "Envíalo por WhatsApp", texto: "Te confirmamos stock y total, y coordinamos el pago y la entrega." }
+        { icono: "🛍️", titulo: "Elige", texto: "Toca «Agregar»: por unidad, media docena o docena." },
+        { icono: "🧾", titulo: "Revisa tu pedido", texto: "Mira el total y cuánto falta para el envío gratis." },
+        { icono: "💬", titulo: "Envíalo por WhatsApp", texto: "Te confirmamos stock, total, pago y entrega." }
     ];
 
     return (
-        <section className="cat-pasos revelar" aria-labelledby="titulo-pasos">
-            <h2 id="titulo-pasos" className="cat-titulo-centrado">Compra en 3 pasos</h2>
-            <ol>
-                {pasos.map((paso, i) => (
-                    <li key={paso.titulo}>
-                        <span className="cat-paso-icono" aria-hidden="true">{paso.icono}</span>
-                        <span className="cat-paso-numero">Paso {i + 1}</span>
-                        <strong>{paso.titulo}</strong>
-                        <p>{paso.texto}</p>
-                    </li>
-                ))}
-            </ol>
+        <section className="cat-banda cat-banda-pasos revelar" aria-labelledby="titulo-pasos">
+            <div className="cat-banda-interior">
+                <h2 id="titulo-pasos" className="cat-sobre cat-pasos-titulo">Compra en 3 pasos</h2>
+                <ol className="cat-pasos-tira">
+                    {pasos.map((paso, i) => (
+                        <li key={paso.titulo}>
+                            <span className="cat-paso-icono" aria-hidden="true">{paso.icono}</span>
+                            <div>
+                                <strong><span className="cat-paso-numero">{i + 1}.</span> {paso.titulo}</strong>
+                                <p>{paso.texto}</p>
+                            </div>
+                        </li>
+                    ))}
+                </ol>
+            </div>
         </section>
     );
 }
 
-// Categorías de todo el catálogo, con la foto de uno de sus productos.
+// Mosaico de categorías: una foto grande por categoría (en el celular se desliza).
 function CategoriasInicio({ categorias, onIr }) {
     if (categorias.length < 2) return null;
 
     return (
-        <section className="cat-categorias-inicio revelar" aria-labelledby="titulo-categorias-inicio">
-            <h2 id="titulo-categorias-inicio" className="cat-titulo-centrado">Compra por categoría</h2>
-            <ul>
+        <Banda etiqueta="titulo-categorias-inicio">
+            <EncabezadoBanda
+                id="titulo-categorias-inicio"
+                sobre="Explora"
+                titulo="Compra por categoría"
+                accion={{ texto: "Ver todo", onClick: () => onIr("todo") }}
+            />
+            <ul className="cat-mosaico-categorias" style={{ "--columnas": Math.min(Math.max(categorias.length, 4), 6) }}>
                 {categorias.map((categoria) => (
                     <li key={`${categoria.seccion}-${categoria.slug}`}>
                         <button type="button" onClick={() => onIr(categoria.seccion, categoria.slug)}>
-                            <span className="cat-categoria-circulo">
+                            <span className="cat-mosaico-foto">
                                 {categoria.foto ? (
-                                    <img src={urlFoto(categoria.foto, "mini")} alt="" loading="lazy" />
+                                    <FotoAdaptada src={urlFoto(categoria.foto, "mini")} />
                                 ) : (
-                                    <span aria-hidden="true">{categoria.icono ?? "✦"}</span>
+                                    <span className="cat-sin-foto" aria-hidden="true">{categoria.icono ?? "✦"}</span>
                                 )}
                             </span>
-                            <span className="cat-categoria-nombre">{categoria.nombre}</span>
-                            <small>{categoria.total} {categoria.total === 1 ? "producto" : "productos"}</small>
+                            <span className="cat-mosaico-nombre">{categoria.nombre}</span>
+                            <span className="cat-mosaico-total">
+                                {categoria.total} {categoria.total === 1 ? "producto" : "productos"}
+                            </span>
                         </button>
                     </li>
                 ))}
             </ul>
-        </section>
+        </Banda>
+    );
+}
+
+// Ferias como banners divididos: foto arriba y, debajo, el nombre, la frase y «Comprar ahora».
+function FeriasInicio({ secciones, onIr }) {
+    if (secciones.length === 0) return null;
+
+    return (
+        <Banda etiqueta="titulo-ferias">
+            <EncabezadoBanda id="titulo-ferias" sobre="Temporadas" titulo="Compra por feria" />
+            <ul className={`cat-ferias-divididas ${secciones.length === 1 ? "cat-ferias-una" : ""}`}>
+                {secciones.map((seccion) => {
+                    const conFoto = seccion.productos.find((p) => p.tieneFoto && p.disponible) ?? seccion.productos.find((p) => p.tieneFoto);
+                    return (
+                        <li key={seccion.slug}>
+                            <button type="button" className="cat-feria-dividida" onClick={() => onIr(seccion.slug)}>
+                                <span className={`cat-feria-dividida-foto cat-tema-${seccion.tema}`}>
+                                    {conFoto ? (
+                                        <img src={urlFoto(conFoto)} alt="" loading="lazy" decoding="async" />
+                                    ) : (
+                                        <span aria-hidden="true">{iconoTema(seccion.tema)}</span>
+                                    )}
+                                </span>
+                                <span className="cat-feria-dividida-texto">
+                                    <span className="cat-sobre">
+                                        {seccion.productos.length} {seccion.productos.length === 1 ? "producto" : "productos"}
+                                    </span>
+                                    <strong>{seccion.nombre}</strong>
+                                    {seccion.descripcion && <span className="cat-feria-frase">{seccion.descripcion}</span>}
+                                    <span className="cat-enlace-subrayado">Comprar ahora</span>
+                                </span>
+                            </button>
+                        </li>
+                    );
+                })}
+            </ul>
+        </Banda>
     );
 }
 
@@ -188,9 +267,9 @@ function Testimonios({ tienda }) {
     if (!tienda?.testimonios?.length) return null;
 
     return (
-        <section className="cat-testimonios revelar" aria-labelledby="titulo-testimonios">
-            <h2 id="titulo-testimonios" className="cat-titulo-centrado">Lo que dicen de nosotros</h2>
-            <ul>
+        <Banda etiqueta="titulo-testimonios">
+            <EncabezadoBanda id="titulo-testimonios" sobre="Clientes felices" titulo="Lo que dicen de nosotros" centrado />
+            <ul className="cat-testimonios-lista">
                 {tienda.testimonios.map((t) => (
                     <li key={`${t.nombre}-${t.texto.slice(0, 20)}`}>
                         <span className="cat-estrellas" aria-hidden="true">★★★★★</span>
@@ -199,18 +278,19 @@ function Testimonios({ tienda }) {
                     </li>
                 ))}
             </ul>
-        </section>
+        </Banda>
     );
 }
 
 // Preguntas frecuentes: se abren al tocarlas.
 export function PreguntasFrecuentes({ tienda, id }) {
     if (!tienda?.preguntas?.length) return null;
+    const titulo = `${id ?? "inicio"}-titulo-preguntas`;
 
     return (
-        <section className="cat-preguntas revelar" id={id} aria-labelledby={`${id ?? "inicio"}-titulo-preguntas`}>
-            <h2 id={`${id ?? "inicio"}-titulo-preguntas`} className="cat-titulo-centrado">Preguntas frecuentes</h2>
-            <div>
+        <Banda id={id} etiqueta={titulo} fondo="suave" clase="cat-faq">
+            <EncabezadoBanda id={titulo} sobre="¿Tienes dudas?" titulo="Preguntas frecuentes" centrado />
+            <div className="cat-faq-lista">
                 {tienda.preguntas.map((p) => (
                     <details key={p.pregunta}>
                         <summary>{p.pregunta}</summary>
@@ -224,7 +304,7 @@ export function PreguntasFrecuentes({ tienda, id }) {
                     Escríbenos por WhatsApp
                 </a>
             </p>
-        </section>
+        </Banda>
     );
 }
 
@@ -245,8 +325,10 @@ export function BotonWhatsAppFlotante() {
     );
 }
 
-// Portada: presentación, cómo comprar, categorías, más vendidos, novedades, comentarios y preguntas.
-export function Portada({ tienda, secciones, categorias, destacados, masVendidos, grilla, carrusel, onIr, onAbrir, onAplicarCupon }) {
+/* Portada de la tienda, ordenada por secciones de todo el ancho:
+   portada con carrusel → cómo comprar → categorías → más vendidos → ferias → novedades
+   → promociones → comentarios → preguntas → quiénes somos. */
+export function Portada({ tienda, secciones, categorias, destacados, masVendidos, carrusel, onIr, onAbrir, onAplicarCupon }) {
     const portada = urlImagenTienda(tienda, "portada");
     // Carrusel de la portada: la foto subida en «Página web» y fotos de productos (más vendidos y novedades).
     const conFoto = [...masVendidos, ...destacados]
@@ -257,6 +339,7 @@ export function Portada({ tienda, secciones, categorias, destacados, masVendidos
         ...conFoto.map((p) => ({
             clave: p.id,
             src: urlFoto(p),
+            producto: true,
             titulo: p.nombre,
             detalle: `${moneda(p.precioMinimo)} c/u`,
             onVer: () => onAbrir(p)
@@ -289,60 +372,44 @@ export function Portada({ tienda, secciones, categorias, destacados, masVendidos
             <CategoriasInicio categorias={categorias} onIr={onIr} />
 
             {masVendidos.length > 0 && (
-                <section className="cat-bloque cat-bloque-carrusel revelar" aria-label="Los más vendidos">
-                    <h2 className="cat-titulo-centrado">Los más vendidos</h2>
+                <Banda etiqueta="titulo-mas-vendidos" fondo="suave">
+                    <EncabezadoBanda
+                        id="titulo-mas-vendidos"
+                        sobre="Favoritos de nuestros clientes"
+                        titulo="Los más vendidos"
+                        accion={{ texto: "Ver todo", onClick: () => onIr("todo") }}
+                    />
                     {carrusel(masVendidos, "Los más vendidos")}
-                </section>
+                </Banda>
             )}
 
-            <BloquesPromocion tienda={tienda} onAplicarCupon={onAplicarCupon} />
-
-            {secciones.length > 0 && (
-                <section className="cat-ferias revelar" aria-label="Compra por feria">
-                    <h2 className="cat-titulo-centrado">Compra por feria</h2>
-                    <ul>
-                        {secciones.map((seccion) => {
-                            const conFoto = seccion.productos.find((p) => p.tieneFoto);
-                            return (
-                                <li key={seccion.slug}>
-                                    <button type="button" className={`cat-feria cat-tema-${seccion.tema}`} onClick={() => onIr(seccion.slug)}>
-                                        {conFoto && <img src={urlFoto(conFoto)} alt="" loading="lazy" />}
-                                        <span className="cat-feria-texto">
-                                            <span aria-hidden="true">{iconoTema(seccion.tema)}</span>
-                                            <strong>{seccion.nombre}</strong>
-                                            <small>{seccion.productos.length} {seccion.productos.length === 1 ? "producto" : "productos"} · Ver todo →</small>
-                                        </span>
-                                    </button>
-                                </li>
-                            );
-                        })}
-                    </ul>
-                </section>
-            )}
+            <FeriasInicio secciones={secciones} onIr={onIr} />
 
             {destacados.length > 0 && (
-                <section className="cat-bloque cat-bloque-carrusel revelar" aria-label="Novedades">
-                    <h2 className="cat-titulo-centrado">Novedades</h2>
+                <Banda etiqueta="titulo-novedades" fondo="suave">
+                    <EncabezadoBanda
+                        id="titulo-novedades"
+                        sobre="Recién llegados"
+                        titulo="Novedades"
+                        accion={{ texto: "Ver todo el catálogo", onClick: () => onIr("todo") }}
+                    />
                     {carrusel(destacados, "Novedades")}
-                    <div className="cat-centrado">
-                        <button type="button" className="cat-boton-oscuro" onClick={() => onIr("todo")}>
-                            Ver todo el catálogo
-                        </button>
-                    </div>
-                </section>
+                </Banda>
             )}
+
+            <BandaPromociones tienda={tienda} onAplicarCupon={onAplicarCupon} />
 
             <Testimonios tienda={tienda} />
 
             <PreguntasFrecuentes tienda={tienda} />
 
             {tienda && (
-                <section className="cat-nosotros-breve revelar">
+                <Banda etiqueta="titulo-quienes-somos" clase="cat-nosotros-inicio">
                     <div>
-                        <p className="cat-banner-sobre">¿Quiénes somos?</p>
-                        <h2>Un negocio familiar lleno de ilusión</h2>
+                        <p className="cat-sobre">¿Quiénes somos?</p>
+                        <h2 id="titulo-quienes-somos">Un negocio familiar lleno de ilusión</h2>
                         <p>{tienda.quienesSomos}</p>
-                        <button type="button" className="cat-boton-oscuro" onClick={() => onIr("nosotros")}>
+                        <button type="button" className="cat-enlace-subrayado" onClick={() => onIr("nosotros")}>
                             Conoce más de nosotros
                         </button>
                     </div>
@@ -356,7 +423,7 @@ export function Portada({ tienda, secciones, categorias, destacados, masVendidos
                             ))}
                         </ul>
                     )}
-                </section>
+                </Banda>
             )}
         </>
     );
