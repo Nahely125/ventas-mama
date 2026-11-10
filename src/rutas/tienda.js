@@ -1,6 +1,7 @@
 const express = require("express");
 const pool = require("../db");
 const { requiereJefe } = require("../autenticacion");
+const almacen = require("../almacenR2");
 
 /* Página web del catálogo: "¿Quiénes somos?", valores, información corporativa
    y promociones (cupón de primera compra y envío gratis). La edita el jefe. */
@@ -215,15 +216,24 @@ router.get("/imagen/:clave", async (req, res) => {
     }
 
     try {
-        const resultado = await pool.query(`SELECT datos, tipo FROM tienda_imagenes WHERE clave = $1`, [req.params.clave]);
+        // Si está en R2 no se trae la imagen de la base: solo su nombre.
+        const resultado = await pool.query(
+            `SELECT clave_r2, tipo, CASE WHEN clave_r2 IS NULL THEN datos END AS datos FROM tienda_imagenes WHERE clave = $1`,
+            [req.params.clave]
+        );
         const imagen = resultado.rows[0];
 
-        if (!imagen) {
+        if (!imagen || (!imagen.datos && !(imagen.clave_r2 && almacen.activo))) {
             return res.status(404).end();
         }
 
         // Con versión en la dirección se guarda en caché mucho tiempo (cambia al subir otra).
         res.set("Cache-Control", req.query.v ? "public, max-age=31536000, immutable" : "public, max-age=300");
+
+        if (imagen.clave_r2) {
+            return res.redirect(302, almacen.direccionPublica(imagen.clave_r2));
+        }
+
         res.type(imagen.tipo).send(imagen.datos);
     } catch (error) {
         console.error("Error al enviar la imagen de la tienda:", error.message);
@@ -251,11 +261,24 @@ router.put("/imagen/:clave", requiereJefe, async (req, res) => {
     }
 
     try {
+        const anterior = await pool.query(`SELECT clave_r2 FROM tienda_imagenes WHERE clave = $1`, [req.params.clave]);
+        let claveR2 = null;
+
+        if (almacen.activo) {
+            claveR2 = `tienda/${req.params.clave}-${Date.now()}.${almacen.extension(coincidencia[1])}`;
+            await almacen.subir(claveR2, datos, coincidencia[1]);
+        }
+
         await pool.query(
-            `INSERT INTO tienda_imagenes (clave, datos, tipo, actualizada) VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
-             ON CONFLICT (clave) DO UPDATE SET datos = EXCLUDED.datos, tipo = EXCLUDED.tipo, actualizada = CURRENT_TIMESTAMP`,
-            [req.params.clave, datos, coincidencia[1]]
+            `INSERT INTO tienda_imagenes (clave, datos, tipo, actualizada, clave_r2) VALUES ($1, $2, $3, CURRENT_TIMESTAMP, $4)
+             ON CONFLICT (clave) DO UPDATE SET datos = EXCLUDED.datos, tipo = EXCLUDED.tipo,
+                 actualizada = CURRENT_TIMESTAMP, clave_r2 = EXCLUDED.clave_r2`,
+            [req.params.clave, claveR2 ? null : datos, coincidencia[1], claveR2]
         );
+
+        if (almacen.activo && anterior.rows[0]?.clave_r2) {
+            await almacen.borrar(anterior.rows[0].clave_r2);
+        }
         res.json({ mensaje: `Se guardó ${req.params.clave === "logo" ? "el" : "la"} ${nombre}.`, tienda: await leerTienda() });
     } catch (error) {
         console.error("Error al guardar la imagen de la tienda:", error.message);
@@ -271,7 +294,10 @@ router.delete("/imagen/:clave", requiereJefe, async (req, res) => {
     }
 
     try {
-        await pool.query(`DELETE FROM tienda_imagenes WHERE clave = $1`, [req.params.clave]);
+        const borrada = await pool.query(`DELETE FROM tienda_imagenes WHERE clave = $1 RETURNING clave_r2`, [req.params.clave]);
+        if (almacen.activo && borrada.rows[0]?.clave_r2) {
+            await almacen.borrar(borrada.rows[0].clave_r2);
+        }
         res.json({ mensaje: `Se quitó ${req.params.clave === "logo" ? "el" : "la"} ${nombre}.`, tienda: await leerTienda() });
     } catch (error) {
         console.error("Error al quitar la imagen de la tienda:", error.message);

@@ -109,7 +109,8 @@ app.use((req, res, next) => {
 
 // Fotos de los productos: públicas, así que van antes de las sesiones (no se lee ni se
 // renueva la sesión en cada foto: eran 2 consultas de más a la base por cada imagen).
-const { enviarFoto, crearMiniaturasPendientes } = require("./fotosServidor");
+const { enviarFoto, crearMiniaturasPendientes, migrarFotosAR2 } = require("./fotosServidor");
+const almacenR2 = require("./almacenR2");
 app.get("/api/productos/:id/foto", enviarFoto);
 
 // Las sesiones se guardan en PostgreSQL (tabla "session") para que no se
@@ -349,8 +350,10 @@ function prepararBase() {
         .then(() => {
             baseLista = true;
             console.log(`Base de datos lista en ${Date.now() - inicio} ms.`);
-            // Miniaturas de las fotos antiguas, de a una y sin apuro.
-            setTimeout(crearMiniaturasPendientes, 5000);
+            // Con Cloudflare R2: se pasan allí las fotos que aún estén en la base.
+            // Sin R2: se crean las miniaturas de las fotos antiguas. De a una y sin apuro.
+            console.log(almacenR2.activo ? "Fotos: Cloudflare R2." : "Fotos: en la base de datos (R2 no configurado).");
+            setTimeout(almacenR2.activo ? migrarFotosAR2 : crearMiniaturasPendientes, 5000);
         })
         .catch((error) => {
             console.error(`No se pudo conectar con la base de datos (se reintenta en 1 minuto): ${error.message || error.code || error}`);

@@ -154,6 +154,10 @@ const MIGRACIONES = `
     -- Foto sin editar (para poder cambiar de escena sin perder calidad).
     ALTER TABLE productos ADD COLUMN IF NOT EXISTS foto_original BYTEA;
     ALTER TABLE productos ADD COLUMN IF NOT EXISTS foto_original_tipo VARCHAR(30);
+    -- Fotos guardadas en Cloudflare R2 (en vez de en la base): nombre base de la foto y su
+    -- miniatura, y nombre de la foto original. Si están en R2, las columnas BYTEA quedan vacías.
+    ALTER TABLE productos ADD COLUMN IF NOT EXISTS foto_r2 VARCHAR(200);
+    ALTER TABLE productos ADD COLUMN IF NOT EXISTS foto_original_r2 VARCHAR(200);
 
     -- Costos con hasta 4 decimales (por ejemplo, S/ 0.0833 por unidad). Solo se cambia una vez.
     DO $$
@@ -358,6 +362,9 @@ const MIGRACIONES = `
         tipo        VARCHAR(30) NOT NULL,
         actualizada TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
+    -- Si la imagen está en Cloudflare R2, se guarda su nombre y «datos» queda vacío.
+    ALTER TABLE tienda_imagenes ALTER COLUMN datos DROP NOT NULL;
+    ALTER TABLE tienda_imagenes ADD COLUMN IF NOT EXISTS clave_r2 VARCHAR(200);
 
     -- Fecha de registro del producto (para la etiqueta «Nuevo» del catálogo).
     -- Los productos que ya existían quedan sin fecha: no se marcan como nuevos.

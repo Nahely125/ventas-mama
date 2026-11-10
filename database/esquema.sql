@@ -84,6 +84,8 @@ CREATE TABLE IF NOT EXISTS productos (
     foto_mini          BYTEA,                                               -- miniatura (se crea sola al pedirla)
     foto_original      BYTEA,                                               -- la foto sin editar (para cambiar de escena)
     foto_original_tipo VARCHAR(30),
+    foto_r2            VARCHAR(200),                                        -- foto en Cloudflare R2: nombre base (foto y miniatura)
+    foto_original_r2   VARCHAR(200),                                        -- foto original en Cloudflare R2
     foto_actualizada   TIMESTAMP,
     creado_en          TIMESTAMP     DEFAULT CURRENT_TIMESTAMP              -- para la etiqueta «Nuevo» del catálogo
 );
@@ -328,9 +330,10 @@ CREATE TABLE IF NOT EXISTS tienda (
 -- Imágenes de la página web: foto de portada ('portada') y logo ('logo').
 CREATE TABLE IF NOT EXISTS tienda_imagenes (
     clave       VARCHAR(20) PRIMARY KEY,
-    datos       BYTEA       NOT NULL,
+    datos       BYTEA,                    -- vacío si la imagen está en Cloudflare R2
     tipo        VARCHAR(30) NOT NULL,
-    actualizada TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP
+    actualizada TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    clave_r2    VARCHAR(200)              -- nombre del archivo en Cloudflare R2
 );
 
 COMMIT;

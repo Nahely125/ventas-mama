@@ -4,7 +4,9 @@ const { requiereSesion, requiereJefe, leerId } = require("../autenticacion");
 const { OBSEQUIABLE } = require("./ajustes");
 const { COLORES_JSON, validarColores, guardarColores } = require("./colores");
 const { MOTIVOS_AJUSTE, anotarMovimiento } = require("../movimientos");
+const crypto = require("crypto");
 const { crearMiniatura, olvidarFoto } = require("../fotosServidor");
+const almacen = require("../almacenR2");
 
 const router = express.Router();
 
@@ -24,7 +26,7 @@ const COLUMNAS_COMUNES = `
     stock,
     seccion_id AS "seccionId",
     categoria_id AS "categoriaId",
-    (foto IS NOT NULL) AS "tieneFoto",
+    (foto IS NOT NULL OR foto_r2 IS NOT NULL) AS "tieneFoto",
     foto_editada AS "fotoEditada",
     -- Se puede regalar (el empleado solo ve si sí o no, nunca el costo).
     ${OBSEQUIABLE} AS "obsequiable",
@@ -401,6 +403,7 @@ function leerImagen(texto) {
 }
 
 // Foto sin editar: la usa el jefe para cambiar de escena. Si no hay, se envía la foto guardada.
+// Si está en R2, el servidor la descarga y la envía (así el editor no necesita permisos de otro dominio).
 router.get("/:id/foto-original", requiereJefe, async (req, res) => {
     const id = leerId(req);
 
@@ -410,9 +413,9 @@ router.get("/:id/foto-original", requiereJefe, async (req, res) => {
 
     try {
         const resultado = await pool.query(
-            `SELECT COALESCE(foto_original, foto) AS foto,
+            `SELECT COALESCE(foto_original, foto) AS foto, foto_r2, foto_original_r2, foto_tipo, foto_original_tipo,
                     CASE WHEN foto_original IS NULL THEN foto_tipo ELSE foto_original_tipo END AS tipo
-             FROM productos WHERE id = $1 AND foto IS NOT NULL`,
+             FROM productos WHERE id = $1 AND (foto IS NOT NULL OR foto_r2 IS NOT NULL)`,
             [id]
         );
         const fila = resultado.rows[0];
@@ -421,13 +424,73 @@ router.get("/:id/foto-original", requiereJefe, async (req, res) => {
             return res.status(404).end();
         }
 
+        let datos = fila.foto;
+        let tipo = fila.tipo;
+
+        if (!datos && fila.foto_original_r2) {
+            datos = await almacen.descargar(fila.foto_original_r2);
+            tipo = fila.foto_original_tipo || fila.foto_tipo;
+        } else if (!datos && fila.foto_r2) {
+            datos = await almacen.descargar(almacen.claveFoto(fila.foto_r2, fila.foto_tipo));
+            tipo = fila.foto_tipo;
+        }
+
         res.set("Cache-Control", "private, no-cache");
-        res.type(fila.tipo).send(fila.foto);
+        res.type(tipo).send(datos);
     } catch (error) {
         console.error("Error al enviar la foto original:", error.message);
         res.status(500).end();
     }
 });
+
+/* Guarda la foto en Cloudflare R2: la foto, su miniatura y (si llega) la original, con un nombre
+   nuevo cada vez. En la base solo queda el nombre. Al final se borran los archivos anteriores. */
+async function guardarFotoEnR2(res, { id, foto, miniatura, editada, original }) {
+    const antes = await pool.query(
+        `SELECT foto_r2, foto_tipo, foto_original_r2 FROM productos WHERE id = $1`,
+        [id]
+    );
+
+    if (antes.rows.length === 0) {
+        return res.status(404).json({ error: "Producto no encontrado" });
+    }
+
+    const anterior = antes.rows[0];
+    const base = almacen.baseProducto(id, `${Math.floor(Date.now() / 1000)}-${crypto.randomBytes(3).toString("hex")}`);
+    const claveOriginal = original ? almacen.claveOriginal(base, original.tipo) : null;
+
+    await almacen.subir(almacen.claveFoto(base, foto.tipo), foto.datos, foto.tipo);
+    // Si no se pudo crear la miniatura, se usa la misma foto.
+    await almacen.subir(almacen.claveMini(base), miniatura ?? foto.datos, miniatura ? "image/jpeg" : foto.tipo);
+    if (original) {
+        await almacen.subir(claveOriginal, original.datos, original.tipo);
+    }
+
+    // La original anterior se conserva solo si la foto nueva es editada y no trae otra original.
+    const conservaOriginal = editada && !original;
+
+    await pool.query(
+        `UPDATE productos
+         SET foto = NULL, foto_mini = NULL, foto_r2 = $2, foto_tipo = $3, foto_editada = $4,
+             foto_original = CASE WHEN $6 THEN foto_original END,
+             foto_original_r2 = CASE WHEN $5::VARCHAR IS NOT NULL THEN $5 WHEN $6 THEN foto_original_r2 END,
+             foto_original_tipo = CASE WHEN $5::VARCHAR IS NOT NULL THEN $7 WHEN $6 THEN foto_original_tipo END,
+             foto_actualizada = CURRENT_TIMESTAMP
+         WHERE id = $1`,
+        [id, base, foto.tipo, editada, claveOriginal, conservaOriginal, original?.tipo ?? null]
+    );
+    olvidarFoto(id);
+
+    // Archivos que ya no se usan.
+    if (anterior.foto_r2) {
+        await almacen.borrar(almacen.claveFoto(anterior.foto_r2, anterior.foto_tipo), almacen.claveMini(anterior.foto_r2));
+    }
+    if (anterior.foto_original_r2 && !conservaOriginal) {
+        await almacen.borrar(anterior.foto_original_r2);
+    }
+
+    res.json({ mensaje: "Foto guardada correctamente." });
+}
 
 /* Guarda la foto. editada: tiene una escena del catálogo. original (opcional): la foto sin editar.
    Si se sube sin editar, ella misma es la original; si es editada sin original, se conserva la anterior. */
@@ -454,6 +517,11 @@ router.put("/:id/foto", requiereJefe, async (req, res) => {
     try {
         // La miniatura se crea al subir la foto: así la primera vez que se mira ya está lista.
         const miniatura = await crearMiniatura(foto.datos).catch(() => null);
+
+        if (almacen.activo) {
+            return await guardarFotoEnR2(res, { id, foto, miniatura, editada, original });
+        }
+
         const resultado = await pool.query(
             `UPDATE productos
              SET foto = $1, foto_tipo = $2, foto_editada = $4, foto_mini = $7,
@@ -485,15 +553,28 @@ router.delete("/:id/foto", requiereJefe, async (req, res) => {
     }
 
     try {
-        await pool.query(
-            `UPDATE productos
+        const resultado = await pool.query(
+            `UPDATE productos AS p
              SET foto = NULL, foto_tipo = NULL, foto_editada = FALSE, foto_mini = NULL,
-                 foto_original = NULL, foto_original_tipo = NULL, foto_actualizada = CURRENT_TIMESTAMP
-             WHERE id = $1`,
+                 foto_original = NULL, foto_original_tipo = NULL, foto_r2 = NULL, foto_original_r2 = NULL,
+                 foto_actualizada = CURRENT_TIMESTAMP
+             FROM (SELECT id, foto_r2, foto_tipo, foto_original_r2 FROM productos WHERE id = $1 FOR UPDATE) AS antes
+             WHERE p.id = antes.id
+             RETURNING antes.foto_r2, antes.foto_tipo, antes.foto_original_r2`,
             [id]
         );
 
         olvidarFoto(id);
+
+        // Si la foto estaba en R2, se borran sus archivos.
+        const anterior = resultado.rows[0];
+        if (almacen.activo && anterior?.foto_r2) {
+            await almacen.borrar(
+                almacen.claveFoto(anterior.foto_r2, anterior.foto_tipo),
+                almacen.claveMini(anterior.foto_r2),
+                anterior.foto_original_r2
+            );
+        }
         res.json({ mensaje: "Foto eliminada." });
     } catch (error) {
         console.error("Error al eliminar la foto:", error.message);
