@@ -88,8 +88,11 @@ async function enviarFoto(req, res) {
     }
 
     try {
+        // Solo se trae de la base lo que se va a enviar: la miniatura O la foto, nunca las dos.
+        // (Cada byte que sale de la base cuenta para el límite mensual de transferencia de Neon.)
         const resultado = await pool.query(
-            `SELECT foto, foto_tipo, ${mini ? "foto_mini" : "NULL::BYTEA"} AS foto_mini, foto_actualizada,
+            `SELECT foto_tipo, foto_actualizada,
+                    ${mini ? "foto_mini" : "foto"} AS datos,
                     COALESCE(EXTRACT(EPOCH FROM foto_actualizada)::BIGINT, 0)::INT AS version
              FROM productos WHERE id = $1 AND foto IS NOT NULL`,
             [id]
@@ -100,13 +103,18 @@ async function enviarFoto(req, res) {
             return res.status(404).end();
         }
 
-        let foto = { version: fila.version, tipo: fila.foto_tipo, datos: fila.foto };
+        let foto = { version: fila.version, tipo: fila.foto_tipo, datos: fila.datos };
 
         if (mini) {
-            let miniatura = fila.foto_mini;
+            let miniatura = fila.datos;
 
             if (!miniatura) {
-                miniatura = await crearMiniatura(fila.foto);
+                // Falta la miniatura (foto antigua): solo entonces se trae la foto completa para crearla.
+                const original = await pool.query(`SELECT foto FROM productos WHERE id = $1`, [id]);
+                if (!original.rows[0]?.foto) {
+                    return res.status(404).end();
+                }
+                miniatura = await crearMiniatura(original.rows[0].foto);
                 // Se guarda para la próxima vez (si nadie cambió la foto mientras tanto).
                 await pool.query(
                     `UPDATE productos SET foto_mini = $1 WHERE id = $2 AND foto_actualizada IS NOT DISTINCT FROM $3`,
