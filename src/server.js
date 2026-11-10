@@ -31,9 +31,9 @@ if (enProduccion) {
 app.use(compression());
 app.use(express.json({ limit: "5mb" }));
 
-// Revisión de estado para el hosting: responde 200 si el servidor y la base de datos funcionan.
-// Va antes de las sesiones para no crear ni leer sesiones en cada revisión.
-// Si la base tarda más de 5 s, responde 503 en lugar de dejar esperando al hosting.
+// Revisión de estado para el hosting: responde 200 mientras el servidor esté vivo e indica si
+// la base de datos funciona ("ok") o no ("mantenimiento"). Va antes de las sesiones.
+// Si la base tarda más de 5 s, se da por no disponible en lugar de dejar esperando al hosting.
 app.get("/api/salud", async (req, res) => {
     let temporizador;
 
@@ -46,11 +46,65 @@ app.get("/api/salud", async (req, res) => {
         ]);
         res.json({ estado: "ok" });
     } catch (error) {
-        console.error("Revisión de estado fallida:", error.message);
-        res.status(503).json({ estado: "sin base de datos" });
+        // El servidor sigue vivo y muestra la página de mantenimiento mientras se reconecta solo:
+        // se responde 200 para que el hosting no lo reinicie ni rechace la versión (no serviría de nada).
+        console.error("Revisión de estado: base de datos no disponible:", error.message || error.code || error);
+        res.json({ estado: "mantenimiento", baseDeDatos: "no disponible" });
     } finally {
         clearTimeout(temporizador);
     }
+});
+
+/* Modo mantenimiento: si la base de datos no está disponible (por ejemplo, se agotó la cuota
+   del proveedor), el servidor igual se abre y muestra un aviso amable en vez de un error.
+   Se vuelve a intentar la conexión cada minuto; cuando la base responde, todo funciona solo. */
+let baseLista = false;
+// El mismo número de WhatsApp de los pedidos (client/src/datosPago.js).
+const WHATSAPP_NEGOCIO = "51904979273";
+
+const PAGINA_MANTENIMIENTO = `<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="refresh" content="60">
+<title>Mil Deseos · En mantenimiento</title>
+<style>
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px; box-sizing: border-box;
+         background: linear-gradient(150deg, #7c3aed, #4c1d95 60%, #1e0b3d); color: #fff;
+         font-family: system-ui, -apple-system, "Segoe UI", sans-serif; text-align: center; }
+  main { max-width: 420px; }
+  h1 { margin: 0 0 6px; font-family: Georgia, "Times New Roman", serif; font-size: 2.4rem; font-weight: 600; }
+  .icono { font-size: 3rem; }
+  p { line-height: 1.6; opacity: 0.92; }
+  a { display: inline-block; margin-top: 10px; padding: 12px 22px; border-radius: 999px; background: #25d366;
+      color: #fff; font-weight: 700; text-decoration: none; }
+  small { display: block; margin-top: 18px; opacity: 0.7; }
+</style>
+</head>
+<body>
+<main>
+  <div class="icono" aria-hidden="true">✨</div>
+  <h1>Mil Deseos</h1>
+  <p>Estamos haciendo unos ajustes para atenderte mejor. Vuelve en un rato, por favor.</p>
+  <p>¿Quieres hacer un pedido ahora? Escríbenos:</p>
+  <a href="https://wa.me/${WHATSAPP_NEGOCIO}">💬 Escríbenos por WhatsApp</a>
+  <small>Esta página se actualiza sola cada minuto.</small>
+</main>
+</body>
+</html>`;
+
+app.use((req, res, next) => {
+    if (baseLista || req.path === "/api/salud") return next();
+
+    res.set("Retry-After", "60");
+    res.set("Cache-Control", "no-store");
+
+    if (req.path.startsWith("/api/")) {
+        return res.status(503).json({ error: "Estamos en mantenimiento. Vuelve a intentarlo en un rato." });
+    }
+
+    res.status(503).type("html").send(PAGINA_MANTENIMIENTO);
 });
 
 // Fotos de los productos: públicas, así que van antes de las sesiones (no se lee ni se
@@ -286,16 +340,25 @@ app.get("/catalogo", async (req, res) => {
 const inicio = Date.now();
 console.log("Conectando con la base de datos y revisando su estructura...");
 
-ejecutarMigraciones()
-    .then(() => {
-        console.log(`Base de datos lista en ${Date.now() - inicio} ms.`);
-        app.listen(PORT, "0.0.0.0", () => {
-            console.log(`Servidor iniciado en http://localhost:${PORT}`);
+// El servidor se abre enseguida (así el hosting lo ve vivo); mientras la base no esté lista,
+// se muestra la página de mantenimiento y se reintenta cada minuto.
+const REINTENTO_MS = Number(process.env.REINTENTO_BASE_MS) || 60 * 1000;
+
+function prepararBase() {
+    ejecutarMigraciones()
+        .then(() => {
+            baseLista = true;
+            console.log(`Base de datos lista en ${Date.now() - inicio} ms.`);
             // Miniaturas de las fotos antiguas, de a una y sin apuro.
             setTimeout(crearMiniaturasPendientes, 5000);
+        })
+        .catch((error) => {
+            console.error(`No se pudo conectar con la base de datos (se reintenta en 1 minuto): ${error.message || error.code || error}`);
+            setTimeout(prepararBase, REINTENTO_MS);
         });
-    })
-    .catch((error) => {
-        console.error("No se pudo actualizar la base de datos:", error.message);
-        process.exit(1);
-    });
+}
+
+app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Servidor iniciado en http://localhost:${PORT}`);
+    prepararBase();
+});
