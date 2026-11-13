@@ -9055,7 +9055,9 @@ body.sin-desplazamiento {
 }
 
 .cat-faq-lista details {
+    overflow: hidden;
     border: 1px solid var(--morado-150);
+    border-radius: 14px;
     background: #ffffff;
 }
 
