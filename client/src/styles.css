@@ -9165,7 +9165,8 @@ body.sin-desplazamiento {
 @media (min-width: 900px) {
     .cat-cabecera-fila {
         display: grid;
-        grid-template-columns: 1fr auto 1fr;
+        /* Logo a la izquierda, buscador en el centro exacto y carrito a la derecha */
+        grid-template-columns: minmax(auto, 1fr) minmax(220px, 520px) minmax(auto, 1fr);
         align-items: center;
         gap: 20px;
     }
@@ -9178,8 +9179,10 @@ body.sin-desplazamiento {
         display: flex;
         align-items: center;
         gap: 8px;
-        justify-self: start;
-        width: min(100%, 320px);
+        grid-column: 2;
+        grid-row: 1;
+        justify-self: stretch;
+        width: 100%;
         padding: 0 14px;
         border: 1px solid var(--morado-200);
         border-radius: 999px;
@@ -9214,7 +9217,19 @@ body.sin-desplazamiento {
         outline: none;
     }
 
+    .cat-cabecera-fila > .cat-logo {
+        grid-column: 1;
+        grid-row: 1;
+        justify-self: start;
+    }
+
+    .cat-cabecera-fila > .cat-logo img {
+        margin: 0;
+    }
+
     .cat-cabecera-fila > .cat-boton-pedido {
+        grid-column: 3;
+        grid-row: 1;
         justify-self: end;
     }
 
@@ -9549,4 +9564,11 @@ body.sin-desplazamiento {
     padding: 12px;
     border-radius: 12px;
     background: #ecfdf5;
+}
+
+/* Pantallas medianas: el buscador un poco más angosto para que siga en el centro exacto */
+@media (min-width: 900px) and (max-width: 1100px) {
+    .cat-cabecera-fila {
+        grid-template-columns: minmax(auto, 1fr) minmax(220px, 400px) minmax(auto, 1fr);
+    }
 }
