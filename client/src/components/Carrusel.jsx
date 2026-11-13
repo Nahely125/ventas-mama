@@ -10,9 +10,11 @@ export function prefiereQuieto() {
 
 /* Foto adaptada al recuadro (3:4):
    - Si la foto es vertical (casi 3:4), llena el recuadro.
-   - Si es horizontal o cuadrada, se ve completa, sin cortarse, sobre un fondo difuminado de la misma foto.
+   - Si es horizontal o cuadrada, se ve completa, sin cortarse, sobre un fondo suave. Con «difuminado»
+     (solo en la ficha), el fondo es la misma foto difuminada: se ve lindo pero le cuesta al celular,
+     por eso no se usa en las listas de muchas tarjetas.
    Mientras carga se ve un brillo suave, y aparece con un desvanecido. */
-export function FotoAdaptada({ src, alt = "", prioridad = false }) {
+export function FotoAdaptada({ src, alt = "", prioridad = false, difuminado = false }) {
     const [modo, setModo] = useState(null); // null (cargando) | "llenar" | "ajustar"
 
     function alCargar(evento) {
@@ -23,7 +25,7 @@ export function FotoAdaptada({ src, alt = "", prioridad = false }) {
 
     return (
         <span className={`foto-adaptada ${modo ? `cargada foto-${modo}` : ""}`}>
-            {modo === "ajustar" && <img className="foto-adaptada-fondo" src={src} alt="" aria-hidden="true" decoding="async" />}
+            {modo === "ajustar" && difuminado && <img className="foto-adaptada-fondo" src={src} alt="" aria-hidden="true" decoding="async" />}
             <img
                 className="foto-adaptada-principal"
                 src={src}

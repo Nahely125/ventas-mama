@@ -778,7 +778,7 @@ function DetalleProducto({ producto, relacionados = [], enPedido, onAgregar, onA
                     ✕
                 </button>
                 <div className="cat-detalle-foto">
-                    {foto ? <FotoAdaptada src={foto} alt={producto.nombre} prioridad /> : <span aria-hidden="true">✦</span>}
+                    {foto ? <FotoAdaptada src={foto} alt={producto.nombre} prioridad difuminado /> : <span aria-hidden="true">✦</span>}
                 </div>
                 <div className="cat-detalle-datos">
                     {producto.codigo && <span className="cat-codigo">Código {producto.codigo}</span>}

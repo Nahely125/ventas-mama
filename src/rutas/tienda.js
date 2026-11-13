@@ -2,6 +2,7 @@ const express = require("express");
 const pool = require("../db");
 const { requiereJefe } = require("../autenticacion");
 const almacen = require("../almacenR2");
+const { optimizarFoto } = require("../fotosServidor");
 
 /* Página web del catálogo: "¿Quiénes somos?", valores, información corporativa
    y promociones (cupón de primera compra y envío gratis). La edita el jefe. */
@@ -261,19 +262,23 @@ router.put("/imagen/:clave", requiereJefe, async (req, res) => {
     }
 
     try {
+        // La portada se aligera (máx. 1600 px: se ve a pantalla completa). El logo se deja como está.
+        const imagen = req.params.clave === "portada"
+            ? await optimizarFoto(datos, coincidencia[1], 1600)
+            : { datos, tipo: coincidencia[1] };
         const anterior = await pool.query(`SELECT clave_r2 FROM tienda_imagenes WHERE clave = $1`, [req.params.clave]);
         let claveR2 = null;
 
         if (almacen.activo) {
-            claveR2 = `tienda/${req.params.clave}-${Date.now()}.${almacen.extension(coincidencia[1])}`;
-            await almacen.subir(claveR2, datos, coincidencia[1]);
+            claveR2 = `tienda/${req.params.clave}-${Date.now()}.${almacen.extension(imagen.tipo)}`;
+            await almacen.subir(claveR2, imagen.datos, imagen.tipo);
         }
 
         await pool.query(
             `INSERT INTO tienda_imagenes (clave, datos, tipo, actualizada, clave_r2) VALUES ($1, $2, $3, CURRENT_TIMESTAMP, $4)
              ON CONFLICT (clave) DO UPDATE SET datos = EXCLUDED.datos, tipo = EXCLUDED.tipo,
                  actualizada = CURRENT_TIMESTAMP, clave_r2 = EXCLUDED.clave_r2`,
-            [req.params.clave, claveR2 ? null : datos, coincidencia[1], claveR2]
+            [req.params.clave, claveR2 ? null : imagen.datos, imagen.tipo, claveR2]
         );
 
         if (almacen.activo && anterior.rows[0]?.clave_r2) {

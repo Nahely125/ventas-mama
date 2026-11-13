@@ -5,7 +5,7 @@ const { OBSEQUIABLE } = require("./ajustes");
 const { COLORES_JSON, validarColores, guardarColores } = require("./colores");
 const { MOTIVOS_AJUSTE, MOTIVOS_MERMA, anotarMovimiento } = require("../movimientos");
 const crypto = require("crypto");
-const { crearMiniatura, olvidarFoto } = require("../fotosServidor");
+const { crearMiniatura, optimizarFoto, olvidarFoto } = require("../fotosServidor");
 const almacen = require("../almacenR2");
 
 const router = express.Router();
@@ -515,7 +515,9 @@ router.put("/:id/foto", requiereJefe, async (req, res) => {
     }
 
     try {
-        // La miniatura se crea al subir la foto: así la primera vez que se mira ya está lista.
+        // Se aligera la foto (máx. 1000 px, JPEG optimizado) y se crea su miniatura al subirla:
+        // así la primera vez que se mira ya está lista y pesa menos.
+        Object.assign(foto, await optimizarFoto(foto.datos, foto.tipo));
         const miniatura = await crearMiniatura(foto.datos).catch(() => null);
 
         if (almacen.activo) {

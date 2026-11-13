@@ -31,6 +31,13 @@ if (enProduccion) {
 app.use(compression());
 app.use(express.json({ limit: "5mb" }));
 
+// «¿Estás despierto?»: para un servicio que visite la app cada pocos minutos (por ejemplo,
+// UptimeRobot) y así Render no la duerma. No toca la base de datos, así Neon sí puede dormir.
+app.get("/api/vivo", (_req, res) => {
+    res.set("Cache-Control", "no-store");
+    res.type("text").send("ok");
+});
+
 // Revisión de estado para el hosting: responde 200 mientras el servidor esté vivo e indica si
 // la base de datos funciona ("ok") o no ("mantenimiento"). Va antes de las sesiones.
 // Si la base tarda más de 5 s, se da por no disponible en lugar de dejar esperando al hosting.

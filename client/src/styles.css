@@ -8138,6 +8138,11 @@ body.sin-desplazamiento {
     animation: none;
 }
 
+/* Foto horizontal o cuadrada en una tarjeta: se ve completa sobre un fondo suave */
+.foto-adaptada.foto-ajustar {
+    background: #f8f6fb;
+}
+
 .foto-adaptada .foto-adaptada-principal {
     position: relative;
     z-index: 1;

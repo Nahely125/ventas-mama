@@ -24,8 +24,36 @@ async function crearMiniatura(foto) {
     return sharp(foto)
         .rotate()
         .resize({ ...LADO_MINI, fit: "inside", withoutEnlargement: true })
-        .jpeg({ quality: 78, mozjpeg: true })
+        .jpeg({ quality: 74, mozjpeg: true })
         .toBuffer();
+}
+
+// Foto grande: hasta 1000 px por lado (alcanza para la ficha y la portada en el celular).
+const LADO_GRANDE = { width: 1000, height: 1000 };
+
+/* Aligera una foto antes de guardarla: la gira según el celular, la reduce a 1000 px como máximo
+   y la comprime en JPEG optimizado (se ve igual y pesa bastante menos; JPEG funciona en todos
+   los celulares). Los PNG con transparencia (por ejemplo, un logo) se dejan como están.
+   Si no se gana nada, se devuelve la foto original. */
+async function optimizarFoto(datos, tipo, lado = LADO_GRANDE.width) {
+    if (!sharp) return { datos, tipo };
+
+    try {
+        const imagen = sharp(datos).rotate();
+        const meta = await imagen.metadata();
+
+        if (meta.hasAlpha && tipo === "image/png") return { datos, tipo };
+
+        const optimizada = await imagen
+            .resize({ width: lado, height: lado, fit: "inside", withoutEnlargement: true })
+            .flatten({ background: "#ffffff" })
+            .jpeg({ quality: 80, mozjpeg: true })
+            .toBuffer();
+
+        return optimizada.length < datos.length ? { datos: optimizada, tipo: "image/jpeg" } : { datos, tipo };
+    } catch {
+        return { datos, tipo };
+    }
 }
 
 // Memoria de fotos: { version, tipo, datos } por "id:foto" o "id:mini".
@@ -221,10 +249,12 @@ async function migrarFotosAR2() {
 
             const base = almacen.baseProducto(fila.id, `${fila.version}-m`);
             const miniatura = fila.foto_mini ?? (await crearMiniatura(fila.foto).catch(() => null));
+            // De paso se aligera la foto grande (pesa menos al verla en el catálogo).
+            const foto = await optimizarFoto(fila.foto, fila.foto_tipo);
             const claveOriginal = fila.foto_original ? almacen.claveOriginal(base, fila.foto_original_tipo) : null;
-            const claves = [almacen.claveFoto(base, fila.foto_tipo), almacen.claveMini(base), claveOriginal];
+            const claves = [almacen.claveFoto(base, foto.tipo), almacen.claveMini(base), claveOriginal];
 
-            await almacen.subir(claves[0], fila.foto, fila.foto_tipo);
+            await almacen.subir(claves[0], foto.datos, foto.tipo);
             await almacen.subir(claves[1], miniatura ?? fila.foto, miniatura ? "image/jpeg" : fila.foto_tipo);
             if (claveOriginal) {
                 await almacen.subir(claveOriginal, fila.foto_original, fila.foto_original_tipo);
@@ -233,10 +263,10 @@ async function migrarFotosAR2() {
             // La versión (foto_actualizada) no cambia: las direcciones que ya tienen los clientes siguen sirviendo.
             const guardado = await pool.query(
                 `UPDATE productos
-                 SET foto = NULL, foto_mini = NULL, foto_original = NULL, foto_r2 = $2,
+                 SET foto = NULL, foto_mini = NULL, foto_original = NULL, foto_r2 = $2, foto_tipo = $5,
                      foto_original_r2 = COALESCE($3, foto_original_r2)
                  WHERE id = $1 AND foto_r2 IS NULL AND foto_actualizada::TEXT IS NOT DISTINCT FROM $4`,
-                [fila.id, base, claveOriginal, fila.marca]
+                [fila.id, base, claveOriginal, fila.marca, foto.tipo]
             );
 
             if (guardado.rowCount === 0) {
@@ -274,4 +304,4 @@ async function migrarFotosAR2() {
     }
 }
 
-module.exports = { enviarFoto, crearMiniatura, olvidarFoto, crearMiniaturasPendientes, migrarFotosAR2 };
+module.exports = { enviarFoto, crearMiniatura, optimizarFoto, olvidarFoto, crearMiniaturasPendientes, migrarFotosAR2 };
