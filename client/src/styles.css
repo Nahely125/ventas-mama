@@ -9574,3 +9574,301 @@ body.sin-desplazamiento {
         grid-template-columns: minmax(auto, 1fr) minmax(220px, 400px) minmax(auto, 1fr);
     }
 }
+
+/* ===== Estética del catálogo: morado y dorado, tarjetas limpias, íconos de línea ===== */
+.cat-pagina {
+    --dorado: #b8892f;
+    --dorado-claro: #f7eedb;
+    --dorado-oscuro: #6b4e12;
+}
+
+/* Íconos de línea dentro de textos y botones */
+.icono {
+    flex: 0 0 auto;
+    width: 1.15em;
+    height: 1.15em;
+    vertical-align: -0.2em;
+}
+
+/* Marca: monograma «MD» + nombre (si no hay logo subido) */
+.cat-marca {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.cat-monograma {
+    display: inline-grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border: 1.5px solid var(--dorado);
+    border-radius: 50%;
+    color: var(--morado-900);
+    font-family: 'Playfair Display', serif;
+    font-size: 0.95rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+.cat-marca-nombre {
+    line-height: 1;
+}
+
+.cat-logo-pie .cat-monograma {
+    color: #ffffff;
+    border-color: #e5c27a;
+}
+
+@media (max-width: 420px) {
+    .cat-monograma {
+        width: 34px;
+        height: 34px;
+        font-size: 0.82rem;
+    }
+}
+
+/* Una sola etiqueta por tarjeta, en la paleta de la tienda */
+.cat-etiquetas .cat-etiqueta {
+    padding: 4px 9px;
+    border-radius: 999px;
+    box-shadow: none;
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+}
+
+.cat-etiqueta-vendido {
+    background: var(--dorado-claro);
+    color: var(--dorado-oscuro);
+}
+
+.cat-etiqueta-nuevo {
+    background: var(--morado-900);
+    color: #ffffff;
+}
+
+.cat-etiqueta-ultimas {
+    border: 1px solid var(--morado-900);
+    background: #ffffff;
+    color: var(--morado-900);
+}
+
+.cat-etiqueta-agotado {
+    background: rgba(255, 255, 255, 0.92);
+    color: var(--texto-suave);
+}
+
+/* Ahorro y consejo en dorado (el color de las ofertas) */
+.cat-ahorro {
+    background: var(--dorado-claro);
+    color: var(--dorado-oscuro);
+}
+
+.cat-consejo {
+    background: #fbf6ea;
+    color: var(--dorado-oscuro);
+}
+
+/* Tarjeta: nombre y precio con más presencia */
+.cat-producto-nombre {
+    color: #241736;
+    font-size: 0.92rem;
+    font-weight: 600;
+    line-height: 1.35;
+}
+
+.cat-producto-precio {
+    color: var(--morado-900);
+    font-size: 1.05rem;
+    font-weight: 700;
+}
+
+.cat-producto-docena {
+    color: var(--morado-700);
+    font-weight: 600;
+}
+
+/* Botón «Agregar» discreto en las tarjetas (contorno); lleno solo en la ficha */
+.cat-agregar:not(.cat-agregar-grande) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 40px;
+    border: 1px solid var(--morado-200);
+    background: #ffffff;
+    color: var(--morado-900);
+    font-weight: 600;
+}
+
+.cat-agregar:not(.cat-agregar-grande):hover:not(:disabled) {
+    border-color: var(--morado-900);
+    background: var(--morado-900);
+    color: #ffffff;
+}
+
+.cat-agregar.en-pedido:not(.cat-agregar-grande) {
+    border-color: var(--morado-900);
+    background: var(--morado-50);
+}
+
+.cat-agregar-grande {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.cat-pedir {
+    gap: 6px;
+}
+
+/* Al tocar una tarjeta en el celular, se hunde apenas */
+.cat-producto-boton .cat-foto {
+    transition: transform 0.15s ease;
+}
+
+.cat-producto-boton:active .cat-foto {
+    transform: scale(0.97);
+}
+
+/* Producto sin foto: recuadro elegante con su inicial */
+.cat-sin-foto {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: 6px;
+    background: linear-gradient(160deg, #faf7ff 0%, #f1eafe 100%);
+    font-size: 1rem;
+}
+
+.cat-sin-foto-inicial {
+    display: grid;
+    place-items: center;
+    width: 64px;
+    height: 64px;
+    border: 1.5px solid var(--dorado);
+    border-radius: 50%;
+    color: var(--morado-700);
+    font-family: 'Playfair Display', serif;
+    font-size: 1.9rem;
+    line-height: 1;
+}
+
+.cat-sin-foto-texto {
+    color: var(--morado-400);
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+}
+
+.cat-relacionado-foto .cat-sin-foto-inicial {
+    width: 44px;
+    height: 44px;
+    font-size: 1.3rem;
+}
+
+.cat-relacionado-foto .cat-sin-foto-texto {
+    display: none;
+}
+
+/* Íconos de los pasos, las promociones y las ferias sin foto */
+.cat-pasos-tira .cat-paso-icono {
+    color: var(--morado-700);
+}
+
+.cat-pasos-tira .cat-paso-icono .icono {
+    width: 22px;
+    height: 22px;
+}
+
+.cat-promo-item-icono {
+    width: clamp(44px, 6vw, 60px);
+    height: clamp(44px, 6vw, 60px);
+    color: #e5c27a;
+}
+
+.cat-feria-sin-foto {
+    width: 64px;
+    height: 64px;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.cat-condiciones h3 .icono {
+    color: var(--dorado);
+}
+
+/* Barra del pedido con íconos */
+.cat-barra-pedido-texto,
+.cat-barra-envio {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* Franja de confianza (sobre el pie de página) */
+.cat-confianza {
+    padding: clamp(28px, 4vw, 44px) var(--cat-margen);
+    border-top: 1px solid var(--morado-150);
+    background: #ffffff;
+}
+
+.cat-confianza ul {
+    list-style: none;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 22px 16px;
+    max-width: var(--cat-ancho);
+    margin: 0 auto;
+    padding: 0;
+}
+
+@media (min-width: 900px) {
+    .cat-confianza ul {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+}
+
+.cat-confianza li {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.cat-confianza-icono {
+    width: 30px;
+    height: 30px;
+    color: var(--dorado);
+}
+
+.cat-confianza strong {
+    display: block;
+    color: var(--morado-900);
+    font-size: 0.9rem;
+}
+
+.cat-confianza small {
+    display: block;
+    margin-top: 2px;
+    color: var(--texto);
+    font-size: 0.8rem;
+    line-height: 1.4;
+}
+
+/* Valores con íconos de línea dorados */
+.cat-valor-chip-icono {
+    color: var(--dorado);
+}
+
+.cat-valor-icono {
+    color: var(--dorado);
+}
+
+.cat-valor-icono .icono {
+    width: 30px;
+    height: 30px;
+}

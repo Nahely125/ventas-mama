@@ -57,7 +57,12 @@ const TIENDA_INICIAL = {
         { pregunta: "¿Cómo sé si hay stock?", respuesta: "Cada producto indica si está disponible o agotado. Igual te confirmamos las cantidades por WhatsApp antes de cerrar tu pedido." }
     ],
     // Comentarios de clientes: solo se muestran si el jefe los agrega.
-    testimonios: []
+    testimonios: [],
+    // Texto de la portada del catálogo (sobre el carrusel de fotos).
+    portada: {
+        titulo: "Haz realidad tus deseos",
+        frase: "Adornos, luces, árboles, útiles y regalos para cada celebración. Por unidad, media docena o docena."
+    }
 };
 
 // Imágenes de la página web que se pueden subir.
@@ -116,7 +121,11 @@ function validarTienda(cuerpo) {
             .filter((p) => p.pregunta && p.respuesta),
         testimonios: (Array.isArray(cuerpo?.testimonios) ? cuerpo.testimonios : [])
             .map((t) => ({ nombre: texto(t?.nombre, 60), texto: texto(t?.texto, 400) }))
-            .filter((t) => t.nombre && t.texto)
+            .filter((t) => t.nombre && t.texto),
+        portada: {
+            titulo: texto(cuerpo?.portada?.titulo, 60) || TIENDA_INICIAL.portada.titulo,
+            frase: texto(cuerpo?.portada?.frase, 200) || TIENDA_INICIAL.portada.frase
+        }
     };
 
     if (datos.preguntas.length > 12) {
@@ -175,6 +184,7 @@ async function leerTienda() {
         empresa: { ...TIENDA_INICIAL.empresa, ...guardado.empresa },
         cupon: { ...TIENDA_INICIAL.cupon, ...guardado.cupon },
         envio: { ...TIENDA_INICIAL.envio, ...guardado.envio },
+        portada: { ...TIENDA_INICIAL.portada, ...guardado.portada },
         // Versión de cada imagen subida (cambia al reemplazarla, así no queda la vieja en caché).
         imagenes: Object.fromEntries(imagenes.rows.map((fila) => [fila.clave, String(fila.version)]))
     };

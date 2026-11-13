@@ -6,8 +6,9 @@ import { WHATSAPP_NEGOCIO } from "../datosPago.js";
 import CarritoCatalogo, { detalleCarrito, precioCatalogo, useCarrito } from "./CarritoCatalogo.jsx";
 import { PanelFiltros, VentanaFiltros, aplicarFiltros, cantidadFiltros } from "./FiltrosCatalogo.jsx";
 import { CarruselFila, FotoAdaptada, useRevelar } from "./Carrusel.jsx";
-import { BarraPromociones, BotonWhatsAppFlotante, Nosotros, PieTienda, Portada, VentanaBienvenida } from "./TiendaWeb.jsx";
-import { totalesPedido, urlImagenTienda, useCupon, useTienda } from "../tienda.js";
+import Icono from "./Iconos.jsx";
+import { BarraPromociones, BotonWhatsAppFlotante, MarcaTienda, Nosotros, PieTienda, Portada, VentanaBienvenida } from "./TiendaWeb.jsx";
+import { totalesPedido, useCupon, useTienda } from "../tienda.js";
 import { contiene, normalizar } from "../texto.js";
 
 // Enlace para pedir un producto por WhatsApp con el mensaje ya escrito.
@@ -30,15 +31,25 @@ function ahorroPor(producto, modalidad) {
     return ahorro >= 0.5 ? Math.round(ahorro * 100) / 100 : 0;
 }
 
-// Etiquetas de la tarjeta: «Agotado», «Más vendido», «Nuevo» o «Últimas unidades» (máximo dos).
+// Etiqueta de la tarjeta: solo la más importante (una sola, para que la tarjeta se vea limpia).
 function etiquetasDe(producto) {
     if (!producto.disponible) return [{ clave: "agotado", texto: "Agotado" }];
 
     return [
-        producto.puestoVendido && { clave: "vendido", texto: "★ Más vendido" },
-        producto.nuevo && { clave: "nuevo", texto: "Nuevo" },
-        producto.ultimasUnidades && { clave: "ultimas", texto: "Últimas unidades" }
-    ].filter(Boolean).slice(0, 2);
+        producto.puestoVendido && { clave: "vendido", texto: "Más vendido" },
+        producto.ultimasUnidades && { clave: "ultimas", texto: "Últimas unidades" },
+        producto.nuevo && { clave: "nuevo", texto: "Nuevo" }
+    ].filter(Boolean).slice(0, 1);
+}
+
+// Producto sin foto: un recuadro elegante con su inicial (en vez de un espacio vacío).
+function SinFoto({ nombre }) {
+    return (
+        <span className="cat-sin-foto" aria-hidden="true">
+            <span className="cat-sin-foto-inicial">{(nombre ?? "✦").trim().charAt(0).toUpperCase()}</span>
+            <span className="cat-sin-foto-texto">Mil Deseos</span>
+        </span>
+    );
 }
 
 function Etiquetas({ producto }) {
@@ -63,7 +74,7 @@ function BotonPedir({ producto, grande = false }) {
             rel="noopener"
             aria-label={`Pedir ${producto.nombre} por WhatsApp`}
         >
-            <span aria-hidden="true">💬</span> {grande ? "Pedir por WhatsApp" : "Pedir solo este por WhatsApp"}
+            <Icono nombre="chat" /> {grande ? "Pedir por WhatsApp" : "Pedir solo este por WhatsApp"}
         </a>
     );
 }
@@ -118,7 +129,15 @@ function BotonAgregar({ producto, enPedido, onAgregar, grande = false }) {
             }}
             aria-label={`Agregar ${producto.nombre} al pedido`}
         >
-            {recien ? "✓ Agregado" : enPedido ? `🛒 Agregar otro (${enPedido})` : grande ? "🛒 Agregar al pedido" : "🛒 Agregar"}
+            {recien ? (
+                <><Icono nombre="hecho" /> Agregado</>
+            ) : enPedido ? (
+                <><Icono nombre="mas" /> Agregar otro ({enPedido})</>
+            ) : grande ? (
+                <><Icono nombre="bolsa" /> Agregar al pedido</>
+            ) : (
+                <><Icono nombre="mas" /> Agregar</>
+            )}
         </button>
     );
 }
@@ -131,11 +150,7 @@ function TarjetaProductoCatalogo({ producto, onAbrir, enPedido, onAgregar }) {
         <li className={`cat-producto ${producto.disponible ? "" : "cat-agotado"}`}>
             <button type="button" className="cat-producto-boton" onClick={() => onAbrir(producto)}>
                 <span className="cat-foto">
-                    {foto ? (
-                        <FotoAdaptada src={foto} />
-                    ) : (
-                        <span className="cat-sin-foto" aria-hidden="true">✦</span>
-                    )}
+                    {foto ? <FotoAdaptada src={foto} /> : <SinFoto nombre={producto.nombre} />}
                     <Etiquetas producto={producto} />
                 </span>
                 <span className="cat-producto-datos">
@@ -286,8 +301,9 @@ export default function Catalogo() {
     // Lo más nuevo: primero lo disponible y con foto.
     const destacados = useMemo(
         () => [...(datos?.productos ?? [])]
-            .filter((p) => p.disponible)
-            .sort((a, b) => Number(b.tieneFoto) - Number(a.tieneFoto) || b.id - a.id)
+            // En el inicio solo van productos con foto: así nunca se ven huecos.
+            .filter((p) => p.disponible && p.tieneFoto)
+            .sort((a, b) => b.id - a.id)
             .slice(0, 12),
         [datos]
     );
@@ -295,7 +311,7 @@ export default function Catalogo() {
     // Los más vendidos (últimos 90 días) que siguen disponibles.
     const masVendidos = useMemo(
         () => (datos?.productos ?? [])
-            .filter((p) => p.puestoVendido && p.disponible)
+            .filter((p) => p.puestoVendido && p.disponible && p.tieneFoto)
             .sort((a, b) => a.puestoVendido - b.puestoVendido),
         [datos]
     );
@@ -311,7 +327,9 @@ export default function Catalogo() {
                 icono: c.icono,
                 total: c.productos.length,
                 foto: c.productos.find((p) => p.tieneFoto && p.disponible) ?? c.productos.find((p) => p.tieneFoto) ?? null
-            }))),
+            }))
+            // Solo las categorías que tienen al menos una foto.
+            .filter((c) => c.foto)),
         [secciones]
     );
 
@@ -465,7 +483,7 @@ export default function Catalogo() {
                     </label>
 
                     <a className="cat-logo" href="/catalogo" onClick={(e) => { e.preventDefault(); ir(INICIO); }}>
-                        {urlImagenTienda(tienda, "logo") ? <img src={urlImagenTienda(tienda, "logo")} alt="Mil Deseos" /> : "Mil Deseos"}
+                        <MarcaTienda tienda={tienda} />
                     </a>
 
                     <button
@@ -734,12 +752,12 @@ function BarraPedido({ pedido, totales, onVer }) {
     return (
         <button type="button" className="cat-barra-pedido" onClick={onVer}>
             <span className="cat-barra-pedido-fila">
-                <span>🛒 Ver mi pedido ({pedido.piezas})</span>
+                <span className="cat-barra-pedido-texto"><Icono nombre="bolsa" /> Ver mi pedido ({pedido.piezas})</span>
                 <strong>{moneda(totales.total)}</strong>
             </span>
             {totales.envioActivo && (
                 <small className="cat-barra-envio">
-                    {totales.envioGratis ? "🚚 ¡Tienes envío gratis!" : `🚚 Te faltan ${moneda(totales.faltaEnvio)} para el envío gratis`}
+                    <Icono nombre="camion" /> {totales.envioGratis ? "¡Tienes envío gratis!" : `Te faltan ${moneda(totales.faltaEnvio)} para el envío gratis`}
                 </small>
             )}
         </button>
@@ -778,7 +796,7 @@ function DetalleProducto({ producto, relacionados = [], enPedido, onAgregar, onA
                     ✕
                 </button>
                 <div className="cat-detalle-foto">
-                    {foto ? <FotoAdaptada src={foto} alt={producto.nombre} prioridad difuminado /> : <span aria-hidden="true">✦</span>}
+                    {foto ? <FotoAdaptada src={foto} alt={producto.nombre} prioridad difuminado /> : <SinFoto nombre={producto.nombre} />}
                 </div>
                 <div className="cat-detalle-datos">
                     {producto.codigo && <span className="cat-codigo">Código {producto.codigo}</span>}
@@ -839,7 +857,7 @@ function DetalleProducto({ producto, relacionados = [], enPedido, onAgregar, onA
                                 <li key={p.id}>
                                     <button type="button" onClick={() => onAbrir(p)}>
                                         <span className="cat-relacionado-foto">
-                                            {fotoRelacionado ? <FotoAdaptada src={fotoRelacionado} /> : <span aria-hidden="true">✦</span>}
+                                            {fotoRelacionado ? <FotoAdaptada src={fotoRelacionado} /> : <SinFoto nombre={p.nombre} />}
                                             {!p.disponible && <span className="cat-etiqueta">Agotado</span>}
                                         </span>
                                         <span className="cat-relacionado-nombre">{p.nombre}</span>

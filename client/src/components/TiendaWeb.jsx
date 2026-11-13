@@ -1,16 +1,61 @@
 import { useEffect, useRef, useState } from "react";
 import { moneda } from "../api.js";
 import { urlFoto } from "../fotos.js";
-import { iconoTema } from "../secciones.js";
 import { BILLETERAS, RECARGO_TARJETA } from "../datosPago.js";
 import { enlaceWhatsApp, telefonoLegible, urlImagenTienda } from "../tienda.js";
 import { CarruselPortada, FotoAdaptada, prefiereQuieto } from "./Carrusel.jsx";
+import Icono from "./Iconos.jsx";
+
+/* Marca de la tienda: el logo subido en «Página web» o, si no hay, un monograma «MD»
+   con el nombre en letra elegante. */
+export function MarcaTienda({ tienda }) {
+    const logo = urlImagenTienda(tienda, "logo");
+    if (logo) return <img src={logo} alt="Mil Deseos" />;
+
+    return (
+        <span className="cat-marca">
+            <span className="cat-monograma" aria-hidden="true">MD</span>
+            <span className="cat-marca-nombre">Mil Deseos</span>
+        </span>
+    );
+}
+
+// Franja de confianza (sobre el pie de página): pagos, envíos, atención y el negocio familiar.
+function FranjaConfianza({ tienda }) {
+    const puntos = [
+        { icono: "tarjeta", titulo: "Paga como prefieras", texto: `${Object.values(BILLETERAS).map((b) => b.nombre).join(", ")}, transferencia o tarjeta` },
+        {
+            icono: "camion",
+            titulo: "Envíos",
+            texto: tienda?.envio?.activo ? `Gratis en compras mayores a ${montoCorto(tienda.envio.gratisDesde)}` : "Coordinamos la entrega contigo"
+        },
+        { icono: "chat", titulo: "Atención por WhatsApp", texto: "Te confirmamos stock y total antes de pagar" },
+        { icono: "corazon", titulo: "Negocio familiar", texto: "Elegimos cada producto con cariño" }
+    ];
+
+    return (
+        <section className="cat-confianza" aria-label="Por qué comprar en Mil Deseos">
+            <ul>
+                {puntos.map((p) => (
+                    <li key={p.icono}>
+                        <Icono nombre={p.icono} className="cat-confianza-icono" />
+                        <span>
+                            <strong>{p.titulo}</strong>
+                            <small>{p.texto}</small>
+                        </span>
+                    </li>
+                ))}
+            </ul>
+        </section>
+    );
+}
 
 /* Partes de la página web del catálogo (inspirada en las tiendas de moda en línea):
    barra de promociones, portada, "Nosotros", pie de página y ventana de bienvenida con el cupón. */
 
 const CLAVE_BIENVENIDA = "mil-deseos-bienvenida";
-const ICONOS_VALORES = ["💜", "✨", "🏷️", "🤝", "🎁", "🌟", "🎄", "📚"];
+// Íconos de línea para los valores (se repiten si hay más valores que íconos).
+const ICONOS_VALORES = ["corazon", "estrella", "etiqueta", "chat", "regalo", "bolsa", "camion", "recibo"];
 
 // "S/ 600.00" → "S/ 600" (los montos redondos se leen mejor sin decimales).
 function montoCorto(valor) {
@@ -133,7 +178,7 @@ function BandaPromociones({ tienda, onAplicarCupon }) {
             <div className="cat-banda-interior cat-promos-fila">
                 {tienda.cupon.activo && (
                     <article className="cat-promo-item">
-                        <span className="cat-promo-item-icono" aria-hidden="true">🏷️</span>
+                        <Icono nombre="etiqueta" className="cat-promo-item-icono" />
                         <div>
                             <p className="cat-sobre">Bienvenida a Mil Deseos</p>
                             <h2>{tienda.cupon.porcentaje}% <em>OFF</em></h2>
@@ -149,7 +194,7 @@ function BandaPromociones({ tienda, onAplicarCupon }) {
                 )}
                 {tienda.envio.activo && (
                     <article className="cat-promo-item">
-                        <span className="cat-promo-item-icono" aria-hidden="true">🚚</span>
+                        <Icono nombre="camion" className="cat-promo-item-icono" />
                         <div>
                             <p className="cat-sobre">Te lo llevamos</p>
                             <h2>Envío <em>gratis</em></h2>
@@ -165,9 +210,9 @@ function BandaPromociones({ tienda, onAplicarCupon }) {
 // "Compra en 3 pasos": una franja corta bajo la portada que explica cómo se compra.
 function PasosCompra() {
     const pasos = [
-        { icono: "🛍️", titulo: "Elige", texto: "Toca «Agregar»: por unidad, media docena o docena." },
-        { icono: "🧾", titulo: "Revisa tu pedido", texto: "Mira el total y cuánto falta para el envío gratis." },
-        { icono: "💬", titulo: "Envíalo por WhatsApp", texto: "Te confirmamos stock, total, pago y entrega." }
+        { icono: "bolsa", titulo: "Elige", texto: "Toca «Agregar»: por unidad, media docena o docena." },
+        { icono: "recibo", titulo: "Revisa tu pedido", texto: "Mira el total y cuánto falta para el envío gratis." },
+        { icono: "chat", titulo: "Envíalo por WhatsApp", texto: "Te confirmamos stock, total, pago y entrega." }
     ];
 
     return (
@@ -177,7 +222,7 @@ function PasosCompra() {
                 <ol className="cat-pasos-tira">
                     {pasos.map((paso, i) => (
                         <li key={paso.titulo}>
-                            <span className="cat-paso-icono" aria-hidden="true">{paso.icono}</span>
+                            <span className="cat-paso-icono"><Icono nombre={paso.icono} /></span>
                             <div>
                                 <strong><span className="cat-paso-numero">{i + 1}.</span> {paso.titulo}</strong>
                                 <p>{paso.texto}</p>
@@ -242,7 +287,7 @@ function FeriasInicio({ secciones, onIr }) {
                                     {conFoto ? (
                                         <img src={urlFoto(conFoto)} alt="" loading="lazy" decoding="async" />
                                     ) : (
-                                        <span aria-hidden="true">{iconoTema(seccion.tema)}</span>
+                                        <Icono nombre="regalo" className="cat-feria-sin-foto" />
                                     )}
                                 </span>
                                 <span className="cat-feria-dividida-texto">
@@ -352,9 +397,9 @@ export function Portada({ tienda, secciones, categorias, destacados, masVendidos
                 <CarruselPortada diapositivas={diapositivas} />
                 <div className="cat-heroe-texto">
                     <p className="cat-banner-sobre">Nueva temporada</p>
-                    <h1>Haz realidad tus deseos</h1>
+                    <h1>{tienda?.portada?.titulo || "Haz realidad tus deseos"}</h1>
                     <p className="cat-heroe-frase">
-                        Adornos, luces, árboles, útiles y regalos para cada celebración. Por unidad, media docena o docena.
+                        {tienda?.portada?.frase || "Adornos, luces, árboles, útiles y regalos para cada celebración. Por unidad, media docena o docena."}
                     </p>
                     <div className="cat-heroe-acciones">
                         <button type="button" className="cat-boton-claro" onClick={() => onIr(secciones[0]?.slug ?? "todo")}>
@@ -417,7 +462,7 @@ export function Portada({ tienda, secciones, categorias, destacados, masVendidos
                         <ul className="cat-valores-breve" aria-label="Nuestros valores">
                             {tienda.valores.map((valor, i) => (
                                 <li key={valor.titulo}>
-                                    <span aria-hidden="true">{ICONOS_VALORES[i % ICONOS_VALORES.length]}</span>
+                                    <Icono nombre={ICONOS_VALORES[i % ICONOS_VALORES.length]} className="cat-valor-chip-icono" />
                                     {valor.titulo}
                                 </li>
                             ))}
@@ -487,7 +532,7 @@ export function Nosotros({ tienda, apartado }) {
                     <ul>
                         {tienda.valores.map((valor, i) => (
                             <li key={valor.titulo}>
-                                <span className="cat-valor-icono" aria-hidden="true">{ICONOS_VALORES[i % ICONOS_VALORES.length]}</span>
+                                <span className="cat-valor-icono"><Icono nombre={ICONOS_VALORES[i % ICONOS_VALORES.length]} /></span>
                                 <h3>{valor.titulo}</h3>
                                 {valor.texto && <p>{valor.texto}</p>}
                             </li>
@@ -516,7 +561,7 @@ export function Nosotros({ tienda, apartado }) {
                     <div>
                         {tienda.cupon.activo && (
                             <article>
-                                <h3>🏷️ {tienda.cupon.porcentaje}% de descuento en tu primera compra</h3>
+                                <h3><Icono nombre="etiqueta" /> {tienda.cupon.porcentaje}% de descuento en tu primera compra</h3>
                                 <p>
                                     Usa el código <strong>{tienda.cupon.codigo}</strong> en tu pedido. {tienda.cupon.condiciones}
                                 </p>
@@ -524,7 +569,7 @@ export function Nosotros({ tienda, apartado }) {
                         )}
                         {tienda.envio.activo && (
                             <article>
-                                <h3>🚚 {textoEnvio(tienda)}</h3>
+                                <h3><Icono nombre="camion" /> {textoEnvio(tienda)}</h3>
                                 <p>{tienda.envio.condiciones}</p>
                             </article>
                         )}
@@ -587,11 +632,13 @@ export function PieTienda({ tienda, secciones, onIr }) {
     const empresa = tienda?.empresa;
 
     return (
+        <>
+        <FranjaConfianza tienda={tienda} />
         <footer className="cat-pie">
             <div className="cat-pie-columnas">
                 <div className="cat-pie-marca">
                     <span className="cat-logo cat-logo-pie">
-                        {urlImagenTienda(tienda, "logo") ? <img src={urlImagenTienda(tienda, "logo")} alt="Mil Deseos" /> : "Mil Deseos"}
+                        <MarcaTienda tienda={tienda} />
                     </span>
                     <p>Adornos, luces, útiles y regalos para cada celebración.</p>
                     {empresa && <RedesSociales empresa={empresa} />}
@@ -626,7 +673,7 @@ export function PieTienda({ tienda, secciones, onIr }) {
                 </nav>
             </div>
             <p className="cat-pie-pagos">
-                <strong>Aceptamos:</strong> {Object.values(BILLETERAS).map((b) => b.nombre).join(" · ")} · Transferencia · 💳 Tarjetas de débito y crédito (+{RECARGO_TARJETA}%)
+                <strong>Aceptamos:</strong> {Object.values(BILLETERAS).map((b) => b.nombre).join(" · ")} · Transferencia · Tarjetas de débito y crédito (+{RECARGO_TARJETA}%)
             </p>
             <p className="cat-pie-legal">
                 © {new Date().getFullYear()} Mil Deseos
@@ -634,6 +681,7 @@ export function PieTienda({ tienda, secciones, onIr }) {
                 {empresa?.ruc ? ` · RUC ${empresa.ruc}` : ""} · Precios en soles (S/). Consulta disponibilidad antes de tu compra.
             </p>
         </footer>
+        </>
     );
 }
 

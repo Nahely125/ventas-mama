@@ -154,6 +154,17 @@ export default function PaginaWeb({ onError }) {
             <form className="formulario" onSubmit={guardar}>
                 <fieldset className="grupo-campos">
                     <legend>Portada y logo</legend>
+                    <div className="campo">
+                        <label htmlFor="web-portada-titulo">Título de la portada</label>
+                        <input id="web-portada-titulo" maxLength={60} value={valores.portada.titulo}
+                            onChange={(e) => cambiarEn("portada", { titulo: e.target.value })} />
+                    </div>
+                    <div className="campo">
+                        <label htmlFor="web-portada-frase">Frase de la portada</label>
+                        <textarea id="web-portada-frase" rows={2} maxLength={200} value={valores.portada.frase}
+                            onChange={(e) => cambiarEn("portada", { frase: e.target.value })} />
+                        <span className="ayuda-campo">Algo tuyo: tu historia, tu barrio o lo que hace especial a la tienda.</span>
+                    </div>
                     <div className="imagenes-tienda">
                         <ImagenTienda clave="portada" titulo="Foto de portada" tienda={valores}
                             ayuda="Una foto horizontal y bonita: la tienda, un árbol armado, luces encendidas. Se ve detrás del título."
