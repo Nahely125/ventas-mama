@@ -3,7 +3,11 @@
    Antes de cambiar el stock, cada ruta dice qué movimiento es con anotarMovimiento(): tipo,
    detalle y quién lo hizo. Vale solo para esa transacción. */
 
-const TIPOS = ["registro", "edicion", "venta", "anulacion", "devolucion", "compra", "compra_anulada", "ajuste", "inicio"];
+const TIPOS = ["registro", "edicion", "venta", "anulacion", "devolucion", "compra", "compra_anulada", "ajuste", "inicio", "cambio"];
+
+// Motivos que cuentan como mercadería perdida (rotos y faltantes): se siguen en «Rotos y faltantes».
+// En un conteo solo cuenta si faltan unidades.
+const MOTIVOS_MERMA = ["roto", "perdido", "conteo"];
 
 // Motivos de un conteo o ajuste de stock.
 const MOTIVOS_AJUSTE = {
@@ -32,4 +36,4 @@ function textoBoleta(id) {
     return `Boleta N° ${String(id).padStart(6, "0")}`;
 }
 
-module.exports = { TIPOS, MOTIVOS_AJUSTE, anotarMovimiento, textoBoleta };
+module.exports = { TIPOS, MOTIVOS_AJUSTE, MOTIVOS_MERMA, anotarMovimiento, textoBoleta };

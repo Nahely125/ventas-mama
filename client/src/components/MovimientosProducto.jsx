@@ -8,6 +8,7 @@ const TIPOS = {
     inicio: { icono: "📌", texto: "Inicio del historial", grupo: "ingresos" },
     compra: { icono: "🚚", texto: "Ingreso de mercadería", grupo: "ingresos" },
     compra_anulada: { icono: "⊘", texto: "Ingreso deshecho", grupo: "ingresos" },
+    cambio: { icono: "🔁", texto: "Cambio del proveedor", grupo: "ingresos" },
     venta: { icono: "🛒", texto: "Venta", grupo: "ventas" },
     anulacion: { icono: "↩️", texto: "Venta anulada", grupo: "ventas" },
     devolucion: { icono: "↩", texto: "Devolución", grupo: "ventas" },

@@ -9240,3 +9240,308 @@ body.sin-desplazamiento {
         animation: none;
     }
 }
+
+/* ===== Rotos y faltantes (mermas) ===== */
+.filtros-mermas {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+    gap: 10px;
+    margin-bottom: 14px;
+}
+
+.filtros-mermas select {
+    width: 100%;
+    max-width: 100%;
+}
+
+.resumen-mermas {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+
+@media (min-width: 760px) {
+    .resumen-mermas {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+}
+
+.total-merma {
+    display: grid;
+    gap: 2px;
+    padding: 12px;
+    border-radius: 12px;
+    background: var(--morado-50);
+}
+
+.total-merma span {
+    color: var(--texto-suave);
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+.total-merma strong {
+    color: var(--morado-900);
+    font-size: clamp(1.05rem, 4.4vw, 1.35rem);
+    white-space: nowrap;
+}
+
+.total-merma small {
+    color: var(--texto-suave);
+    font-size: 0.75rem;
+    line-height: 1.3;
+}
+
+.total-perdido { background: #fff1f2; }
+.total-perdido strong { color: #be123c; }
+.total-recuperado { background: #ecfdf5; }
+.total-recuperado strong { color: #047857; }
+.total-reclamar { background: #fffbeb; }
+.total-reclamar strong { color: #b45309; }
+.total-definitiva { background: #f4f4f5; }
+.total-definitiva strong { color: #3f3f46; }
+
+/* Barras por mes: lo perdido (rojo) y, dentro, lo recuperado (verde) */
+.barras-mermas {
+    list-style: none;
+    display: grid;
+    gap: 10px;
+    margin: 0;
+    padding: 0;
+}
+
+.barras-mermas li {
+    display: grid;
+    grid-template-columns: minmax(0, 130px) minmax(0, 1fr);
+    grid-template-areas:
+        "etiqueta valor"
+        "pista pista";
+    gap: 4px 10px;
+    align-items: center;
+}
+
+@media (min-width: 640px) {
+    .barras-mermas li {
+        grid-template-columns: 150px minmax(0, 1fr) minmax(0, 240px);
+        grid-template-areas: "etiqueta pista valor";
+    }
+}
+
+.barra-etiqueta {
+    grid-area: etiqueta;
+    color: var(--morado-900);
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.barra-pista {
+    grid-area: pista;
+    display: block;
+    height: 12px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--morado-50);
+}
+
+.barra-perdido {
+    display: block;
+    height: 100%;
+    min-width: 4px;
+    border-radius: 999px;
+    background: #fb7185;
+}
+
+.barra-recuperado {
+    display: block;
+    height: 100%;
+    background: #10b981;
+}
+
+.barra-valor {
+    grid-area: valor;
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-align: right;
+}
+
+.barra-valor small {
+    color: #047857;
+    font-weight: 600;
+}
+
+.muestra {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    margin: 0 4px 0 8px;
+    border-radius: 3px;
+    vertical-align: middle;
+}
+
+.muestra-perdido { background: #fb7185; }
+.muestra-recuperado { background: #10b981; }
+
+.ranking-mermas {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+    padding-left: 22px;
+}
+
+.ranking-mermas li {
+    padding: 6px 0;
+    border-bottom: 1px solid var(--morado-150);
+}
+
+.ranking-mermas li::marker {
+    color: var(--morado-600);
+    font-weight: 700;
+}
+
+.ranking-mermas li span:first-child {
+    display: block;
+    color: var(--morado-900);
+    font-weight: 600;
+}
+
+.ranking-mermas li span:last-child {
+    color: var(--texto-suave);
+    font-size: 0.85rem;
+}
+
+.ranking-mermas strong {
+    color: #be123c;
+}
+
+/* Historial: una tarjeta por caso */
+.lista-mermas {
+    list-style: none;
+    display: grid;
+    gap: 12px;
+    margin: 0;
+    padding: 0;
+}
+
+.tarjeta-merma {
+    display: grid;
+    gap: 10px;
+    padding: 14px;
+    border: 1px solid var(--morado-200);
+    border-left: 4px solid #f59e0b;
+    border-radius: 14px;
+    background: #ffffff;
+}
+
+.tarjeta-merma.estado-cambiado { border-left-color: #10b981; }
+.tarjeta-merma.estado-perdida { border-left-color: #a1a1aa; }
+
+.merma-cabecera {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 4px 12px;
+    align-items: start;
+}
+
+.merma-foto {
+    grid-row: span 2;
+    display: grid;
+    place-items: center;
+    width: 52px;
+    height: 52px;
+    overflow: hidden;
+    border-radius: 10px;
+    background: var(--morado-50);
+    font-size: 1.4rem;
+}
+
+.merma-foto img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.merma-datos {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+}
+
+.merma-datos strong {
+    color: var(--morado-900);
+    overflow-wrap: anywhere;
+}
+
+.merma-datos small {
+    color: var(--texto-suave);
+}
+
+.merma-nota {
+    font-style: italic;
+}
+
+.chip-estado {
+    justify-self: start;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.chip-pendiente { background: #fffbeb; color: #b45309; }
+.chip-cambiado { background: #ecfdf5; color: #047857; }
+.chip-perdida { background: #f4f4f5; color: #52525b; }
+
+.merma-numeros {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    margin: 0;
+}
+
+@media (min-width: 640px) {
+    .merma-numeros {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+}
+
+.merma-numeros div {
+    display: grid;
+    gap: 2px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: var(--morado-50);
+}
+
+.merma-numeros dt {
+    color: var(--texto-suave);
+    font-size: 0.75rem;
+}
+
+.merma-numeros dd {
+    color: var(--morado-900);
+    font-weight: 700;
+}
+
+.merma-numeros dd small {
+    color: var(--texto-suave);
+    font-weight: 500;
+}
+
+.merma-resolucion {
+    margin: 0;
+    color: var(--texto-suave);
+    font-size: 0.85rem;
+}
+
+.acciones-merma {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.formulario-merma {
+    padding: 12px;
+    border-radius: 12px;
+    background: #ecfdf5;
+}

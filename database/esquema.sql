@@ -320,6 +320,46 @@ CREATE TABLE IF NOT EXISTS reposicion (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS reposicion_producto_color ON reposicion (producto_id, (COALESCE(color_id, 0)));
 
+-- Historial de movimientos del stock (kardex). Lo llena un trigger sobre productos.stock
+-- (ver src/migraciones.js: anotar_movimiento_stock).
+CREATE TABLE IF NOT EXISTS movimientos_stock (
+    id               SERIAL PRIMARY KEY,
+    producto_id      INTEGER NOT NULL REFERENCES productos(id) ON DELETE CASCADE,
+    fecha            TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'America/Lima'),
+    tipo             VARCHAR(20) NOT NULL,      -- registro, venta, compra, ajuste, cambio, ...
+    cantidad         INTEGER NOT NULL,          -- unidades que entran (+) o salen (−)
+    stock_resultante INTEGER NOT NULL,
+    costo            NUMERIC(14, 4),            -- costo unitario en ese momento
+    detalle          VARCHAR(200),
+    referencia       VARCHAR(60),
+    motivo           VARCHAR(20),
+    usuario_id       INTEGER REFERENCES usuarios(id) ON DELETE SET NULL
+);
+
+-- Rotos y faltantes (mermas): cada salida de mercadería rota, perdida o que faltó en un conteo.
+-- Se sigue si el proveedor la cambió (vuelve al stock) o si quedó como pérdida.
+--   estado: pendiente (por reclamar), cambiado (el proveedor la repuso), perdida (no se pudo cambiar).
+CREATE TABLE IF NOT EXISTS mermas (
+    id                SERIAL PRIMARY KEY,
+    producto_id       INTEGER NOT NULL REFERENCES productos(id) ON DELETE CASCADE,
+    color_id          INTEGER REFERENCES producto_colores(id) ON DELETE SET NULL,
+    color_nombre      VARCHAR(60),
+    motivo            VARCHAR(20) NOT NULL,
+    cantidad          INTEGER NOT NULL CHECK (cantidad > 0),
+    costo_unitario    NUMERIC(14, 4),
+    nota              VARCHAR(200),
+    fecha             TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'America/Lima'),
+    usuario_id        INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+    movimiento_id     INTEGER UNIQUE REFERENCES movimientos_stock(id) ON DELETE SET NULL,
+    estado            VARCHAR(12) NOT NULL DEFAULT 'pendiente' CHECK (estado IN ('pendiente', 'cambiado', 'perdida')),
+    cantidad_cambiada INTEGER NOT NULL DEFAULT 0 CHECK (cantidad_cambiada >= 0 AND cantidad_cambiada <= cantidad),
+    fecha_resuelta    TIMESTAMP,
+    nota_resuelta     VARCHAR(200),
+    resuelta_por      INTEGER REFERENCES usuarios(id) ON DELETE SET NULL
+);
+CREATE INDEX IF NOT EXISTS mermas_fecha ON mermas (fecha);
+CREATE INDEX IF NOT EXISTS mermas_estado ON mermas (estado);
+
 -- Página web del catálogo: quiénes somos, valores, datos de la empresa y promociones (una sola fila).
 CREATE TABLE IF NOT EXISTS tienda (
     id          INTEGER PRIMARY KEY CHECK (id = 1),

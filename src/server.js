@@ -252,6 +252,7 @@ app.use("/api/ajustes", require("./rutas/ajustes").router);
 app.use("/api/reportes", require("./rutas/reportes"));
 app.use("/api/reposicion", require("./rutas/reposicion"));
 app.use("/api/prestamos", require("./rutas/prestamos").router);
+app.use("/api/mermas", require("./rutas/mermas"));
 const tienda = require("./rutas/tienda");
 app.use("/api/tienda", tienda.router);
 

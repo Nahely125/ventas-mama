@@ -3,7 +3,7 @@ const pool = require("../db");
 const { requiereSesion, requiereJefe, leerId } = require("../autenticacion");
 const { OBSEQUIABLE } = require("./ajustes");
 const { COLORES_JSON, validarColores, guardarColores } = require("./colores");
-const { MOTIVOS_AJUSTE, anotarMovimiento } = require("../movimientos");
+const { MOTIVOS_AJUSTE, MOTIVOS_MERMA, anotarMovimiento } = require("../movimientos");
 const crypto = require("crypto");
 const { crearMiniatura, olvidarFoto } = require("../fotosServidor");
 const almacen = require("../almacenR2");
@@ -762,6 +762,19 @@ router.post("/:id/conteo", requiereJefe, async (req, res) => {
                 `UPDATE productos SET stock = stock + $1, stock_2025 = LEAST(stock_2025, stock + $1) WHERE id = $2`,
                 [diferencia, id]
             );
+
+            // Rotos, perdidos o faltantes de un conteo: quedan en «Rotos y faltantes» para seguir
+            // si el proveedor los cambia. Se enlaza con el movimiento que acaba de anotar el trigger.
+            if (diferencia < 0 && MOTIVOS_MERMA.includes(motivo)) {
+                await client.query(
+                    `INSERT INTO mermas (producto_id, color_id, color_nombre, motivo, cantidad, costo_unitario, nota, usuario_id, movimiento_id)
+                     SELECT p.id, $2, $3, $4, $5, p.precio_compra, $6, $7,
+                            (SELECT MAX(m.id) FROM movimientos_stock m WHERE m.producto_id = p.id)
+                     FROM productos p WHERE p.id = $1`,
+                    [id, cambio.color?.id ?? null, cambio.color?.nombre ?? null, motivo, -diferencia, nota || null, req.session.usuario.id]
+                );
+            }
+
             diferenciaTotal += diferencia;
             cambiados++;
         }

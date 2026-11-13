@@ -19,6 +19,7 @@ const Empleados = lazy(() => import("./Empleados.jsx"));
 const SeccionesCatalogo = lazy(() => import("./SeccionesCatalogo.jsx"));
 const Reposicion = lazy(() => import("./Reposicion.jsx"));
 const Prestamos = lazy(() => import("./Prestamos.jsx"));
+const Mermas = lazy(() => import("./Mermas.jsx"));
 
 function CargandoVista() {
     return (
@@ -85,6 +86,13 @@ const VISTAS = [
         icono: "📝",
         nombre: "Por reponer",
         descripcion: "Arma la lista de lo que hay que comprar, mira cuánto costaría y marca lo que se adquirió.",
+        soloJefe: true
+    },
+    {
+        clave: "mermas",
+        icono: "💔",
+        nombre: "Rotos y faltantes",
+        descripcion: "Cuánta mercadería se rompe o falta, si el proveedor la cambió (vuelve al stock) o si quedó como pérdida.",
         soloJefe: true
     },
     {
@@ -289,6 +297,10 @@ export default function Panel({ usuario, onSalir, onActualizarUsuario }) {
 
                     {vistaActual.clave === "compras" && (
                         <Compras productos={productos} onCambio={recargarInventario} onError={manejarError} />
+                    )}
+
+                    {vistaActual.clave === "mermas" && (
+                        <Mermas productos={productos} onCambio={recargarInventario} onError={manejarError} />
                     )}
 
                     {vistaActual.clave === "reposicion" && (

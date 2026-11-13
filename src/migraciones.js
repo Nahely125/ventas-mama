@@ -348,6 +348,30 @@ const MIGRACIONES = `
         AFTER INSERT OR UPDATE OF stock ON productos
         FOR EACH ROW EXECUTE FUNCTION anotar_movimiento_stock();
 
+    -- Rotos y faltantes (mermas): cada salida de mercadería rota, perdida o que faltó en un conteo.
+    -- Se sigue si el proveedor la cambió (vuelve al stock) o si quedó como pérdida.
+    --   estado: pendiente (por reclamar), cambiado (el proveedor la repuso), perdida (no se pudo cambiar).
+    CREATE TABLE IF NOT EXISTS mermas (
+        id                SERIAL PRIMARY KEY,
+        producto_id       INTEGER NOT NULL REFERENCES productos(id) ON DELETE CASCADE,
+        color_id          INTEGER REFERENCES producto_colores(id) ON DELETE SET NULL,
+        color_nombre      VARCHAR(60),
+        motivo            VARCHAR(20) NOT NULL,
+        cantidad          INTEGER NOT NULL CHECK (cantidad > 0),
+        costo_unitario    NUMERIC(14, 4),
+        nota              VARCHAR(200),
+        fecha             TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'America/Lima'),
+        usuario_id        INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+        movimiento_id     INTEGER UNIQUE REFERENCES movimientos_stock(id) ON DELETE SET NULL,
+        estado            VARCHAR(12) NOT NULL DEFAULT 'pendiente' CHECK (estado IN ('pendiente', 'cambiado', 'perdida')),
+        cantidad_cambiada INTEGER NOT NULL DEFAULT 0 CHECK (cantidad_cambiada >= 0 AND cantidad_cambiada <= cantidad),
+        fecha_resuelta    TIMESTAMP,
+        nota_resuelta     VARCHAR(200),
+        resuelta_por      INTEGER REFERENCES usuarios(id) ON DELETE SET NULL
+    );
+    CREATE INDEX IF NOT EXISTS mermas_fecha ON mermas (fecha);
+    CREATE INDEX IF NOT EXISTS mermas_estado ON mermas (estado);
+
     -- Página web del catálogo (quiénes somos, valores, datos de la empresa, promociones): una sola fila.
     CREATE TABLE IF NOT EXISTS tienda (
         id          INTEGER PRIMARY KEY CHECK (id = 1),
@@ -413,6 +437,20 @@ async function asignarPorNombre(client, condicionProductos, parametros, reglas, 
 /* Cambios de datos que se aplican UNA sola vez (quedan anotados en migraciones_unicas).
    Así, si luego se borra o cambia algo a mano, no vuelve a aparecer. */
 const MIGRACIONES_UNICAS = [
+    {
+        // Los rotos, perdidos y faltantes de conteo que ya estaban en el historial pasan al registro
+        // de «Rotos y faltantes» como «por reclamar» (la jefa decide si se cambiaron o se perdieron).
+        nombre: "2026-11-mermas-desde-historial",
+        async aplicar(client) {
+            await client.query(
+                `INSERT INTO mermas (producto_id, motivo, cantidad, costo_unitario, nota, fecha, usuario_id, movimiento_id)
+                 SELECT producto_id, motivo, -cantidad, costo, detalle, fecha, usuario_id, id
+                 FROM movimientos_stock
+                 WHERE tipo = 'ajuste' AND cantidad < 0 AND motivo IN ('roto', 'perdido', 'conteo')
+                 ON CONFLICT (movimiento_id) DO NOTHING`
+            );
+        }
+    },
     {
         // Se quita el cupón de bienvenida (BIENVENIDA20) del catálogo. Se puede volver a activar en "Página web".
         nombre: "2026-11-sin-cupon-bienvenida",
