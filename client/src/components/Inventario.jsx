@@ -336,6 +336,7 @@ export default function Inventario({
                                     const foto = urlFoto(producto, "mini");
                                     return (
                                         <li key={producto.id}>
+                                            <div className="galeria-marco">
                                             <button
                                                 type="button"
                                                 className="galeria-foto"
@@ -348,7 +349,7 @@ export default function Inventario({
                                                 ) : (
                                                     <span className="galeria-sin-foto">
                                                         <span aria-hidden="true">📦</span>
-                                                        {producto.nombre}
+                                                        Sin foto
                                                     </span>
                                                 )}
                                             </button>
@@ -359,6 +360,20 @@ export default function Inventario({
                                                 aria-label={`Información de ${producto.nombre}`}
                                             >
                                                 i
+                                            </button>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                className="galeria-nombre"
+                                                onClick={() => setInfoId(producto.id)}
+                                            >
+                                                <strong>{producto.nombre}</strong>
+                                                <small>
+                                                    {producto.codigo ? `${producto.codigo} · ` : ""}{moneda(producto.precio)} ·{" "}
+                                                    <span className={producto.stock === 0 ? "agotado" : producto.stock < STOCK_ALERTA ? "bajo" : ""}>
+                                                        {producto.stock === 0 ? "Agotado" : `${producto.stock} u.`}
+                                                    </span>
+                                                </small>
                                             </button>
                                         </li>
                                     );
