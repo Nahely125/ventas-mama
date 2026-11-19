@@ -1,7 +1,8 @@
 import { useCallback, useState } from "react";
 import { moneda } from "../api.js";
 import Escaner from "./Escaner.jsx";
-import { contiene, normalizar } from "../texto.js";
+import { normalizar } from "../texto.js";
+import { buscarProductos } from "../busqueda.js";
 import { urlFoto } from "../fotos.js";
 
 // Fotito del producto para listas (miniatura liviana); sin foto, su inicial.
@@ -21,7 +22,8 @@ export function MiniFoto({ producto, className = "" }) {
 
 const MAXIMO_RESULTADOS = 8;
 
-// Ordena primero los productos cuyo código coincide exactamente, luego por nombre.
+// Primero el código exacto, luego los que contienen lo escrito y después los parecidos
+// (sinónimos y errores de ortografía: ver busqueda.js).
 function buscar(productos, texto) {
     const busqueda = normalizar(texto);
 
@@ -29,8 +31,7 @@ function buscar(productos, texto) {
         return productos.slice(0, MAXIMO_RESULTADOS);
     }
 
-    return productos
-        .filter((producto) => contiene(busqueda, producto.nombre, producto.codigo))
+    return buscarProductos(productos, texto)
         .sort((a, b) => {
             const exactoA = normalizar(a.codigo) === busqueda ? 0 : 1;
             const exactoB = normalizar(b.codigo) === busqueda ? 0 : 1;

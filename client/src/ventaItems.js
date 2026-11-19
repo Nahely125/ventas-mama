@@ -60,3 +60,47 @@ export const MODALIDADES_VENTA = [
     { valor: "media", texto: "Media docena (6 u.)" },
     { valor: "docena", texto: "Docena (12 u.)" }
 ];
+
+/* Sube los precios del carrito para que el total sea exactamente «nuevoTotal» (mayor que el actual).
+   El aumento se reparte según el importe de cada producto (los obsequios siguen gratis). Si quedan
+   céntimos que no se pueden repartir parejo, una unidad (o paquete) se separa en su propia línea. */
+export function subirPrecios(carrito, nuevoTotal) {
+    const meta = centimos(nuevoTotal);
+    const lineas = carrito.map((item) => ({ ...item, centavos: centimos(item.precio) }));
+    const cobrables = lineas.filter((item) => item.modalidad !== "obsequio" && item.centavos > 0);
+    const actual = cobrables.reduce((suma, item) => suma + item.centavos * item.cantidad, 0);
+
+    if (cobrables.length === 0 || meta <= actual) return carrito;
+
+    for (const item of cobrables) item.centavos = Math.floor((item.centavos * meta) / actual);
+
+    let faltan = meta - cobrables.reduce((suma, item) => suma + item.centavos * item.cantidad, 0);
+
+    for (const item of cobrables) {
+        const porPaquete = Math.floor(faltan / item.cantidad);
+        item.centavos += porPaquete;
+        faltan -= porPaquete * item.cantidad;
+    }
+
+    const resultado = [];
+
+    for (const item of lineas) {
+        const { centavos, ...resto } = item;
+
+        if (faltan > 0 && cobrables.includes(item)) {
+            // Lo que sobra (menos que la cantidad de la línea) va a una sola unidad o paquete.
+            if (item.cantidad > 1) {
+                resultado.push({ ...resto, cantidad: item.cantidad - 1, precio: centavos / 100 });
+                resultado.push({ ...resto, clave: nuevaClave(), cantidad: 1, precio: (centavos + faltan) / 100 });
+            } else {
+                resultado.push({ ...resto, precio: (centavos + faltan) / 100 });
+            }
+            faltan = 0;
+            continue;
+        }
+
+        resultado.push(cobrables.includes(item) ? { ...resto, precio: centavos / 100 } : resto);
+    }
+
+    return resultado;
+}

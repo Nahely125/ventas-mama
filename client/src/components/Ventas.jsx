@@ -3,7 +3,7 @@ import { moneda, monedaCosto, pedir } from "../api.js";
 import { METODOS_PAGO, nombreModalidad } from "../venta.js";
 import {
     MODALIDADES_VENTA, centimos, esPaquete, minimoDe, nuevaClave, precioDeLista, precioPaquete, tieneColores,
-    unidadesColorEnCarrito as unidadesColor, unidadesDe, unidadesEnCarrito as unidadesProducto
+    subirPrecios, unidadesColorEnCarrito as unidadesColor, unidadesDe, unidadesEnCarrito as unidadesProducto
 } from "../ventaItems.js";
 import CantidadesPorColor from "./CantidadesPorColor.jsx";
 import BuscadorProducto, { MiniFoto } from "./BuscadorProducto.jsx";
@@ -145,6 +145,9 @@ export default function Ventas({ esJefe, productos, carrito, onCarrito: setCarri
     const [codigoAjuste, setCodigoAjuste] = useState("");
     const [ajuste, setAjuste] = useState(null); // { codigo, monto, libre } (monto null = se escribe)
     const [montoPropio, setMontoPropio] = useState("");
+    // Total escrito a mano por un administrador (null = no se está cambiando).
+    const [totalEscrito, setTotalEscrito] = useState(null);
+    const [errorTotal, setErrorTotal] = useState("");
     const [errorAjuste, setErrorAjuste] = useState("");
     const [validandoAjuste, setValidandoAjuste] = useState(false);
 
@@ -431,6 +434,39 @@ export default function Ventas({ esJefe, productos, carrito, onCarrito: setCarri
         setAjuste({ codigo: "Descuento del jefe", monto: null, libre: true });
         setMontoPropio("");
         setErrorAjuste("");
+    }
+
+    /* Un administrador cambia el total a mano. Si es menor, la diferencia va como descuento del jefe;
+       si es mayor, se suben los precios de los productos (repartido parejo). */
+    function aplicarTotal() {
+        const nuevo = Number(totalEscrito);
+        const cobrable = carrito.some((item) => item.modalidad !== "obsequio");
+
+        if (!(totalEscrito ?? "").trim() || !Number.isFinite(nuevo) || nuevo <= 0) {
+            setErrorTotal("Escribe el total que vas a cobrar (mayor que cero).");
+            return;
+        }
+
+        if (!cobrable) {
+            setErrorTotal("Solo hay obsequios: no hay nada que cobrar.");
+            return;
+        }
+
+        const nuevoCentimos = centimos(nuevo);
+        const subtotalCentimos = centimos(subtotal);
+
+        if (nuevoCentimos < subtotalCentimos) {
+            setAjuste({ codigo: "Descuento del jefe", monto: null, libre: true });
+            setCodigoAjuste("");
+            setMontoPropio(((subtotalCentimos - nuevoCentimos) / 100).toFixed(2));
+            setErrorAjuste("");
+        } else {
+            quitarAjuste();
+            if (nuevoCentimos > subtotalCentimos) setCarrito((anterior) => subirPrecios(anterior, nuevoCentimos / 100));
+        }
+
+        setTotalEscrito(null);
+        setErrorTotal("");
     }
 
     function quitarAjuste() {
@@ -891,6 +927,54 @@ export default function Ventas({ esJefe, productos, carrito, onCarrito: setCarri
                             <span>{metodoPago === "tarjeta" ? "Total normal" : "Total a cobrar"}</span>
                             <strong>{moneda(total)}</strong>
                         </div>
+                        {esJefe && carrito.length > 0 && (totalEscrito === null ? (
+                            <button
+                                type="button"
+                                className="boton-enlace boton-cambiar-total"
+                                onClick={() => {
+                                    setTotalEscrito(total.toFixed(2));
+                                    setErrorTotal("");
+                                }}
+                            >
+                                ✏️ Cambiar el total
+                            </button>
+                        ) : (
+                            <div className="campo cambiar-total">
+                                <label htmlFor="total-escrito">Nuevo total (S/)</label>
+                                <div className="campo-con-boton">
+                                    <input
+                                        type="number"
+                                        id="total-escrito"
+                                        min="0.01"
+                                        step="0.01"
+                                        inputMode="decimal"
+                                        value={totalEscrito}
+                                        autoFocus
+                                        onChange={(e) => {
+                                            setTotalEscrito(e.target.value);
+                                            setErrorTotal("");
+                                        }}
+                                        onKeyDown={(e) => {
+                                            if (e.key === "Enter") {
+                                                e.preventDefault();
+                                                aplicarTotal();
+                                            }
+                                        }}
+                                    />
+                                    <button type="button" className="boton-principal boton-pequeno" onClick={aplicarTotal}>
+                                        Aplicar
+                                    </button>
+                                    <button type="button" className="boton-secundario boton-pequeno" onClick={() => setTotalEscrito(null)}>
+                                        Cancelar
+                                    </button>
+                                </div>
+                                <span className="ayuda-campo">
+                                    Si es menor, la diferencia queda como descuento; si es mayor, se sube el precio de los productos.
+                                    Solo los administradores pueden cambiarlo.
+                                </span>
+                                {errorTotal && <p className="mensaje mensaje-error" role="alert">{errorTotal}</p>}
+                            </div>
+                        ))}
                         {metodoPago === "tarjeta" && (
                             <div className="total-venta total-tarjeta">
                                 <span>💳 Total con tarjeta (+{RECARGO_TARJETA}%)</span>

@@ -8,7 +8,8 @@ import IngresarMercaderia from "./IngresarMercaderia.jsx";
 import MovimientosProducto from "./MovimientosProducto.jsx";
 import ConteoProducto from "./ConteoProducto.jsx";
 import AgregarAVenta from "./AgregarAVenta.jsx";
-import { contiene, normalizar } from "../texto.js";
+import { normalizar } from "../texto.js";
+import { buscadorDeProductos, buscarProductos } from "../busqueda.js";
 import { STOCK_ALERTA } from "../producto.js";
 import { useSecciones } from "../secciones.js";
 
@@ -140,7 +141,9 @@ export default function Inventario({
     const parteActual = PARTES.find((p) => p.valor === parte);
     const deLaParte = (productos ?? []).filter(parteActual.incluye);
     const texto = normalizar(busqueda);
-    const filtrados = filtrarProductos(deLaParte, filtros).filter((producto) => contiene(texto, producto.nombre, producto.codigo));
+    // Al buscar: también por sinónimos y con errores de ortografía; primero lo más parecido.
+    const filtrados = texto ? buscarProductos(filtrarProductos(deLaParte, filtros), busqueda) : filtrarProductos(deLaParte, filtros);
+    const coincideBusqueda = buscadorDeProductos(busqueda);
 
     function tarjeta(producto, retraso) {
         return (
@@ -310,7 +313,7 @@ export default function Inventario({
                 ) : filtrados.length === 0 ? (
                     <p>
                         No se encontraron productos con ese código o nombre en el {parte === "2025" ? "inventario 2025" : "inventario nuevo"}.
-                        {(productos ?? []).some((p) => !parteActual.incluye(p) && contiene(texto, p.nombre, p.codigo)) && (
+                        {(productos ?? []).some((p) => !parteActual.incluye(p) && coincideBusqueda(p) !== null) && (
                             <>
                                 {" "}
                                 <button type="button" className="boton-enlace" onClick={() => setParte(parte === "2025" ? "nuevo" : "2025")}>
