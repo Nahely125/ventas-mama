@@ -10017,3 +10017,119 @@ body.sin-desplazamiento {
     margin: 0;
     -webkit-appearance: none;
 }
+
+/* ===== Panel de control: alertas con «Ver más» y los más vendidos ===== */
+.boton-ver-mas {
+    margin-top: 10px;
+}
+
+.mas-vendidos .encabezado-seccion {
+    flex-wrap: wrap;
+}
+
+.periodo-vendidos {
+    display: inline-flex;
+    gap: 4px;
+    padding: 4px;
+    border-radius: 999px;
+    background: var(--morado-100);
+}
+
+.periodo-vendidos button {
+    min-height: 34px;
+    padding: 4px 12px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--morado-700);
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+
+.periodo-vendidos button.activo {
+    background: #ffffff;
+    color: var(--morado-900);
+    box-shadow: 0 2px 6px rgba(76, 29, 149, 0.12);
+}
+
+.lista-mas-vendidos {
+    display: grid;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.lista-mas-vendidos li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border: 1px solid var(--morado-150, #ede9fe);
+    border-radius: 12px;
+    background: #ffffff;
+}
+
+.puesto-vendido {
+    display: inline-grid;
+    flex: 0 0 auto;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--morado-100);
+    color: var(--morado-700);
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+
+.puesto-vendido.puesto-1 {
+    background: #b8892f;
+    color: #ffffff;
+}
+
+.puesto-vendido.puesto-2 {
+    background: #9ca3af;
+    color: #ffffff;
+}
+
+.puesto-vendido.puesto-3 {
+    background: #b4693e;
+    color: #ffffff;
+}
+
+.mas-vendido-datos {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.mas-vendido-datos strong {
+    overflow: hidden;
+    color: var(--morado-900);
+    font-size: 0.92rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mas-vendido-datos small {
+    color: var(--texto-suave);
+    font-size: 0.78rem;
+}
+
+.barra-vendido {
+    display: block;
+    height: 6px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--morado-100);
+}
+
+.barra-vendido span {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--morado-400), var(--morado-700));
+}

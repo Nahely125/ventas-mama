@@ -204,6 +204,45 @@ router.get("/stock-bajo", requiereSesion, async (req, res) => {
     }
 });
 
+/* Los 10 productos más vendidos de los últimos ?dias (7, 30 o 90; por defecto 30), en unidades,
+   sin ventas anuladas ni obsequios. El dinero vendido solo lo ve el jefe. */
+const DIAS_MAS_VENDIDOS = [7, 30, 90];
+
+router.get("/mas-vendidos", requiereSesion, async (req, res) => {
+    const dias = DIAS_MAS_VENDIDOS.includes(Number(req.query.dias)) ? Number(req.query.dias) : 30;
+    const esJefe = req.session.usuario.rol === "jefe";
+
+    try {
+        const resultado = await pool.query(
+            `SELECT productos.id, productos.codigo, productos.nombre, productos.stock,
+                    (productos.foto IS NOT NULL OR productos.foto_r2 IS NOT NULL) AS "tieneFoto",
+                    COALESCE(EXTRACT(EPOCH FROM productos.foto_actualizada)::BIGINT, 0)::INT AS "fotoVersion",
+                    SUM(ventas.cantidad)::INT AS unidades,
+                    SUM(ventas.total) AS vendido
+             FROM ventas
+             INNER JOIN productos ON productos.id = ventas.producto_id
+             WHERE ventas.anulada_en IS NULL AND NOT ventas.obsequio
+               AND ventas.fecha >= (CURRENT_TIMESTAMP AT TIME ZONE 'America/Lima')::DATE - ($1::INT - 1)
+             GROUP BY productos.id
+             HAVING SUM(ventas.cantidad) > 0
+             ORDER BY unidades DESC, vendido DESC, productos.nombre
+             LIMIT 10`,
+            [dias]
+        );
+
+        res.json({
+            dias,
+            productos: resultado.rows.map(({ vendido, ...fila }) => ({
+                ...fila,
+                ...(esJefe ? { vendido: Number(vendido).toFixed(2) } : {})
+            }))
+        });
+    } catch (error) {
+        console.error("Error al consultar los más vendidos:", error.message);
+        res.status(500).json({ error: "No se pudieron consultar los productos más vendidos." });
+    }
+});
+
 // Registrar un producto nuevo.
 router.post("/", requiereJefe, async (req, res) => {
     const { datos, error } = validarProducto(req.body);
