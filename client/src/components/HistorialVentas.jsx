@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { moneda, monedaCosto } from "../api.js";
 import { describirCantidad, formatearFecha, nombreMetodoPago, precioCobrado } from "../venta.js";
 
@@ -5,7 +6,19 @@ function monedaOpcional(valor) {
     return valor == null ? "No disponible" : monedaCosto(valor);
 }
 
-export default function HistorialVentas({ ventas, error, esJefe, textoVacio, onVerComprobante, onAnular, onDevolver }) {
+// Ventas (boletas) que se ven al inicio; el resto con «Ver más».
+const VENTAS_VISIBLES = 5;
+
+export default function HistorialVentas({
+    ventas, error, esJefe, textoVacio, onVerComprobante, onAnular, onDevolver, hayMas = false, cargandoMas = false, onCargarMas
+}) {
+    const [verTodas, setVerTodas] = useState(false);
+    // Grupos (boletas) en el orden en que llegan: se cortan por venta, no por producto.
+    const grupos = [...new Set((ventas ?? []).map((v) => v.grupo ?? v.id))];
+    const gruposVisibles = new Set(verTodas ? grupos : grupos.slice(0, VENTAS_VISIBLES));
+    const ocultas = grupos.length - gruposVisibles.size;
+    const visibles = (ventas ?? []).filter((v) => gruposVisibles.has(v.grupo ?? v.id));
+
     // Número de boleta = el id más bajo de las filas de la misma venta.
     const numeros = new Map();
     for (const venta of ventas ?? []) {
@@ -26,7 +39,7 @@ export default function HistorialVentas({ ventas, error, esJefe, textoVacio, onV
         filas = <tr><td colSpan={columnas}>{textoVacio}</td></tr>;
     } else {
         // data-etiqueta se usa en móvil para mostrar cada fila como tarjeta.
-        filas = ventas.map((venta) => (
+        filas = visibles.map((venta) => (
             <tr key={venta.id} className={venta.anuladaEn ? "fila-anulada" : ""}>
                 <td data-etiqueta="Fecha" className="celda-fecha">{formatearFecha(venta.fecha)}</td>
                 <td data-etiqueta="Producto" className="celda-producto">
@@ -134,6 +147,27 @@ export default function HistorialVentas({ ventas, error, esJefe, textoVacio, onV
                     <tbody>{filas}</tbody>
                 </table>
             </div>
+
+            {ocultas > 0 ? (
+                <button type="button" className="boton-secundario boton-ver-mas-ventas" onClick={() => setVerTodas(true)}>
+                    Ver más ({ocultas} {ocultas === 1 ? "venta" : "ventas"}{hayMas ? " y más" : ""})
+                </button>
+            ) : verTodas && grupos.length > VENTAS_VISIBLES ? (
+                <div className="acciones-ver-mas-ventas">
+                    {hayMas && onCargarMas && (
+                        <button type="button" className="boton-secundario" onClick={onCargarMas} disabled={cargandoMas}>
+                            {cargandoMas ? "Cargando..." : "Cargar más ventas"}
+                        </button>
+                    )}
+                    <button type="button" className="boton-enlace" onClick={() => setVerTodas(false)}>
+                        Ver menos
+                    </button>
+                </div>
+            ) : hayMas && onCargarMas ? (
+                <button type="button" className="boton-secundario boton-ver-mas-ventas" onClick={() => { setVerTodas(true); onCargarMas(); }} disabled={cargandoMas}>
+                    {cargandoMas ? "Cargando..." : "Ver más"}
+                </button>
+            ) : null}
 
             {error && <p className="mensaje mensaje-error" role="status">{error}</p>}
         </section>

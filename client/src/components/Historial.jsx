@@ -378,13 +378,11 @@ export default function Historial({ esJefe, onCambio, onError }) {
                 onVerComprobante={(venta) => setComprobante(boletaDe(venta))}
                 onAnular={esJefe ? (venta) => setAnulando(boletaDe(venta)) : null}
                 onDevolver={esJefe ? setDevolviendo : null}
+                hayMas={hayMas}
+                cargandoMas={cargandoMas}
+                onCargarMas={cargarMas}
+                key={consulta}
             />
-
-            {hayMas && (
-                <button type="button" className="boton-secundario boton-cargar-mas" onClick={cargarMas} disabled={cargandoMas}>
-                    {cargandoMas ? "Cargando..." : "Cargar más ventas"}
-                </button>
-            )}
 
             {comprobante && (
                 <Comprobante boleta={comprobante} onCerrar={() => setComprobante(null)} />

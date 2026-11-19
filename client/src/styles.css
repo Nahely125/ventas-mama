@@ -10261,3 +10261,18 @@ body.sin-desplazamiento {
     color: #b45309;
     font-weight: 600;
 }
+
+/* Detalle de ventas: 5 ventas y el resto con «Ver más» */
+.boton-ver-mas-ventas {
+    display: block;
+    margin: 14px auto 0;
+}
+
+.acciones-ver-mas-ventas {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    margin-top: 14px;
+}
