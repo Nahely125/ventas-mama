@@ -3,7 +3,7 @@ import { moneda, monedaCosto, pedir } from "../api.js";
 import { METODOS_PAGO, nombreModalidad } from "../venta.js";
 import {
     MODALIDADES_VENTA, centimos, esPaquete, minimoDe, nuevaClave, precioDeLista, precioPaquete, tieneColores,
-    subirPrecios, unidadesColorEnCarrito as unidadesColor, unidadesDe, unidadesEnCarrito as unidadesProducto
+    ajustarPrecios, unidadesColorEnCarrito as unidadesColor, unidadesDe, unidadesEnCarrito as unidadesProducto
 } from "../ventaItems.js";
 import CantidadesPorColor from "./CantidadesPorColor.jsx";
 import BuscadorProducto, { MiniFoto } from "./BuscadorProducto.jsx";
@@ -436,8 +436,9 @@ export default function Ventas({ esJefe, productos, carrito, onCarrito: setCarri
         setErrorAjuste("");
     }
 
-    /* Un administrador cambia el total a mano. Si es menor, la diferencia va como descuento del jefe;
-       si es mayor, se suben los precios de los productos (repartido parejo). */
+    /* Cambiar el total a mano. Administrador: si es menor, la diferencia va como descuento del jefe.
+       Trabajador: se bajan los precios de los productos (si quedan bajo el mínimo, al cobrar se pide la
+       contraseña del jefe, como con cualquier precio). Si es mayor, se suben los precios (repartido parejo). */
     function aplicarTotal() {
         const nuevo = Number(totalEscrito);
         const cobrable = carrito.some((item) => item.modalidad !== "obsequio");
@@ -455,14 +456,14 @@ export default function Ventas({ esJefe, productos, carrito, onCarrito: setCarri
         const nuevoCentimos = centimos(nuevo);
         const subtotalCentimos = centimos(subtotal);
 
-        if (nuevoCentimos < subtotalCentimos) {
+        if (esJefe && nuevoCentimos < subtotalCentimos) {
             setAjuste({ codigo: "Descuento del jefe", monto: null, libre: true });
             setCodigoAjuste("");
             setMontoPropio(((subtotalCentimos - nuevoCentimos) / 100).toFixed(2));
             setErrorAjuste("");
         } else {
             quitarAjuste();
-            if (nuevoCentimos > subtotalCentimos) setCarrito((anterior) => subirPrecios(anterior, nuevoCentimos / 100));
+            if (nuevoCentimos !== subtotalCentimos) setCarrito((anterior) => ajustarPrecios(anterior, nuevoCentimos / 100));
         }
 
         setTotalEscrito(null);
@@ -927,7 +928,7 @@ export default function Ventas({ esJefe, productos, carrito, onCarrito: setCarri
                             <span>{metodoPago === "tarjeta" ? "Total normal" : "Total a cobrar"}</span>
                             <strong>{moneda(total)}</strong>
                         </div>
-                        {esJefe && carrito.length > 0 && (totalEscrito === null ? (
+                        {carrito.length > 0 && (totalEscrito === null ? (
                             <button
                                 type="button"
                                 className="boton-enlace boton-cambiar-total"
@@ -969,8 +970,9 @@ export default function Ventas({ esJefe, productos, carrito, onCarrito: setCarri
                                     </button>
                                 </div>
                                 <span className="ayuda-campo">
-                                    Si es menor, la diferencia queda como descuento; si es mayor, se sube el precio de los productos.
-                                    Solo los administradores pueden cambiarlo.
+                                    {esJefe
+                                        ? "Si es menor, la diferencia queda como descuento; si es mayor, se sube el precio de los productos."
+                                        : "Se ajusta el precio de los productos. Si queda por debajo del mínimo, al cobrar se pedirá la contraseña del jefe."}
                                 </span>
                                 {errorTotal && <p className="mensaje mensaje-error" role="alert">{errorTotal}</p>}
                             </div>

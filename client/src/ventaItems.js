@@ -61,16 +61,16 @@ export const MODALIDADES_VENTA = [
     { valor: "docena", texto: "Docena (12 u.)" }
 ];
 
-/* Sube los precios del carrito para que el total sea exactamente «nuevoTotal» (mayor que el actual).
-   El aumento se reparte según el importe de cada producto (los obsequios siguen gratis). Si quedan
+/* Cambia los precios del carrito para que el total sea exactamente «nuevoTotal» (mayor o menor).
+   El cambio se reparte según el importe de cada producto (los obsequios siguen gratis). Si quedan
    céntimos que no se pueden repartir parejo, una unidad (o paquete) se separa en su propia línea. */
-export function subirPrecios(carrito, nuevoTotal) {
+export function ajustarPrecios(carrito, nuevoTotal) {
     const meta = centimos(nuevoTotal);
     const lineas = carrito.map((item) => ({ ...item, centavos: centimos(item.precio) }));
     const cobrables = lineas.filter((item) => item.modalidad !== "obsequio" && item.centavos > 0);
     const actual = cobrables.reduce((suma, item) => suma + item.centavos * item.cantidad, 0);
 
-    if (cobrables.length === 0 || meta <= actual) return carrito;
+    if (cobrables.length === 0 || meta <= 0 || meta === actual) return carrito;
 
     for (const item of cobrables) item.centavos = Math.floor((item.centavos * meta) / actual);
 
