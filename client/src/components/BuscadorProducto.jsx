@@ -2,6 +2,22 @@ import { useCallback, useState } from "react";
 import { moneda } from "../api.js";
 import Escaner from "./Escaner.jsx";
 import { contiene, normalizar } from "../texto.js";
+import { urlFoto } from "../fotos.js";
+
+// Fotito del producto para listas (miniatura liviana); sin foto, su inicial.
+export function MiniFoto({ producto, className = "" }) {
+    const foto = urlFoto(producto, "mini");
+
+    return (
+        <span className={`mini-foto ${className}`} aria-hidden="true">
+            {foto ? (
+                <img src={foto} alt="" loading="lazy" decoding="async" />
+            ) : (
+                (producto?.nombre ?? "?").trim().charAt(0).toUpperCase()
+            )}
+        </span>
+    );
+}
 
 const MAXIMO_RESULTADOS = 8;
 
@@ -76,6 +92,7 @@ export default function BuscadorProducto({ productos, seleccionado, onSelecciona
     if (seleccionado) {
         return (
             <div className="producto-seleccionado">
+                <MiniFoto producto={seleccionado} className="mini-foto-grande" />
                 <div className="producto-seleccionado-datos">
                     {seleccionado.codigo && (
                         <span className="codigo-producto">{seleccionado.codigo}</span>
@@ -149,13 +166,16 @@ export default function BuscadorProducto({ productos, seleccionado, onSelecciona
                                 }}
                                 onMouseEnter={() => setActivo(indice)}
                             >
-                                <span className="resultado-nombre">
-                                    {producto.codigo && <span className="codigo-producto">{producto.codigo}</span>}
-                                    {producto.nombre}
-                                </span>
-                                <span className="resultado-detalle">
-                                    {moneda(producto.precio)} ·{" "}
-                                    {producto.stock === 0 ? "Agotado" : `Stock: ${producto.stock}`}
+                                <MiniFoto producto={producto} />
+                                <span className="resultado-textos">
+                                    <span className="resultado-nombre">
+                                        {producto.codigo && <span className="codigo-producto">{producto.codigo}</span>}
+                                        {producto.nombre}
+                                    </span>
+                                    <span className="resultado-detalle">
+                                        {moneda(producto.precio)} ·{" "}
+                                        {producto.stock === 0 ? "Agotado" : `Stock: ${producto.stock}`}
+                                    </span>
                                 </span>
                             </li>
                         ))

@@ -9872,3 +9872,148 @@ body.sin-desplazamiento {
     width: 30px;
     height: 30px;
 }
+
+/* ===== Registrar venta: fotitos de los productos y cantidad por color ===== */
+.mini-foto {
+    display: inline-grid;
+    flex: 0 0 auto;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    overflow: hidden;
+    border: 1px solid var(--morado-200);
+    border-radius: 10px;
+    background: linear-gradient(160deg, #faf7ff 0%, #f1eafe 100%);
+    color: var(--morado-700);
+    font-family: 'Playfair Display', serif;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.mini-foto img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    background: #ffffff;
+}
+
+.mini-foto-grande {
+    width: 56px;
+    height: 56px;
+    font-size: 1.4rem;
+}
+
+.resultado-producto {
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+}
+
+.resultado-textos {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.producto-seleccionado .producto-seleccionado-datos {
+    flex: 1;
+}
+
+.cantidades-colores {
+    display: grid;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+@media (min-width: 640px) {
+    .cantidades-colores {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+.cantidades-colores li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px 10px 8px 14px;
+    border: 1px solid var(--morado-200);
+    border-radius: 12px;
+    background: #ffffff;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.cantidades-colores li.con-cantidad {
+    border-color: var(--morado-600);
+    background: var(--morado-50, #faf7ff);
+}
+
+.cantidades-colores li.agotado {
+    opacity: 0.5;
+}
+
+.cantidad-color-nombre {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.cantidad-color-nombre strong {
+    color: var(--morado-900);
+    overflow-wrap: anywhere;
+}
+
+.cantidad-color-nombre small {
+    color: var(--texto-suave);
+    font-size: 0.75rem;
+}
+
+.contador-cantidad {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 4px;
+}
+
+.contador-cantidad button {
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    border: 1px solid var(--morado-200);
+    border-radius: 10px;
+    background: #ffffff;
+    color: var(--morado-900);
+    font-size: 1.2rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.contador-cantidad button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.contador-cantidad input {
+    width: 54px;
+    min-height: 38px;
+    padding: 4px;
+    text-align: center;
+}
+
+.fila-cantidad-precio.solo-precio {
+    grid-template-columns: 1fr;
+}
+
+.contador-cantidad input {
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
+.contador-cantidad input::-webkit-outer-spin-button,
+.contador-cantidad input::-webkit-inner-spin-button {
+    margin: 0;
+    -webkit-appearance: none;
+}
