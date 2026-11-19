@@ -10133,3 +10133,64 @@ body.sin-desplazamiento {
     border-radius: 999px;
     background: linear-gradient(90deg, var(--morado-400), var(--morado-700));
 }
+
+/* ===== Inventario: agregar productos a la venta en curso ===== */
+.lista-inventario > li.fila-con-accion.fila-con-dos {
+    grid-template-columns: minmax(0, 1fr) 48px 48px;
+}
+
+.fila-vender {
+    background: var(--morado-50, #faf7ff);
+}
+
+.fila-vender:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+.boton-vender-tarjeta {
+    width: 100%;
+    min-height: 46px;
+    margin-top: 12px;
+    border: 0;
+    border-radius: 12px;
+    background: var(--morado-600);
+    color: #ffffff;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.boton-vender-tarjeta:disabled {
+    background: var(--morado-200);
+    cursor: not-allowed;
+}
+
+.barra-venta-curso {
+    position: sticky;
+    bottom: 12px;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 16px;
+    padding: 10px 12px 10px 16px;
+    border: 1px solid var(--morado-300, #c4b5fd);
+    border-radius: 16px;
+    background: #ffffff;
+    box-shadow: 0 10px 30px rgba(76, 29, 149, 0.22);
+    color: var(--morado-900);
+    font-size: 0.9rem;
+    animation: aparecerSuave 0.2s ease-out;
+}
+
+.barra-venta-curso .boton-principal {
+    flex: 0 0 auto;
+    width: auto;
+    white-space: nowrap;
+}
+
+.contador-grande input {
+    width: 72px;
+    font-size: 1.05rem;
+}

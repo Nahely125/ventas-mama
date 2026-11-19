@@ -7,6 +7,7 @@ import Escaner from "./Escaner.jsx";
 import IngresarMercaderia from "./IngresarMercaderia.jsx";
 import MovimientosProducto from "./MovimientosProducto.jsx";
 import ConteoProducto from "./ConteoProducto.jsx";
+import AgregarAVenta from "./AgregarAVenta.jsx";
 import { contiene, normalizar } from "../texto.js";
 import { STOCK_ALERTA } from "../producto.js";
 import { useSecciones } from "../secciones.js";
@@ -104,6 +105,9 @@ export default function Inventario({
     onCambio,
     onRegistrar,
     onReponer,
+    carritoVenta = [],
+    onAgregarVenta,
+    onIrAVenta,
     onError
 }) {
     const secciones = useSecciones();
@@ -123,6 +127,10 @@ export default function Inventario({
     const [escaneando, setEscaneando] = useState(false);
     const [ingresando, setIngresando] = useState(null);
     const [aviso, setAviso] = useState("");
+    // Producto que se está agregando a la venta en curso.
+    const [vendiendo, setVendiendo] = useState(null);
+    const piezasVenta = carritoVenta.reduce((suma, item) => suma + item.cantidad, 0);
+    const totalVenta = carritoVenta.reduce((suma, item) => suma + item.precio * item.cantidad, 0);
 
     const codigoLeido = useCallback((codigo) => {
         setEscaneando(false);
@@ -148,6 +156,7 @@ export default function Inventario({
                 onMovimientos={() => setMovimientosDe(producto)}
                 onConteo={() => setConteoDe(producto)}
                 onReponer={() => agregarAReponer(producto)}
+                onVender={onAgregarVenta ? () => setVendiendo(producto) : null}
             />
         );
     }
@@ -361,7 +370,7 @@ export default function Inventario({
                                     const foto = urlFoto(producto, "mini");
 
                                     return (
-                                        <li key={producto.id} className={`${abierto ? "abierta" : ""} ${esJefe ? "fila-con-accion" : ""}`}>
+                                        <li key={producto.id} className={`${abierto ? "abierta" : ""} fila-con-accion ${esJefe ? "fila-con-dos" : ""}`}>
                                             <button
                                                 type="button"
                                                 className="fila-inventario"
@@ -388,6 +397,16 @@ export default function Inventario({
                                                 </span>
                                                 <span className="fila-flecha" aria-hidden="true">{abierto ? "▴" : "▾"}</span>
                                             </button>
+                                            <button
+                                                type="button"
+                                                className="fila-descontar fila-vender"
+                                                onClick={() => setVendiendo(producto)}
+                                                disabled={producto.stock === 0}
+                                                aria-label={`Agregar ${producto.nombre} a la venta`}
+                                                title={producto.stock === 0 ? "Agotado" : "Agregar a la venta"}
+                                            >
+                                                🛒
+                                            </button>
                                             {esJefe && (
                                                 <button
                                                     type="button"
@@ -408,6 +427,31 @@ export default function Inventario({
                     </>
                 )}
             </section>
+
+            {vendiendo && (
+                <AgregarAVenta
+                    producto={(productos ?? []).find((p) => p.id === vendiendo.id) ?? vendiendo}
+                    carrito={carritoVenta}
+                    onCerrar={() => setVendiendo(null)}
+                    onAgregar={(items) => {
+                        onAgregarVenta(items);
+                        setVendiendo(null);
+                        setInfoId(null);
+                        setAviso(`${vendiendo.nombre} se agregó a la venta.`);
+                    }}
+                />
+            )}
+
+            {carritoVenta.length > 0 && (
+                <div className="barra-venta-curso" role="status">
+                    <span>
+                        🛒 <strong>Venta en curso:</strong> {piezasVenta} {piezasVenta === 1 ? "pieza" : "piezas"} · {moneda(totalVenta)}
+                    </span>
+                    <button type="button" className="boton-principal boton-pequeno" onClick={onIrAVenta}>
+                        Ir a cobrar →
+                    </button>
+                </div>
+            )}
 
             {ingresando && (
                 <IngresarMercaderia

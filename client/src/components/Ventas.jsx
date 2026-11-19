@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { moneda, monedaCosto, pedir } from "../api.js";
-import { METODOS_PAGO, UNIDADES_MODALIDAD, nombreModalidad } from "../venta.js";
+import { METODOS_PAGO, nombreModalidad } from "../venta.js";
+import {
+    MODALIDADES_VENTA, centimos, esPaquete, minimoDe, nuevaClave, precioDeLista, precioPaquete, tieneColores,
+    unidadesColorEnCarrito as unidadesColor, unidadesDe, unidadesEnCarrito as unidadesProducto
+} from "../ventaItems.js";
+import CantidadesPorColor from "./CantidadesPorColor.jsx";
 import BuscadorProducto, { MiniFoto } from "./BuscadorProducto.jsx";
 import Comprobante from "./Comprobante.jsx";
 import DatosPago from "./DatosPago.jsx";
@@ -8,37 +13,6 @@ import { RECARGO_TARJETA, cobroConTarjeta } from "../datosPago.js";
 import DictadoVenta from "./DictadoVenta.jsx";
 import SelectorCliente from "./SelectorCliente.jsx";
 
-const unidadesDe = (modalidad) => UNIDADES_MODALIDAD[modalidad] ?? 1;
-// Docena y media docena: se escribe el precio por unidad y se calcula el del paquete.
-const esPaquete = (modalidad) => modalidad === "docena" || modalidad === "media";
-
-// Precio de lista del paquete: unidad, media docena (mitad de la docena), docena o gratis (obsequio).
-function precioPaquete(producto, modalidad) {
-    if (modalidad === "obsequio") return 0;
-    if (modalidad === "docena") return Number(producto.precioDocena);
-    if (modalidad === "media") return Number((Number(producto.precioDocena) / 2).toFixed(2));
-    return Number(producto.precio);
-}
-
-// Mínimo del paquete (el que valida el servidor): la media docena tiene la mitad del de la docena.
-function minimoDe(producto, modalidad) {
-    if (modalidad === "obsequio") return 0;
-    if (modalidad === "docena") return Number(producto.precioMinimoDocena);
-    if (modalidad === "media") return Number((Number(producto.precioMinimoDocena) / 2).toFixed(2));
-    return Number(producto.precioMinimo);
-}
-
-// Lo que se escribe en el formulario: siempre el precio por unidad.
-function precioDeLista(producto, modalidad) {
-    if (!producto) return "";
-    return (precioPaquete(producto, modalidad) / unidadesDe(modalidad)).toFixed(2);
-}
-
-function centimos(valor) {
-    return Math.round(Number(valor) * 100);
-}
-
-let siguienteClave = 1;
 
 /* Botones para elegir el color de un producto que tiene colores. Muestra cuántas quedan de cada
    uno (descontando lo que ya está en el carrito) y no deja elegir los que no tienen stock. */
@@ -68,65 +42,6 @@ function SelectorColor({ producto, colorId, enCarrito, onElegir, id }) {
     );
 }
 
-/* Cantidad para cada color (en la modalidad elegida: unidades, medias docenas o docenas).
-   Muestra cuántas quedan de cada color (descontando lo que ya está en el carrito). */
-function CantidadesPorColor({ producto, cantidades, porUnidades, nombreUnidad, enCarrito, onCambiar }) {
-    return (
-        <div className="campo">
-            <span className="etiqueta-campo" id="etiqueta-cantidad-colores">
-                Cantidad por color ({nombreUnidad})
-            </span>
-            <ul className="cantidades-colores" aria-labelledby="etiqueta-cantidad-colores">
-                {producto.colores.map((color) => {
-                    const quedan = Math.max(color.stock - enCarrito(color.id), 0);
-                    const maximo = Math.floor(quedan / porUnidades);
-                    const valor = cantidades[color.id] ?? "";
-                    const numero = Number(valor) || 0;
-                    const cambiar = (nuevo) => onCambiar(color.id, nuevo <= 0 ? "" : String(Math.min(nuevo, maximo)));
-
-                    return (
-                        <li key={color.id} className={`${numero > 0 ? "con-cantidad" : ""} ${maximo === 0 ? "agotado" : ""}`}>
-                            <span className="cantidad-color-nombre">
-                                <strong>{color.nombre}</strong>
-                                <small>{quedan > 0 ? `quedan ${quedan} u.` : "agotado"}</small>
-                            </span>
-                            <span className="contador-cantidad">
-                                <button
-                                    type="button"
-                                    onClick={() => cambiar(numero - 1)}
-                                    disabled={numero <= 0}
-                                    aria-label={`Una menos de ${color.nombre}`}
-                                >
-                                    −
-                                </button>
-                                <input
-                                    type="number"
-                                    min="0"
-                                    max={maximo}
-                                    step="1"
-                                    inputMode="numeric"
-                                    placeholder="0"
-                                    value={valor}
-                                    disabled={maximo === 0}
-                                    onChange={(e) => onCambiar(color.id, e.target.value)}
-                                    aria-label={`Cantidad de ${color.nombre}`}
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => cambiar(numero + 1)}
-                                    disabled={numero >= maximo}
-                                    aria-label={`Una más de ${color.nombre}`}
-                                >
-                                    +
-                                </button>
-                            </span>
-                        </li>
-                    );
-                })}
-            </ul>
-        </div>
-    );
-}
 
 // Ventana para que el jefe escriba su contraseña y autorice precios bajo el mínimo.
 function ModalAutorizacion({ productos, minimoDescuento, error, enviando, onConfirmar, onCerrar }) {
@@ -199,7 +114,9 @@ function ModalAutorizacion({ productos, minimoDescuento, error, enviando, onConf
     );
 }
 
-export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onError }) {
+/* El carrito lo guarda el panel (carrito, onCarrito): así no se pierde al ir al inventario y
+   desde allí también se pueden agregar productos a la venta. */
+export default function Ventas({ esJefe, productos, carrito, onCarrito: setCarrito, onVenta, onIrAHistorial, onError }) {
     // Producto que se está agregando
     const [producto, setProducto] = useState(null);
     const [modalidad, setModalidad] = useState("unidad");
@@ -216,7 +133,6 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
     const [revisandoRegalo, setRevisandoRegalo] = useState(false);
 
     // Carrito y cobro
-    const [carrito, setCarrito] = useState([]);
     const [metodoPago, setMetodoPago] = useState("efectivo");
     const [cliente, setCliente] = useState(null);
     const [mensaje, setMensaje] = useState(null);
@@ -267,17 +183,10 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
         && centimos(precioDelPaquete) < centimos(minimoPaquete);
 
     // Unidades ya puestas en el carrito por producto (para avisar del stock).
-    const unidadesEnCarrito = (id) =>
-        carrito
-            .filter((item) => item.producto.id === id)
-            .reduce((suma, item) => suma + item.cantidad * unidadesDe(item.modalidad), 0);
+    const unidadesEnCarrito = (id) => unidadesProducto(carrito, id);
 
     // Unidades de un color ya puestas en el carrito.
-    const unidadesColorEnCarrito = (id) =>
-        carrito
-            .filter((item) => item.color?.id === id)
-            .reduce((suma, item) => suma + item.cantidad * unidadesDe(item.modalidad), 0);
-    const tieneColores = (p) => (p?.colores ?? []).length > 0;
+    const unidadesColorEnCarrito = (id) => unidadesColor(carrito, id);
 
     // Con colores, se escribe una cantidad para cada color; sin colores, una sola cantidad.
     const conColores = tieneColores(productoActual);
@@ -364,7 +273,7 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
         setCarrito((anterior) => [
             ...anterior,
             ...lineas.map((linea) => ({
-                clave: siguienteClave++,
+                clave: nuevaClave(),
                 producto: productoActual,
                 modalidad,
                 cantidad: linea.cantidad,
@@ -439,7 +348,7 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
         setCarrito((anterior) => [
             ...anterior,
             {
-                clave: siguienteClave++,
+                clave: nuevaClave(),
                 producto: regaloActual,
                 modalidad: "obsequio",
                 cantidad: cantidadNum,
@@ -477,7 +386,7 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
 
             usadas.set(actual.id, (usadas.get(actual.id) ?? 0) + unidades);
             nuevos.push({
-                clave: siguienteClave++,
+                clave: nuevaClave(),
                 producto: actual,
                 modalidad: linea.modalidad,
                 cantidad: linea.cantidad,
@@ -642,11 +551,7 @@ export default function Ventas({ esJefe, productos, onVenta, onIrAHistorial, onE
                                 <div className="campo">
                                     <span className="etiqueta-campo" id="etiqueta-modalidad">Vender por</span>
                                     <div className="selector-modalidad" role="radiogroup" aria-labelledby="etiqueta-modalidad">
-                                        {[
-                                            { valor: "unidad", texto: "Unidad" },
-                                            { valor: "media", texto: "Media docena (6 u.)" },
-                                            { valor: "docena", texto: "Docena (12 u.)" }
-                                        ].map((opcion) => (
+                                        {MODALIDADES_VENTA.map((opcion) => (
                                             <button
                                                 key={opcion.valor}
                                                 type="button"

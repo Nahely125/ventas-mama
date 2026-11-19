@@ -150,6 +150,9 @@ export default function Panel({ usuario, onSalir, onActualizarUsuario }) {
     const [resumen, setResumen] = useState(null);
     const [alertas, setAlertas] = useState(null);
     const [errorAlertas, setErrorAlertas] = useState("");
+    // Venta en curso: se arma en «Registrar venta» o desde el inventario, y no se pierde al cambiar de pantalla.
+    const [carritoVenta, setCarritoVenta] = useState([]);
+    const agregarAVenta = useCallback((items) => setCarritoVenta((anterior) => [...anterior, ...items]), []);
 
     // Si el servidor responde 401, la sesión expiró o la cuenta fue desactivada: volver al login.
     const manejarError = useCallback((error, mostrarError) => {
@@ -267,6 +270,9 @@ export default function Panel({ usuario, onSalir, onActualizarUsuario }) {
                             onCambio={recargarInventario}
                             onRegistrar={() => cambiarVista("registrar")}
                             onReponer={() => cambiarVista("reposicion")}
+                            carritoVenta={carritoVenta}
+                            onAgregarVenta={agregarAVenta}
+                            onIrAVenta={() => cambiarVista("ventas")}
                             onError={manejarError}
                         />
                     )}
@@ -281,6 +287,8 @@ export default function Panel({ usuario, onSalir, onActualizarUsuario }) {
                         <Ventas
                             esJefe={esJefe}
                             productos={productos}
+                            carrito={carritoVenta}
+                            onCarrito={setCarritoVenta}
                             onVenta={recargarTodo}
                             onIrAHistorial={() => cambiarVista("historial")}
                             onError={manejarError}
