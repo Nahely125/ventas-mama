@@ -132,7 +132,12 @@ app.use(session({
     store: new AlmacenSesiones({
         pool,
         tableName: "session",
-        createTableIfMissing: true
+        createTableIfMissing: true,
+        // Sin «touch»: no se escribe en la base en cada clic solo para alargar la sesión
+        // (las sesiones de 30 días se renuevan una vez al día en /api/sesion).
+        disableTouch: true,
+        // Borrar sesiones vencidas cada 6 horas (no cada 15 min): la base puede «dormir» sin uso.
+        pruneSessionInterval: 60 * 60 * 6
     }),
     secret: process.env.SESSION_SECRET,
     resave: false,

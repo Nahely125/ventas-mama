@@ -1,7 +1,7 @@
 const express = require("express");
 const bcrypt = require("bcrypt");
 const pool = require("../db");
-const { requiereJefe, leerId } = require("../autenticacion");
+const { requiereJefe, leerId, olvidarCuenta } = require("../autenticacion");
 
 const router = express.Router();
 
@@ -160,6 +160,7 @@ router.put("/:id", requiereJefe, async (req, res) => {
         );
 
         const usuario = resultado.rows[0];
+        olvidarCuenta(id);
 
         if (esPropia) {
             req.session.usuario = {
@@ -197,6 +198,8 @@ router.delete("/:id", requiereJefe, async (req, res) => {
              RETURNING id, nombre`,
             [id]
         );
+
+        olvidarCuenta(id);
 
         if (resultado.rows.length === 0) {
             return res.status(404).json({ error: "Cuenta no encontrada." });

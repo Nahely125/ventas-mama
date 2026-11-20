@@ -1,20 +1,35 @@
 const pool = require("./db");
 
-// Vuelve a leer el usuario de la base de datos en cada petición.
-// Así, si el jefe desactiva o elimina a un empleado, su sesión deja de funcionar al instante.
-async function usuarioVigente(req) {
-    if (!req.session.usuario) {
-        return null;
-    }
+/* Las cuentas se recuerdan un minuto: así cada clic no consulta la base solo para revisar
+   que la cuenta siga activa. Al editar, desactivar o eliminar una cuenta se olvida al instante. */
+const RECORDAR_CUENTA_MS = 60 * 1000;
+const cuentasRecordadas = new Map(); // id → { cuenta, hasta }
+
+function olvidarCuenta(id) {
+    cuentasRecordadas.delete(Number(id));
+}
+
+async function leerCuenta(id) {
+    const recordada = cuentasRecordadas.get(id);
+    if (recordada && recordada.hasta > Date.now()) return recordada.cuenta;
 
     const resultado = await pool.query(
         `SELECT id, usuario, nombre, rol, activo
          FROM usuarios
          WHERE id = $1`,
-        [req.session.usuario.id]
+        [id]
     );
+    const cuenta = resultado.rows[0] ?? null;
+    cuentasRecordadas.set(id, { cuenta, hasta: Date.now() + RECORDAR_CUENTA_MS });
+    return cuenta;
+}
 
-    const cuenta = resultado.rows[0];
+async function usuarioVigente(req) {
+    if (!req.session.usuario) {
+        return null;
+    }
+
+    const cuenta = await leerCuenta(req.session.usuario.id);
 
     if (!cuenta || !cuenta.activo) {
         await new Promise((resolver) => req.session.destroy(resolver));
@@ -68,4 +83,4 @@ function leerId(req) {
     return Number.isInteger(id) && id > 0 ? id : null;
 }
 
-module.exports = { usuarioVigente, requiereSesion, requiereJefe, leerId };
+module.exports = { usuarioVigente, olvidarCuenta, requiereSesion, requiereJefe, leerId };
