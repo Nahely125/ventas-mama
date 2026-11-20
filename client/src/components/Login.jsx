@@ -4,6 +4,7 @@ import { pedir } from "../api.js";
 export default function Login({ onIngresar }) {
     const [usuario, setUsuario] = useState("");
     const [password, setPassword] = useState("");
+    const [mantener, setMantener] = useState(true);
     const [mensaje, setMensaje] = useState("");
     const [enviando, setEnviando] = useState(false);
 
@@ -15,7 +16,7 @@ export default function Login({ onIngresar }) {
         try {
             const resultado = await pedir("/api/login", {
                 method: "POST",
-                cuerpo: { usuario: usuario.trim(), password }
+                cuerpo: { usuario: usuario.trim(), password, mantener }
             });
 
             onIngresar(resultado.usuario);
@@ -59,6 +60,18 @@ export default function Login({ onIngresar }) {
                         onChange={(e) => setPassword(e.target.value)}
                         required
                     />
+
+                    <label className="casilla-mantener">
+                        <input
+                            type="checkbox"
+                            checked={mantener}
+                            onChange={(e) => setMantener(e.target.checked)}
+                        />
+                        <span>
+                            Mantener sesión iniciada
+                            <small>Desmárcalo si usas un celular o computadora que no es tuyo.</small>
+                        </span>
+                    </label>
 
                     <button type="submit" className="boton-principal" disabled={enviando}>
                         {enviando ? "Verificando..." : "Iniciar sesión"}

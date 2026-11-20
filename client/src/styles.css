@@ -10276,3 +10276,34 @@ body.sin-desplazamiento {
     gap: 14px;
     margin-top: 14px;
 }
+
+/* Inicio de sesión: «Mantener sesión iniciada» */
+.casilla-mantener {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin: 4px 0 6px;
+    color: var(--texto);
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.casilla-mantener input {
+    flex: 0 0 auto;
+    width: 20px;
+    height: 20px;
+    margin: 2px 0 0;
+    accent-color: var(--morado-600);
+}
+
+.casilla-mantener span {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.casilla-mantener small {
+    color: var(--texto-suave);
+    font-size: 0.78rem;
+    font-weight: 400;
+}

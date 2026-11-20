@@ -120,6 +120,12 @@ const { enviarFoto, crearMiniaturasPendientes, migrarFotosAR2 } = require("./fot
 const almacenR2 = require("./almacenR2");
 app.get("/api/productos/:id/foto", enviarFoto);
 
+// Duración de la sesión: 8 horas, o 30 días si se marcó «Mantener sesión iniciada»
+// (y se renueva una vez al día mientras se use la app).
+const SESION_CORTA = 1000 * 60 * 60 * 8;
+const SESION_LARGA = 1000 * 60 * 60 * 24 * 30;
+const UN_DIA = 1000 * 60 * 60 * 24;
+
 // Las sesiones se guardan en PostgreSQL (tabla "session") para que no se
 // pierdan cuando el servidor se reinicia.
 app.use(session({
@@ -135,7 +141,7 @@ app.use(session({
         httpOnly: true,
         secure: enProduccion,
         sameSite: "lax",
-        maxAge: 1000 * 60 * 60 * 8
+        maxAge: SESION_CORTA
     }
 }));
 
@@ -182,6 +188,12 @@ app.post("/api/login", async (req, res) => {
                 });
             }
 
+            // «Mantener sesión iniciada» viene marcado por defecto.
+            const mantener = req.body.mantener !== false;
+            req.session.cookie.maxAge = mantener ? SESION_LARGA : SESION_CORTA;
+            req.session.mantener = mantener;
+            req.session.renovada = Date.now();
+
             req.session.usuario = {
                 id: cuenta.id,
                 usuario: cuenta.usuario,
@@ -220,6 +232,13 @@ app.get("/api/sesion", async (req, res) => {
                 autenticado: false,
                 error: "No has iniciado sesión."
             });
+        }
+
+        // Sesión mantenida: al abrir la app, se renuevan los 30 días (como mucho una vez al día,
+        // para no escribir en la base en cada visita).
+        if (req.session.mantener && Date.now() - (req.session.renovada ?? 0) > UN_DIA) {
+            req.session.cookie.maxAge = SESION_LARGA;
+            req.session.renovada = Date.now();
         }
 
         res.json({ autenticado: true, usuario });
