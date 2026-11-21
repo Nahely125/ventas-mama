@@ -174,7 +174,7 @@ function ModalDevolver({ venta, onDevuelta, onCerrar, onError }) {
 
                 {valida && (
                     <p className="caja-esperada">
-                        <span>{venta.metodoPago === "fiado" ? "Se descuenta de la deuda" : "Devuelves al cliente"}</span>
+                        <span>{venta.metodoPago === "fiado" ? "Se descuenta de la deuda" : venta.metodoPago === "mixto" ? "Devuelves al cliente (en efectivo)" : "Devuelves al cliente"}</span>
                         <strong>{moneda(monto)}</strong>
                     </p>
                 )}

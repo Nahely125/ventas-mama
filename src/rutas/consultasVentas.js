@@ -1,4 +1,6 @@
 const METODOS_PAGO = ["efectivo", "yape", "plin", "tarjeta", "transferencia", "fiado"];
+// Medios que se pueden combinar en un pago mixto (el fiado va solo).
+const METODOS_MIXTO = ["efectivo", "yape", "plin", "tarjeta", "transferencia"];
 const MODALIDADES = ["unidad", "media", "docena"];
 // Unidades que trae cada modalidad (media = media docena).
 const UNIDADES_MODALIDAD = { unidad: 1, media: 6, docena: 12 };
@@ -79,6 +81,12 @@ async function consultarVentas(pool, esJefe, opciones = {}) {
             ventas.obsequio,
             ventas.unidades_devueltas AS "unidadesDevueltas",
             ventas.metodo_pago AS "metodoPago",
+            -- Pago con varios medios: [{ metodo, monto }] (de mayor a menor monto).
+            CASE WHEN ventas.metodo_pago = 'mixto' THEN (
+                SELECT json_agg(json_build_object('metodo', pagos_venta.metodo, 'monto', pagos_venta.monto)
+                                ORDER BY pagos_venta.monto DESC)
+                FROM pagos_venta WHERE pagos_venta.grupo = ventas.grupo
+            ) END AS pagos,
             COALESCE(usuarios.nombre, 'No registrado') AS vendedor,
             autoriza.nombre AS "autorizadoPor",
             clientes.id AS "clienteId",
@@ -128,8 +136,11 @@ async function totalesVentas(pool, esJefe, opciones = {}) {
 
     if (esJefe) {
         const metodos = await pool.query(
-            `SELECT ventas.metodo_pago AS metodo, SUM(ventas.total) AS total
-             FROM ventas ${donde}
+            // Un pago mixto se reparte entre sus medios según lo pagado con cada uno.
+            `SELECT ventas_metodos.metodo, ROUND(SUM(ventas.total * ventas_metodos.fraccion), 2) AS total
+             FROM ventas
+             INNER JOIN ventas_metodos ON ventas_metodos.venta_id = ventas.id
+             ${donde}
              GROUP BY 1`,
             parametros
         );
@@ -153,6 +164,7 @@ function armarBoleta(todas) {
         fecha: primera.fecha,
         vendedor: primera.vendedor,
         metodoPago: primera.metodoPago,
+        pagos: primera.pagos ?? null,
         cliente: primera.cliente,
         clienteTelefono: primera.clienteTelefono,
         anulada: vigentes.length === 0,
@@ -179,6 +191,7 @@ function armarBoleta(todas) {
 
 module.exports = {
     METODOS_PAGO,
+    METODOS_MIXTO,
     MODALIDADES,
     UNIDADES_MODALIDAD,
     MAXIMO_PRODUCTOS,

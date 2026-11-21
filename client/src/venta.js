@@ -9,8 +9,25 @@ export const METODOS_PAGO = [
     { valor: "fiado", nombre: "Fiado", icono: "📝" }
 ];
 
+// Medios que se pueden combinar en un pago con varios medios (el fiado va solo).
+export const METODOS_MIXTO = METODOS_PAGO.filter((metodo) => metodo.valor !== "fiado");
+
 export function nombreMetodoPago(valor) {
+    if (valor === "mixto") return "Varios medios";
     return METODOS_PAGO.find((metodo) => metodo.valor === valor)?.nombre ?? valor;
+}
+
+// Nombre corto del medio (para la boleta): «Tarjeta» en vez de «Tarjeta (Izipay)».
+export function nombreCortoPago(valor) {
+    return nombreMetodoPago(valor).replace(/\s*\(.*\)$/, "");
+}
+
+/* Cómo se pagó una venta: «Yape» o, con varios medios, «Yape S/ 20.00 + Efectivo S/ 30.00». */
+export function textoPago(venta) {
+    if (venta.metodoPago === "mixto" && Array.isArray(venta.pagos) && venta.pagos.length > 0) {
+        return venta.pagos.map((p) => `${nombreCortoPago(p.metodo)} ${moneda(p.monto)}`).join(" + ");
+    }
+    return nombreMetodoPago(venta.metodoPago);
 }
 
 export function formatearFecha(fecha) {
@@ -78,6 +95,7 @@ export function boletaDesdeFilas(filas) {
         fecha: primera.fecha,
         vendedor: primera.vendedor,
         metodoPago: primera.metodoPago,
+        pagos: primera.pagos ?? null,
         cliente: primera.cliente,
         clienteTelefono: primera.clienteTelefono,
         anulada: vigentes.length === 0,

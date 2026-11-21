@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { moneda, monedaCosto, pedir } from "../api.js";
-import { METODOS_PAGO, nombreModalidad } from "../venta.js";
+import { METODOS_MIXTO, METODOS_PAGO, nombreCortoPago, nombreModalidad } from "../venta.js";
 import {
     MODALIDADES_VENTA, centimos, esPaquete, minimoDe, nuevaClave, precioDeLista, precioPaquete, tieneColores,
     ajustarPrecios, unidadesColorEnCarrito as unidadesColor, unidadesDe, unidadesEnCarrito as unidadesProducto
@@ -134,6 +134,10 @@ export default function Ventas({ esJefe, productos, carrito, onCarrito: setCarri
 
     // Carrito y cobro
     const [metodoPago, setMetodoPago] = useState("efectivo");
+    // Pago con varios medios (ej. Yape y efectivo): monto escrito para cada medio.
+    const [pagoMixto, setPagoMixto] = useState(false);
+    const [montosPago, setMontosPago] = useState({});
+    const [errorPago, setErrorPago] = useState("");
     const [cliente, setCliente] = useState(null);
     const [mensaje, setMensaje] = useState(null);
     const [enviando, setEnviando] = useState(false);
@@ -208,6 +212,20 @@ export default function Ventas({ esJefe, productos, carrito, onCarrito: setCarri
         : 0;
     const ajusteExcede = centimos(montoAjuste) > centimos(subtotal);
     const total = Math.max(subtotal - montoAjuste, 0);
+    // Pago mixto: medios con monto, cuánto suman y cuánto falta (en céntimos para no perder decimales).
+    const pagosEscritos = METODOS_MIXTO
+        .map((m) => ({ metodo: m.valor, monto: Number(montosPago[m.valor] || 0) }))
+        .filter((p) => p.monto !== 0);
+    const pagadoCentimos = pagosEscritos.reduce((suma, p) => suma + Math.round(p.monto * 100), 0);
+    const faltaCentimos = centimos(total) - pagadoCentimos;
+
+    function completarPago(metodo) {
+        const actual = Math.round(Number(montosPago[metodo] || 0) * 100);
+        const nuevo = actual + faltaCentimos;
+        setMontosPago((anterior) => ({ ...anterior, [metodo]: nuevo > 0 ? (nuevo / 100).toFixed(2) : "" }));
+        setErrorPago("");
+    }
+
     const estaBajoMinimo = (item) =>
         item.modalidad !== "obsequio" && centimos(item.precio) < centimos(minimoDe(item.producto, item.modalidad));
     const itemsBajoMinimo = esJefe ? [] : carrito.filter(estaBajoMinimo);
@@ -496,7 +514,8 @@ export default function Ventas({ esJefe, productos, carrito, onCarrito: setCarri
                         precio: item.precio,
                         ...(item.modalidad === "obsequio" ? { obsequio: true } : {})
                     })),
-                    metodoPago,
+                    metodoPago: pagoMixto ? "mixto" : metodoPago,
+                    ...(pagoMixto ? { pagos: pagosEscritos } : {}),
                     ajuste: ajuste
                         ? (ajuste.libre ? { libre: true, monto: montoAjuste } : { codigo: ajuste.codigo, monto: montoAjuste })
                         : null,
@@ -514,6 +533,8 @@ export default function Ventas({ esJefe, productos, carrito, onCarrito: setCarri
             setCarrito([]);
             quitarAjuste();
             setMetodoPago("efectivo");
+            setPagoMixto(false);
+            setMontosPago({});
             setCliente(null);
             await onVenta();
         } catch (error) {
@@ -533,7 +554,24 @@ export default function Ventas({ esJefe, productos, carrito, onCarrito: setCarri
     function cobrar(evento) {
         evento.preventDefault();
 
-        if (metodoPago === "fiado" && !cliente) {
+        if (pagoMixto) {
+            if (pagosEscritos.some((p) => !Number.isFinite(p.monto) || p.monto < 0)) {
+                setErrorPago("Revisa los montos: deben ser números mayores que cero.");
+                return;
+            }
+            if (pagosEscritos.length < 2) {
+                setErrorPago("Escribe el monto de al menos dos medios de pago (si pagó con uno solo, desmarca «Pagó con dos o más medios»).");
+                return;
+            }
+            if (faltaCentimos !== 0) {
+                setErrorPago(faltaCentimos > 0
+                    ? `Faltan ${moneda(faltaCentimos / 100)} para completar el total.`
+                    : `Los montos pasan el total por ${moneda(-faltaCentimos / 100)}.`);
+                return;
+            }
+        }
+
+        if (!pagoMixto && metodoPago === "fiado" && !cliente) {
             setMensaje({ tipo: "error", texto: "Para vender fiado, elige o registra al cliente." });
             return;
         }
@@ -925,7 +963,7 @@ export default function Ventas({ esJefe, productos, carrito, onCarrito: setCarri
                         )}
 
                         <div className="total-venta">
-                            <span>{metodoPago === "tarjeta" ? "Total normal" : "Total a cobrar"}</span>
+                            <span>{!pagoMixto && metodoPago === "tarjeta" ? "Total normal" : "Total a cobrar"}</span>
                             <strong>{moneda(total)}</strong>
                         </div>
                         {carrito.length > 0 && (totalEscrito === null ? (
@@ -977,7 +1015,7 @@ export default function Ventas({ esJefe, productos, carrito, onCarrito: setCarri
                                 {errorTotal && <p className="mensaje mensaje-error" role="alert">{errorTotal}</p>}
                             </div>
                         ))}
-                        {metodoPago === "tarjeta" && (
+                        {!pagoMixto && metodoPago === "tarjeta" && (
                             <div className="total-venta total-tarjeta">
                                 <span>💳 Total con tarjeta (+{RECARGO_TARJETA}%)</span>
                                 <strong>{moneda(cobroConTarjeta(total).cobrar)}</strong>
@@ -999,6 +1037,72 @@ export default function Ventas({ esJefe, productos, carrito, onCarrito: setCarri
                         <h3>Método de pago</h3>
                         <p className="descripcion-pago">¿Cómo pagó el cliente?</p>
 
+                        <label className="casilla-mantener casilla-pago-mixto">
+                            <input
+                                type="checkbox"
+                                checked={pagoMixto}
+                                onChange={(e) => {
+                                    setPagoMixto(e.target.checked);
+                                    setErrorPago("");
+                                }}
+                            />
+                            <span>
+                                Pagó con dos o más medios
+                                <small>Por ejemplo, una parte por Yape y el resto en efectivo.</small>
+                            </span>
+                        </label>
+
+                        {pagoMixto ? (
+                            <div className="pago-mixto">
+                                {METODOS_MIXTO.map((metodo) => (
+                                    <div className="fila-pago-mixto" key={metodo.valor}>
+                                        <label htmlFor={`monto-${metodo.valor}`}>
+                                            <span aria-hidden="true">{metodo.icono}</span>
+                                            <span>{nombreCortoPago(metodo.valor)}</span>
+                                        </label>
+                                        <input
+                                            type="number"
+                                            id={`monto-${metodo.valor}`}
+                                            min="0"
+                                            step="0.01"
+                                            inputMode="decimal"
+                                            placeholder="0.00"
+                                            value={montosPago[metodo.valor] ?? ""}
+                                            onChange={(e) => {
+                                                setMontosPago((anterior) => ({ ...anterior, [metodo.valor]: e.target.value }));
+                                                setErrorPago("");
+                                            }}
+                                        />
+                                        <button
+                                            type="button"
+                                            className="boton-resto"
+                                            onClick={() => completarPago(metodo.valor)}
+                                            disabled={faltaCentimos <= 0}
+                                            title="Poner aquí lo que falta para completar el total"
+                                            aria-label={`Poner en ${nombreCortoPago(metodo.valor)} lo que falta`}
+                                        >
+                                            Resto
+                                        </button>
+                                    </div>
+                                ))}
+                                <p className={`resumen-pago-mixto ${faltaCentimos === 0 ? "completo" : faltaCentimos < 0 ? "excede" : ""}`}>
+                                    Pagado {moneda(pagadoCentimos / 100)} de {moneda(total)}
+                                    {" · "}
+                                    {faltaCentimos === 0
+                                        ? "✓ Completo"
+                                        : faltaCentimos > 0
+                                            ? `Falta ${moneda(faltaCentimos / 100)}`
+                                            : `Sobra ${moneda(-faltaCentimos / 100)}`}
+                                </p>
+                                {Number(montosPago.tarjeta) > 0 && (
+                                    <p className="ayuda-campo">
+                                        💳 Con tarjeta (+{RECARGO_TARJETA}%): cobra {moneda(cobroConTarjeta(Number(montosPago.tarjeta)).cobrar)} en el POS.
+                                    </p>
+                                )}
+                                {errorPago && <p className="mensaje mensaje-error" role="alert">{errorPago}</p>}
+                            </div>
+                        ) : (
+                        <>
                         <div className="opciones-pago">
                             {METODOS_PAGO.map((metodo) => (
                                 <label className="opcion-pago" key={metodo.valor}>
@@ -1018,6 +1122,8 @@ export default function Ventas({ esJefe, productos, carrito, onCarrito: setCarri
                         </div>
 
                         <DatosPago metodoPago={metodoPago} total={total} />
+                        </>
+                        )}
                     </div>
 
                     <button type="submit" className="boton-principal" disabled={enviando || carrito.length === 0}>
@@ -1025,7 +1131,7 @@ export default function Ventas({ esJefe, productos, carrito, onCarrito: setCarri
                             ? "Registrando..."
                             : carrito.length === 0
                                 ? "Registrar venta"
-                                : metodoPago === "tarjeta"
+                                : !pagoMixto && metodoPago === "tarjeta"
                                     ? `Registrar venta · cobrar ${moneda(cobroConTarjeta(total).cobrar)} en el POS`
                                     : `Registrar venta · ${moneda(total)}`}
                     </button>

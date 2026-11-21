@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { moneda, monedaCosto } from "../api.js";
-import { describirCantidad, formatearFecha, nombreMetodoPago, precioCobrado } from "../venta.js";
+import { describirCantidad, formatearFecha, precioCobrado, textoPago } from "../venta.js";
 
 function monedaOpcional(valor) {
     return valor == null ? "No disponible" : monedaCosto(valor);
@@ -68,7 +68,7 @@ export default function HistorialVentas({
                     {moneda(precioCobrado(venta))}
                 </td>
                 <td data-etiqueta="Total" className="celda-total">{moneda(venta.total)}</td>
-                <td data-etiqueta="Pago">{nombreMetodoPago(venta.metodoPago)}</td>
+                <td data-etiqueta="Pago">{textoPago(venta)}</td>
                 {esJefe && (
                     <>
                         <td data-etiqueta="Costo por unidad">{monedaOpcional(venta.costoUnitario)}</td>

@@ -8,6 +8,7 @@ const router = express.Router();
 
 const {
     METODOS_PAGO,
+    METODOS_MIXTO,
     MODALIDADES,
     UNIDADES_MODALIDAD,
     MAXIMO_PRODUCTOS,
@@ -20,6 +21,31 @@ const {
 const { SALDO } = require("./clientes");
 const { anotarMovimiento, textoBoleta } = require("../movimientos");
 const { COSTO_MAXIMO_OBSEQUIO, OBSEQUIABLE, normalizarCodigo, resolverAjuste, repartirAjuste } = require("./ajustes");
+
+/* Pago con varios medios: pagos = [{ metodo, monto }] (2 o más medios distintos, sin fiado).
+   Devuelve { pagos } normalizados o { error }. La suma se compara con el total más adelante. */
+function validarPagos(pagos) {
+    if (!Array.isArray(pagos) || pagos.length < 2 || pagos.length > METODOS_MIXTO.length) {
+        return { error: "En un pago con varios medios elige al menos dos medios." };
+    }
+
+    const vistos = new Set();
+    const normalizados = [];
+
+    for (const pago of pagos) {
+        const monto = Number(pago?.monto);
+        if (!METODOS_MIXTO.includes(pago?.metodo) || vistos.has(pago.metodo)) {
+            return { error: "Los medios de pago no son válidos (no se puede repetir un medio ni combinar con fiado)." };
+        }
+        if (!Number.isFinite(monto) || monto <= 0 || Math.round(monto * 100) !== Number((monto * 100).toFixed(4))) {
+            return { error: "Cada medio de pago debe tener un monto mayor que cero (hasta 2 decimales)." };
+        }
+        vistos.add(pago.metodo);
+        normalizados.push({ metodo: pago.metodo, monto: Math.round(monto * 100) / 100 });
+    }
+
+    return { pagos: normalizados };
+}
 
 const NOMBRE_MODALIDAD = { unidad: "unidad", media: "media docena", docena: "docena" };
 
@@ -221,14 +247,23 @@ router.post("/validar-ajuste", requiereSesion, async (req, res) => {
            o { libre: true, monto } ajuste directo del jefe (sin código).
    Si algún precio está por debajo del mínimo, un trabajador necesita passwordJefe. */
 router.post("/", requiereSesion, async (req, res) => {
-    const { items, metodoPago = "efectivo", passwordJefe, clienteId = null, ajuste = null } = req.body;
+    const { items, metodoPago = "efectivo", passwordJefe, clienteId = null, ajuste = null, pagos = null } = req.body;
     const usuario = req.session.usuario;
     const esJefe = usuario.rol === "jefe";
 
     const errorItems = validarItems(items);
 
-    if (errorItems || !METODOS_PAGO.includes(metodoPago)) {
+    if (errorItems || !(METODOS_PAGO.includes(metodoPago) || metodoPago === "mixto")) {
         return res.status(400).json({ error: errorItems ?? "Elige un método de pago válido." });
+    }
+
+    // Pago mixto (ej. Yape y efectivo): cuánto se pagó con cada medio.
+    let pagosMixtos = null;
+
+    if (metodoPago === "mixto") {
+        const resultadoPagos = validarPagos(pagos);
+        if (resultadoPagos.error) return res.status(400).json({ error: resultadoPagos.error });
+        pagosMixtos = resultadoPagos.pagos;
     }
 
     let ajusteVenta = null;
@@ -434,6 +469,19 @@ router.post("/", requiereSesion, async (req, res) => {
         const importes = items.map((item) => Number((Number(item.precio.toFixed(2)) * item.cantidad).toFixed(2)));
         const descuentos = ajusteVenta ? repartirAjuste(importes, ajusteVenta.monto) : importes.map(() => 0);
 
+        // En un pago mixto, lo pagado con todos los medios tiene que dar exactamente el total.
+        if (pagosMixtos) {
+            const totalCentimos = importes.reduce((suma, importe, i) => suma + Math.round((importe - descuentos[i]) * 100), 0);
+            const pagadoCentimos = pagosMixtos.reduce((suma, p) => suma + Math.round(p.monto * 100), 0);
+
+            if (totalCentimos !== pagadoCentimos) {
+                await client.query("ROLLBACK");
+                return res.status(400).json({
+                    error: `Los montos por medio de pago suman S/ ${(pagadoCentimos / 100).toFixed(2)}, pero el total es S/ ${(totalCentimos / 100).toFixed(2)}.`
+                });
+            }
+        }
+
         // Unidades del 2025 que quedan por producto: se descuentan primero, y antes en los obsequios
         // (así el obsequio vale lo que se revisó y lo ya pagado se regala antes que lo nuevo).
         const quedan2025 = new Map([...productos.values()].map((p) => [p.id, p.stock_2025]));
@@ -489,6 +537,10 @@ router.post("/", requiereSesion, async (req, res) => {
                     color?.nombre ?? null
                 ]
             );
+        }
+
+        for (const pago of pagosMixtos ?? []) {
+            await client.query(`INSERT INTO pagos_venta (grupo, metodo, monto) VALUES ($1, $2, $3)`, [grupo, pago.metodo, pago.monto]);
         }
 
         // Historial de stock: cada producto anota la venta con su boleta, colores y obsequios.
@@ -793,14 +845,15 @@ router.post("/:grupo/devolver", requiereJefe, async (req, res) => {
             `INSERT INTO devoluciones
                 (grupo, venta_id, producto_id, unidades, monto, unidades_2025, metodo_pago, motivo, usuario_id)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-            [grupo, fila.id, fila.producto_id, unidades, monto, devueltas2025, fila.metodo_pago, motivo, req.session.usuario.id]
+            // Lo pagado con varios medios se devuelve en efectivo.
+            [grupo, fila.id, fila.producto_id, unidades, monto, devueltas2025, fila.metodo_pago === "mixto" ? "efectivo" : fila.metodo_pago, motivo, req.session.usuario.id]
         );
 
         await client.query("COMMIT");
         res.json({
             mensaje: fila.metodo_pago === "fiado"
                 ? `Devolución registrada: se descontaron S/ ${monto.toFixed(2)} de la deuda del cliente.`
-                : `Devolución registrada: devuelve S/ ${monto.toFixed(2)} al cliente.`,
+                : `Devolución registrada: devuelve S/ ${monto.toFixed(2)}${fila.metodo_pago === "mixto" ? " en efectivo" : ""} al cliente.`,
             monto: monto.toFixed(2)
         });
     } catch (error) {

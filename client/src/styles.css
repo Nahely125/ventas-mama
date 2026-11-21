@@ -10307,3 +10307,109 @@ body.sin-desplazamiento {
     font-size: 0.78rem;
     font-weight: 400;
 }
+
+/* ===== Registrar venta: pago con varios medios ===== */
+.casilla-pago-mixto {
+    margin: 4px 0 12px;
+}
+
+.pago-mixto {
+    display: grid;
+    gap: 8px;
+    padding: 12px;
+    border: 1px solid var(--morado-200);
+    border-radius: 14px;
+    background: #ffffff;
+}
+
+.fila-pago-mixto {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 84px 56px;
+    gap: 6px;
+    align-items: center;
+    gap: 8px;
+}
+
+.fila-pago-mixto label {
+    color: var(--morado-900);
+    font-weight: 600;
+}
+
+.fila-pago-mixto input {
+    min-width: 0;
+    text-align: right;
+}
+
+.fila-pago-mixto .boton-enlace {
+    font-size: 0.8rem;
+    white-space: nowrap;
+}
+
+.fila-pago-mixto .boton-enlace:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+
+.resumen-pago-mixto {
+    margin: 4px 0 0;
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: #fef3c7;
+    color: #92400e;
+    font-weight: 600;
+    text-align: center;
+}
+
+.resumen-pago-mixto.completo {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.resumen-pago-mixto.excede {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+
+.fila-pago-mixto label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    font-size: 0.92rem;
+}
+
+.fila-pago-mixto label span:last-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.boton-resto {
+    min-height: 40px;
+    padding: 0 6px;
+    border: 1px solid var(--morado-200);
+    border-radius: 10px;
+    background: var(--morado-50, #faf7ff);
+    color: var(--morado-700);
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.boton-resto:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+
+.fila-pago-mixto input {
+    padding-right: 8px;
+    padding-left: 8px;
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
+.fila-pago-mixto input::-webkit-outer-spin-button,
+.fila-pago-mixto input::-webkit-inner-spin-button {
+    margin: 0;
+    -webkit-appearance: none;
+}

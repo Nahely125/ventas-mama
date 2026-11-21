@@ -1,5 +1,5 @@
 import { moneda } from "./api.js";
-import { UNIDADES_MODALIDAD, enlaceCatalogo, importeItem, nombreMetodoPago, precioCobrado } from "./venta.js";
+import { UNIDADES_MODALIDAD, enlaceCatalogo, importeItem, nombreCortoPago, nombreMetodoPago, precioCobrado } from "./venta.js";
 
 /* Imagen de la boleta para enviar por WhatsApp, con el diseño de la boleta impresa de Mil Deseos:
    papel crema con acuarela, adornos navideños y mochilas, casillas de fecha, tabla
@@ -225,7 +225,10 @@ export async function generarImagenComprobante(boleta) {
     const inicioTabla = 258;
     const finTabla = inicioTabla + ALTO_ENCABEZADO_TABLA + altoFilas;
     const conDescuento = Number(boleta.ajuste?.monto ?? 0) > 0;
-    const alto = finTabla + (conDescuento ? 50 : 0) + 200;
+    // Recuadro de abajo: quién atendió y cómo pagó (una línea por medio si pagó con varios).
+    const pagosMixtos = boleta.metodoPago === "mixto" && Array.isArray(boleta.pagos) ? boleta.pagos : null;
+    const altoRecuadro = Math.max(60, 22 + (pagosMixtos ? 2 + pagosMixtos.length : 2) * 20);
+    const alto = finTabla + (conDescuento ? 50 : 0) + 140 + altoRecuadro;
 
     lienzo.width = ANCHO * ESCALA;
     lienzo.height = alto * ESCALA;
@@ -372,14 +375,34 @@ export async function generarImagenComprobante(boleta) {
         yPie += 20;
     }
 
-    cuadro(ctx, X0, yPie, 214, 60);
+    const anchoRecuadro = 290;
+    cuadro(ctx, X0, yPie, anchoRecuadro, altoRecuadro);
     ctx.textAlign = "left";
-    ctx.font = `600 13px ${SANS}`;
-    ctx.fillText(`Pago: ${nombreMetodoPago(boleta.metodoPago)}`, X0 + 12, yPie + 25);
-    ctx.font = `500 12.5px ${SANS}`;
-    ctx.fillStyle = SUAVE;
-    ctx.fillText(`Atendió: ${boleta.vendedor ?? ""}`.slice(0, 32), X0 + 12, yPie + 45);
-    ctx.fillStyle = TINTA;
+    let yLinea = yPie + 26;
+    ctx.font = `500 13.5px ${SANS}`;
+    ctx.fillText("Atendido por:", X0 + 12, yLinea);
+    const xNombre = X0 + 12 + ctx.measureText("Atendido por: ").width;
+    ctx.font = `700 13.5px ${SANS}`;
+    ctx.fillText(partirTexto(ctx, boleta.vendedor ?? "", X0 + anchoRecuadro - 12 - xNombre)[0] ?? "", xNombre, yLinea);
+    yLinea += 20;
+
+    ctx.font = `500 13.5px ${SANS}`;
+    if (pagosMixtos) {
+        ctx.fillText("Pagó con:", X0 + 12, yLinea);
+        for (const pago of pagosMixtos) {
+            yLinea += 20;
+            ctx.font = `600 13.5px ${SANS}`;
+            ctx.textAlign = "left";
+            ctx.fillText(`• ${nombreCortoPago(pago.metodo)}`, X0 + 20, yLinea);
+            ctx.textAlign = "right";
+            ctx.fillText(moneda(pago.monto), X0 + anchoRecuadro - 12, yLinea);
+        }
+        ctx.textAlign = "left";
+    } else {
+        ctx.fillText("Pago:", X0 + 12, yLinea);
+        ctx.font = `700 13.5px ${SANS}`;
+        ctx.fillText(nombreMetodoPago(boleta.metodoPago), X0 + 12 + ctx.measureText("Pago: ").width + 4, yLinea);
+    }
 
     cuadro(ctx, 543, yPie, 119, 60);
     ctx.textAlign = "right";

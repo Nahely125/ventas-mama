@@ -45,12 +45,14 @@ router.get("/caja", requiereJefe, async (req, res) => {
     try {
         const dia = FECHA.test(req.query.dia ?? "") ? req.query.dia : (await pool.query(`SELECT ${HOY} AS dia`)).rows[0].dia;
 
-        const [ventas, abonos, devoluciones, gastos, cierre] = await Promise.all([
+        const [ventas, abonos, devoluciones, gastos, cierre, cantidadVentas] = await Promise.all([
             pool.query(
-                `SELECT ventas.metodo_pago AS metodo,
+                // Un pago mixto (ej. Yape y efectivo) cuenta en cada medio según lo pagado con él.
+                `SELECT ventas_metodos.metodo,
                         COUNT(DISTINCT ventas.grupo)::INT AS ventas,
-                        SUM(${COBRADO("ventas")}) AS monto
+                        SUM(${COBRADO("ventas")} * ventas_metodos.fraccion) AS monto
                  FROM ventas
+                 INNER JOIN ventas_metodos ON ventas_metodos.venta_id = ventas.id
                  WHERE ventas.fecha >= $1::DATE AND ventas.fecha < $1::DATE + 1
                    AND ${CUENTA_EN_CAJA("ventas")}
                  GROUP BY 1`,
@@ -81,6 +83,15 @@ router.get("/caja", requiereJefe, async (req, res) => {
                  LEFT JOIN usuarios ON usuarios.id = cierres_caja.usuario_id
                  WHERE cierres_caja.dia = $1::DATE`,
                 [dia]
+            ),
+            // Ventas cobradas (sin fiado): una venta con varios medios cuenta una sola vez.
+            pool.query(
+                `SELECT COUNT(DISTINCT ventas.grupo)::INT AS ventas
+                 FROM ventas
+                 WHERE ventas.fecha >= $1::DATE AND ventas.fecha < $1::DATE + 1
+                   AND ventas.metodo_pago <> 'fiado'
+                   AND ${CUENTA_EN_CAJA("ventas")}`,
+                [dia]
             )
         ]);
 
@@ -101,7 +112,7 @@ router.get("/caja", requiereJefe, async (req, res) => {
         res.json({
             dia,
             metodos,
-            ventas: ventas.rows.filter((f) => f.metodo !== "fiado").reduce((suma, f) => suma + f.ventas, 0),
+            ventas: cantidadVentas.rows[0].ventas,
             fiado: porMetodo(ventas, "fiado").toFixed(2),
             fiadoDevuelto: porMetodo(devoluciones, "fiado").toFixed(2),
             total: metodos.reduce((suma, m) => suma + Number(m.total), 0).toFixed(2),
@@ -137,9 +148,10 @@ router.post("/caja", requiereJefe, async (req, res) => {
         const resultado = await pool.query(
             `WITH efectivo AS (
                 SELECT
-                    COALESCE((SELECT SUM(${COBRADO("v")})
+                    COALESCE((SELECT SUM(${COBRADO("v")} * vm.fraccion)
                               FROM ventas v
-                              WHERE v.metodo_pago = 'efectivo' AND v.fecha >= $1::DATE AND v.fecha < $1::DATE + 1
+                              INNER JOIN ventas_metodos vm ON vm.venta_id = v.id
+                              WHERE vm.metodo = 'efectivo' AND v.fecha >= $1::DATE AND v.fecha < $1::DATE + 1
                                 AND ${CUENTA_EN_CAJA("v")}), 0)
                   + COALESCE((SELECT SUM(monto) FROM abonos
                               WHERE metodo_pago = 'efectivo' AND fecha >= $1::DATE AND fecha < $1::DATE + 1), 0)

@@ -395,6 +395,28 @@ const MIGRACIONES = `
     ALTER TABLE productos ADD COLUMN IF NOT EXISTS creado_en TIMESTAMP;
     ALTER TABLE productos ALTER COLUMN creado_en SET DEFAULT CURRENT_TIMESTAMP;
 
+    -- Pago con varios medios (ej. Yape y efectivo): la venta queda con metodo_pago = mixto
+    -- y aquí va cuánto se pagó con cada medio.
+    CREATE TABLE IF NOT EXISTS pagos_venta (
+        grupo  UUID          NOT NULL,
+        metodo VARCHAR(20)   NOT NULL,
+        monto  NUMERIC(10, 2) NOT NULL CHECK (monto > 0),
+        PRIMARY KEY (grupo, metodo)
+    );
+
+    -- Cada fila de ventas con el medio de pago y la parte que le toca (1 si se pagó con un solo medio;
+    -- en un pago mixto, lo pagado con cada medio entre el total). Los reportes por método la usan.
+    CREATE OR REPLACE VIEW ventas_metodos AS
+        SELECT ventas.id AS venta_id, ventas.metodo_pago AS metodo, 1::NUMERIC AS fraccion
+        FROM ventas
+        WHERE ventas.metodo_pago <> 'mixto'
+        UNION ALL
+        SELECT ventas.id, pagos_venta.metodo,
+               pagos_venta.monto / NULLIF(SUM(pagos_venta.monto) OVER (PARTITION BY ventas.id), 0)
+        FROM ventas
+        INNER JOIN pagos_venta ON pagos_venta.grupo = ventas.grupo
+        WHERE ventas.metodo_pago = 'mixto';
+
     -- Registro de los cambios de datos que solo deben hacerse una vez.
     CREATE TABLE IF NOT EXISTS migraciones_unicas (
         nombre VARCHAR(100) PRIMARY KEY,
