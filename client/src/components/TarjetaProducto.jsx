@@ -75,7 +75,7 @@ export default function TarjetaProducto({ producto, parte, esJefe, retraso, onEd
                         Editar
                     </button>
                     <button type="button" className="boton-eliminar" onClick={onEliminar}>
-                        Eliminar
+                        🗑️ Enviar a la papelera
                     </button>
                 </div>
             </>

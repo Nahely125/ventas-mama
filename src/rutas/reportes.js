@@ -262,7 +262,7 @@ router.get("/productos", requiereJefe, async (req, res) => {
                         (SELECT TO_CHAR(MAX(v.fecha), 'YYYY-MM-DD') FROM ventas v
                          WHERE v.producto_id = productos.id AND v.anulada_en IS NULL AND NOT v.obsequio) AS "ultimaVenta"
                  FROM productos
-                 WHERE productos.stock > 0
+                 WHERE productos.stock > 0 AND productos.eliminado_en IS NULL
                    AND NOT EXISTS (SELECT 1 FROM ventas WHERE ventas.producto_id = productos.id AND ${enPeriodo})
                  ORDER BY productos.precio * productos.stock DESC, productos.nombre
                  LIMIT 50`,

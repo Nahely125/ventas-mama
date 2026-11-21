@@ -22,7 +22,8 @@ router.get("/", requiereSesion, async (req, res) => {
                 COUNT(*) AS "totalProductos",
                 COALESCE(SUM(stock), 0) AS "unidadesTotales",
                 COUNT(*) FILTER (WHERE stock < $1) AS "productosStockBajo"
-             FROM productos`,
+             FROM productos
+             WHERE eliminado_en IS NULL`,
             [STOCK_ALERTA]
         );
 
@@ -31,10 +32,10 @@ router.get("/", requiereSesion, async (req, res) => {
         if (req.session.usuario.rol === "jefe") {
             const datos = await pool.query(
                 `SELECT
-                    (SELECT COALESCE(SUM(precio * stock), 0) FROM productos) AS "valorInventario",
-                    (SELECT COALESCE(SUM(precio * GREATEST(stock - stock_2025, 0)), 0) FROM productos) AS "valorInventarioNuevo",
-                    (SELECT COALESCE(SUM(stock_2025), 0) FROM productos) AS "unidades2025",
-                    (SELECT COALESCE(SUM(precio * stock_2025), 0) FROM productos) AS "valorInventario2025",
+                    (SELECT COALESCE(SUM(precio * stock), 0) FROM productos WHERE eliminado_en IS NULL) AS "valorInventario",
+                    (SELECT COALESCE(SUM(precio * GREATEST(stock - stock_2025, 0)), 0) FROM productos WHERE eliminado_en IS NULL) AS "valorInventarioNuevo",
+                    (SELECT COALESCE(SUM(stock_2025), 0) FROM productos WHERE eliminado_en IS NULL) AS "unidades2025",
+                    (SELECT COALESCE(SUM(precio * stock_2025), 0) FROM productos WHERE eliminado_en IS NULL) AS "valorInventario2025",
                     (SELECT COALESCE(SUM(${GANANCIA_NUEVA}), 0) FROM ventas WHERE anulada_en IS NULL) AS "gananciaVentasNuevas",
                     (SELECT COALESCE(SUM(${GANANCIA_2025}), 0) FROM ventas WHERE anulada_en IS NULL) AS "ganancia2025",
                     (SELECT COALESCE(SUM(monto), 0) FROM gastos) AS "gastosTotales",

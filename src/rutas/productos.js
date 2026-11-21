@@ -158,7 +158,7 @@ function errorDuplicado(error, res) {
     }
 
     if (error.code === "23505") {
-        res.status(409).json({ error: "Ya existe un producto con ese código." });
+        res.status(409).json({ error: "Ya existe un producto con ese código (revisa también la papelera del inventario)." });
         return true;
     }
     return false;
@@ -170,6 +170,7 @@ router.get("/", requiereSesion, async (req, res) => {
         const resultado = await pool.query(
             `SELECT ${columnasSegunRol(req)}
              FROM productos
+             WHERE eliminado_en IS NULL
              ORDER BY nombre`
         );
 
@@ -192,7 +193,7 @@ router.get("/stock-bajo", requiereSesion, async (req, res) => {
                  WHERE ventas.producto_id = productos.id AND ventas.anulada_en IS NULL
                    AND ventas.fecha >= (CURRENT_TIMESTAMP AT TIME ZONE 'America/Lima')::DATE - 29)::INT AS "vendidas30"
              FROM productos
-             WHERE stock < $1
+             WHERE stock < $1 AND eliminado_en IS NULL
              ORDER BY stock ASC, "vendidas30" DESC, nombre`,
             [STOCK_ALERTA]
         );
@@ -221,7 +222,7 @@ router.get("/mas-vendidos", requiereSesion, async (req, res) => {
                     SUM(ventas.total) AS vendido
              FROM ventas
              INNER JOIN productos ON productos.id = ventas.producto_id
-             WHERE ventas.anulada_en IS NULL AND NOT ventas.obsequio
+             WHERE ventas.anulada_en IS NULL AND NOT ventas.obsequio AND productos.eliminado_en IS NULL
                AND ventas.fecha >= (CURRENT_TIMESTAMP AT TIME ZONE 'America/Lima')::DATE - ($1::INT - 1)
              GROUP BY productos.id
              HAVING SUM(ventas.cantidad) > 0
@@ -383,6 +384,31 @@ router.put("/:id", requiereJefe, async (req, res) => {
 });
 
 // Eliminar un producto existente.
+/* Papelera: «Eliminar» oculta el producto (no borra nada) y se puede restaurar.
+   GET /papelera: los productos en la papelera, del más reciente al más antiguo. */
+router.get("/papelera", requiereJefe, async (req, res) => {
+    try {
+        const resultado = await pool.query(
+            `SELECT productos.id, productos.codigo, productos.nombre, productos.stock,
+                    productos.precio,
+                    (productos.foto IS NOT NULL OR productos.foto_r2 IS NOT NULL) AS "tieneFoto",
+                    COALESCE(EXTRACT(EPOCH FROM productos.foto_actualizada)::BIGINT, 0)::INT AS "fotoVersion",
+                    TO_CHAR(productos.eliminado_en, 'YYYY-MM-DD"T"HH24:MI:SS') AS "eliminadoEn",
+                    usuarios.nombre AS "eliminadoPor",
+                    EXISTS (SELECT 1 FROM ventas WHERE ventas.producto_id = productos.id) AS "tieneVentas"
+             FROM productos
+             LEFT JOIN usuarios ON usuarios.id = productos.eliminado_por
+             WHERE productos.eliminado_en IS NOT NULL
+             ORDER BY productos.eliminado_en DESC`
+        );
+        res.json(resultado.rows);
+    } catch (error) {
+        console.error("Error al consultar la papelera:", error.message);
+        res.status(500).json({ error: "No se pudo consultar la papelera." });
+    }
+});
+
+// Mandar un producto a la papelera (se oculta de la app y del catálogo).
 router.delete("/:id", requiereJefe, async (req, res) => {
     const id = leerId(req);
 
@@ -392,8 +418,11 @@ router.delete("/:id", requiereJefe, async (req, res) => {
 
     try {
         const resultado = await pool.query(
-            `DELETE FROM productos WHERE id = $1 RETURNING id, nombre`,
-            [id]
+            `UPDATE productos
+             SET eliminado_en = CURRENT_TIMESTAMP AT TIME ZONE 'America/Lima', eliminado_por = $2
+             WHERE id = $1 AND eliminado_en IS NULL
+             RETURNING id, nombre`,
+            [id, req.session.usuario.id]
         );
 
         if (resultado.rows.length === 0) {
@@ -401,18 +430,71 @@ router.delete("/:id", requiereJefe, async (req, res) => {
         }
 
         res.json({
-            mensaje: "Producto eliminado correctamente",
+            mensaje: "Producto enviado a la papelera. Puedes restaurarlo desde la papelera del inventario.",
             producto: resultado.rows[0]
         });
     } catch (error) {
+        console.error("Error al eliminar el producto:", error.message);
+        res.status(500).json({ error: "Error al eliminar el producto" });
+    }
+});
+
+// Sacar un producto de la papelera: vuelve tal cual estaba (stock, fotos, colores, historial).
+router.post("/:id/restaurar", requiereJefe, async (req, res) => {
+    const id = leerId(req);
+
+    if (!id) {
+        return res.status(400).json({ error: "ID de producto inválido" });
+    }
+
+    try {
+        const resultado = await pool.query(
+            `UPDATE productos SET eliminado_en = NULL, eliminado_por = NULL
+             WHERE id = $1 AND eliminado_en IS NOT NULL
+             RETURNING id, nombre`,
+            [id]
+        );
+
+        if (resultado.rows.length === 0) {
+            return res.status(404).json({ error: "Ese producto no está en la papelera." });
+        }
+
+        res.json({ mensaje: `«${resultado.rows[0].nombre}» volvió al inventario.`, producto: resultado.rows[0] });
+    } catch (error) {
+        console.error("Error al restaurar el producto:", error.message);
+        res.status(500).json({ error: "No se pudo restaurar el producto." });
+    }
+});
+
+/* Borrar para siempre (solo desde la papelera). Si el producto tiene ventas, no se puede:
+   las ventas necesitan saber qué se vendió; se queda en la papelera. */
+router.delete("/:id/definitivo", requiereJefe, async (req, res) => {
+    const id = leerId(req);
+
+    if (!id) {
+        return res.status(400).json({ error: "ID de producto inválido" });
+    }
+
+    try {
+        const resultado = await pool.query(
+            `DELETE FROM productos WHERE id = $1 AND eliminado_en IS NOT NULL RETURNING id, nombre`,
+            [id]
+        );
+
+        if (resultado.rows.length === 0) {
+            return res.status(404).json({ error: "Ese producto no está en la papelera." });
+        }
+
+        res.json({ mensaje: `«${resultado.rows[0].nombre}» se borró para siempre.`, producto: resultado.rows[0] });
+    } catch (error) {
         if (error.code === "23503") {
             return res.status(409).json({
-                error: "No se puede eliminar: este producto tiene ventas registradas. Puedes dejar su stock en 0."
+                error: "No se puede borrar para siempre: tiene ventas registradas. Puede quedarse en la papelera sin problema."
             });
         }
 
-        console.error("Error al eliminar el producto:", error.message);
-        res.status(500).json({ error: "Error al eliminar el producto" });
+        console.error("Error al borrar el producto:", error.message);
+        res.status(500).json({ error: "No se pudo borrar el producto." });
     }
 });
 

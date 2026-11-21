@@ -10413,3 +10413,66 @@ body.sin-desplazamiento {
     margin: 0;
     -webkit-appearance: none;
 }
+
+/* ===== Inventario: papelera ===== */
+.acciones-inventario {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.lista-papelera {
+    display: grid;
+    gap: 8px;
+    margin: 12px 0;
+    padding: 0;
+    list-style: none;
+}
+
+.lista-papelera li {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    border: 1px solid var(--morado-200);
+    border-radius: 12px;
+    background: #ffffff;
+}
+
+.papelera-datos {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.papelera-datos strong {
+    color: var(--morado-900);
+    overflow-wrap: anywhere;
+}
+
+.papelera-datos small {
+    color: var(--texto-suave);
+    font-size: 0.78rem;
+}
+
+.papelera-acciones {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.boton-borrar-siempre {
+    color: #b91c1c;
+    font-size: 0.82rem;
+}
+
+.papelera-vacia {
+    margin: 18px 0;
+    color: var(--texto-suave);
+    text-align: center;
+}

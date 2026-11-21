@@ -8,6 +8,7 @@ import IngresarMercaderia from "./IngresarMercaderia.jsx";
 import MovimientosProducto from "./MovimientosProducto.jsx";
 import ConteoProducto from "./ConteoProducto.jsx";
 import AgregarAVenta from "./AgregarAVenta.jsx";
+import Papelera from "./Papelera.jsx";
 import { normalizar } from "../texto.js";
 import { buscadorDeProductos, buscarProductos } from "../busqueda.js";
 import { STOCK_ALERTA } from "../producto.js";
@@ -130,6 +131,7 @@ export default function Inventario({
     const [aviso, setAviso] = useState("");
     // Producto que se está agregando a la venta en curso.
     const [vendiendo, setVendiendo] = useState(null);
+    const [viendoPapelera, setViendoPapelera] = useState(false);
     const piezasVenta = carritoVenta.reduce((suma, item) => suma + item.cantidad, 0);
     const totalVenta = carritoVenta.reduce((suma, item) => suma + item.precio * item.cantidad, 0);
 
@@ -174,14 +176,16 @@ export default function Inventario({
     }
 
     async function eliminar(producto) {
-        if (!confirm(`¿Seguro que deseas eliminar "${producto.nombre}"?`)) {
+        if (!confirm(`¿Enviar "${producto.nombre}" a la papelera? Podrás restaurarlo cuando quieras.`)) {
             return;
         }
 
         try {
             await pedir(`/api/productos/${producto.id}`, { method: "DELETE" });
+            setInfoId(null);
+            setAbiertoId(null);
             await onCambio();
-            alert("Producto eliminado correctamente.");
+            setAviso(`${producto.nombre} se envió a la papelera. Si fue un error, ábrela y toca «Restaurar».`);
         } catch (error) {
             onError(error, () => alert(error.message));
         }
@@ -208,10 +212,17 @@ export default function Inventario({
             <section className={`tarjeta inventario ${parte === "2025" ? "inventario-2025" : ""}`}>
                 <div className="encabezado-inventario">
                     <h2>{parte === "2025" ? "Inventario 2025" : "Inventario nuevo"}</h2>
-                    {esJefe && onRegistrar && (
-                        <button type="button" className="boton-secundario boton-pequeno" onClick={onRegistrar}>
-                            ➕ Registrar producto
-                        </button>
+                    {esJefe && (
+                        <div className="acciones-inventario">
+                            {onRegistrar && (
+                                <button type="button" className="boton-secundario boton-pequeno" onClick={onRegistrar}>
+                                    ➕ Registrar producto
+                                </button>
+                            )}
+                            <button type="button" className="boton-secundario boton-pequeno" onClick={() => setViendoPapelera(true)}>
+                                🗑️ Papelera
+                            </button>
+                        </div>
                     )}
                 </div>
                 {parte === "2025" && esJefe && (
@@ -469,6 +480,10 @@ export default function Inventario({
                         Ir a cobrar →
                     </button>
                 </div>
+            )}
+
+            {viendoPapelera && (
+                <Papelera onCambio={onCambio} onError={onError} onCerrar={() => setViendoPapelera(false)} />
             )}
 
             {ingresando && (

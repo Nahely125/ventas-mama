@@ -80,7 +80,7 @@ async function registrarCompra(client, datos, usuarioId) {
     }
 
     const fila = await client.query(
-        `SELECT id, nombre, stock, stock_2025, precio_compra FROM productos WHERE id = $1 FOR UPDATE`,
+        `SELECT id, nombre, stock, stock_2025, precio_compra FROM productos WHERE id = $1 AND eliminado_en IS NULL FOR UPDATE`,
         [productoId]
     );
     const producto = fila.rows[0];

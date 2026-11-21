@@ -59,7 +59,7 @@ router.get("/catalogo", async (req, res) => {
              FROM productos
              LEFT JOIN secciones ON productos.seccion_id = secciones.id
              LEFT JOIN vendidos ON vendidos.producto_id = productos.id
-             WHERE productos.seccion_id IS NULL OR secciones.visible
+             WHERE (productos.seccion_id IS NULL OR secciones.visible) AND productos.eliminado_en IS NULL
              ORDER BY (productos.stock > 0) DESC, productos.nombre`
         );
 

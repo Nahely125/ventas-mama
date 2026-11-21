@@ -14,14 +14,14 @@ const COLUMNAS = `
     secciones.tema,
     secciones.visible,
     secciones.orden,
-    (SELECT COUNT(*)::INT FROM productos WHERE productos.seccion_id = secciones.id) AS "totalProductos",
+    (SELECT COUNT(*)::INT FROM productos WHERE productos.seccion_id = secciones.id AND productos.eliminado_en IS NULL) AS "totalProductos",
     COALESCE((
         SELECT JSON_AGG(JSON_BUILD_OBJECT(
             'id', categorias.id,
             'nombre', categorias.nombre,
             'icono', categorias.icono,
             'orden', categorias.orden,
-            'totalProductos', (SELECT COUNT(*) FROM productos WHERE productos.categoria_id = categorias.id)
+            'totalProductos', (SELECT COUNT(*) FROM productos WHERE productos.categoria_id = categorias.id AND productos.eliminado_en IS NULL)
         ) ORDER BY categorias.orden, categorias.nombre)
         FROM categorias
         WHERE categorias.seccion_id = secciones.id

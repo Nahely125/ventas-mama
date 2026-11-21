@@ -195,7 +195,7 @@ router.post("/validar-obsequio", requiereSesion, async (req, res) => {
         const resultado = await pool.query(
             `SELECT id, nombre, stock_2025, precio_docena, precio_compra, ${OBSEQUIABLE} AS obsequiable
              FROM productos
-             WHERE id = ANY($1::int[])`,
+             WHERE id = ANY($1::int[]) AND eliminado_en IS NULL`,
             [[...new Set(obsequios.map((o) => o.productoId))]]
         );
         const productos = new Map(resultado.rows.map((p) => [p.id, p]));
@@ -313,7 +313,7 @@ router.post("/", requiereSesion, async (req, res) => {
             `SELECT id, nombre, precio_minimo, precio_minimo_docena, precio_docena, precio_compra, stock, stock_2025,
                     ${OBSEQUIABLE} AS obsequiable
              FROM productos
-             WHERE id = ANY($1::int[])
+             WHERE id = ANY($1::int[]) AND eliminado_en IS NULL
              ORDER BY id
              FOR UPDATE`,
             [ids]

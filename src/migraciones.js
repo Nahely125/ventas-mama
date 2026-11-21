@@ -417,6 +417,10 @@ const MIGRACIONES = `
         INNER JOIN pagos_venta ON pagos_venta.grupo = ventas.grupo
         WHERE ventas.metodo_pago = 'mixto';
 
+    -- Papelera: un producto «eliminado» se oculta (eliminado_en) y se puede restaurar.
+    ALTER TABLE productos ADD COLUMN IF NOT EXISTS eliminado_en TIMESTAMP;
+    ALTER TABLE productos ADD COLUMN IF NOT EXISTS eliminado_por INTEGER REFERENCES usuarios(id) ON DELETE SET NULL;
+
     -- Registro de los cambios de datos que solo deben hacerse una vez.
     CREATE TABLE IF NOT EXISTS migraciones_unicas (
         nombre VARCHAR(100) PRIMARY KEY,

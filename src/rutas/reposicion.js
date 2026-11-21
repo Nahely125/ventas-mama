@@ -47,11 +47,12 @@ async function leerLista(consulta = pool) {
              FROM reposicion
              INNER JOIN productos ON productos.id = reposicion.producto_id
              LEFT JOIN producto_colores ON producto_colores.id = reposicion.color_id
+             WHERE productos.eliminado_en IS NULL
              ORDER BY reposicion.comprar DESC, productos.stock ASC, productos.nombre, producto_colores.nombre`
         ),
         consulta.query(
             `SELECT COUNT(*)::INT AS total FROM productos
-             WHERE stock < $1 AND NOT EXISTS (SELECT 1 FROM reposicion WHERE reposicion.producto_id = productos.id)`,
+             WHERE stock < $1 AND eliminado_en IS NULL AND NOT EXISTS (SELECT 1 FROM reposicion WHERE reposicion.producto_id = productos.id)`,
             [STOCK_ALERTA]
         )
     ]);
@@ -97,7 +98,7 @@ router.post("/", async (req, res) => {
     }
 
     try {
-        const fila = await pool.query(`SELECT id, stock, unidades_por_caja FROM productos WHERE id = $1`, [productoId]);
+        const fila = await pool.query(`SELECT id, stock, unidades_por_caja FROM productos WHERE id = $1 AND eliminado_en IS NULL`, [productoId]);
         const producto = fila.rows[0];
 
         if (!producto) {
@@ -136,7 +137,8 @@ router.post("/sugerir", async (req, res) => {
              SELECT id, CASE WHEN unidades_por_caja > 1 THEN unidades_por_caja ELSE GREATEST(12 - stock, 1) END, $2,
                     unidades_por_caja > 1
              FROM productos
-             WHERE stock < $1 AND NOT EXISTS (SELECT 1 FROM reposicion WHERE reposicion.producto_id = productos.id)
+             WHERE stock < $1 AND eliminado_en IS NULL
+               AND NOT EXISTS (SELECT 1 FROM reposicion WHERE reposicion.producto_id = productos.id)
              ON CONFLICT DO NOTHING`,
             [STOCK_ALERTA, req.session.usuario.id]
         );

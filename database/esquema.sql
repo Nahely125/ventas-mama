@@ -399,4 +399,10 @@ CREATE OR REPLACE VIEW ventas_metodos AS
     INNER JOIN pagos_venta ON pagos_venta.grupo = ventas.grupo
     WHERE ventas.metodo_pago = 'mixto';
 
+
+-- Papelera: un producto «eliminado» se oculta (eliminado_en) y se puede restaurar.
+ALTER TABLE productos ADD COLUMN IF NOT EXISTS eliminado_en TIMESTAMP;
+ALTER TABLE productos ADD COLUMN IF NOT EXISTS eliminado_por INTEGER REFERENCES usuarios(id) ON DELETE SET NULL;
+
+
 COMMIT;
