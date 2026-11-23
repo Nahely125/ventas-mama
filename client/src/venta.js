@@ -134,16 +134,13 @@ export function normalizarWhatsapp(numero) {
     return null;
 }
 
-/* Mensaje de WhatsApp que acompaña la boleta: agradecimiento, la boleta (con su enlace si se
-   manda por chat directo) e información del catálogo con su enlace. */
-export function mensajeBoleta(boleta, { conEnlace = true } = {}) {
+/* Mensaje de WhatsApp que va junto a la imagen de la boleta: agradecimiento e información
+   del catálogo con su enlace (la boleta va como imagen, no como enlace). */
+export function mensajeBoleta(boleta) {
     const lineas = [
         "Hola 👋 ¡Gracias por tu compra en Mil Deseos! 🎁",
-        `Te envío tu boleta N° ${numeroComprobante(boleta)} por ${moneda(boleta.total)}.`
+        `Aquí tienes tu boleta N° ${numeroComprobante(boleta)} por ${moneda(boleta.total)}.`
     ];
-
-    const enlace = enlaceBoleta(boleta);
-    if (conEnlace && enlace) lineas.push(`🧾 Ver boleta: ${enlace}`);
 
     lineas.push(
         "",

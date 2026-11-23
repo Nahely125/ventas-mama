@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { generarImagenComprobante } from "../imagenComprobante.js";
-import { enlaceBoleta, mensajeBoleta, normalizarWhatsapp, numeroComprobante } from "../venta.js";
+import { mensajeBoleta, normalizarWhatsapp, numeroComprobante } from "../venta.js";
 
 function descargar(archivo) {
     const url = URL.createObjectURL(archivo);
@@ -55,11 +55,17 @@ export default function Comprobante({ boleta: venta, onCerrar }) {
     );
 
     const numero = normalizarWhatsapp(telefono);
-    // Mensaje que acompaña la imagen (gracias + catálogo) y el del chat directo (además, el enlace a la boleta).
-    const textoImagen = mensajeBoleta(venta, { conEnlace: false });
-    const chatDirecto = numero
-        ? `https://wa.me/${numero}?text=${encodeURIComponent(mensajeBoleta(venta, { conEnlace: true }))}`
-        : null;
+    // Mensaje que va junto a la imagen de la boleta: gracias + información y enlace del catálogo.
+    const textoImagen = mensajeBoleta(venta);
+    const chatDirecto = numero ? `https://wa.me/${numero}?text=${encodeURIComponent(textoImagen)}` : null;
+
+    /* Copia la imagen de la boleta (para pegarla en el chat). Se llama dentro del mismo toque,
+       sin esperar nada antes, para que el iPhone lo permita. */
+    function copiarImagen() {
+        if (!archivo || !navigator.clipboard?.write || typeof ClipboardItem === "undefined") return false;
+        navigator.clipboard.write([new ClipboardItem({ [archivo.type]: archivo })]).catch(() => {});
+        return true;
+    }
 
     /* Enviar la boleta en imagen por WhatsApp.
        En el celular (iPhone o Android) se abre al instante la ventana de Compartir con la imagen y
@@ -74,9 +80,14 @@ export default function Comprobante({ boleta: venta, onCerrar }) {
         }
 
         if (puedeCompartirArchivos) {
+            // Por si WhatsApp no pone el texto junto a la imagen, el mensaje queda copiado para pegarlo.
+            navigator.clipboard?.writeText?.(textoImagen).catch(() => {});
             navigator
                 .share({ files: [archivo], text: textoImagen })
-                .then(() => setAviso({ tipo: "exito", texto: "✅ Listo. Si elegiste WhatsApp, la boleta ya va con el mensaje del catálogo." }))
+                .then(() => setAviso({
+                    tipo: "exito",
+                    texto: "✅ Listo. La boleta va con el mensaje del catálogo. Si en WhatsApp no apareció el texto, mantén presionado el cuadro de mensaje y toca «Pegar»."
+                }))
                 .catch((error) => {
                     if (error.name !== "AbortError") {
                         setAviso({ tipo: "error", texto: "No se pudo abrir Compartir. Prueba con «Abrir chat del cliente»." });
@@ -105,7 +116,6 @@ export default function Comprobante({ boleta: venta, onCerrar }) {
         }
     }
 
-    const enlace = enlaceBoleta(venta);
 
     return (
         <dialog
@@ -149,15 +159,30 @@ export default function Comprobante({ boleta: venta, onCerrar }) {
                             value={telefono}
                             onChange={(e) => setTelefono(e.target.value)}
                         />
-                        {/* Es un enlace (no un botón con espera): el iPhone lo abre directo en WhatsApp. */}
+                        {/* Es un enlace (no un botón con espera): el iPhone lo abre directo en WhatsApp.
+                            Al tocarlo se copia la imagen de la boleta para pegarla en ese chat. */}
                         {chatDirecto ? (
-                            <a className="boton-secundario boton-chat-directo" href={chatDirecto} target="_blank" rel="noopener noreferrer">
+                            <a
+                                className="boton-secundario boton-chat-directo"
+                                href={chatDirecto}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={() => {
+                                    const copiada = copiarImagen();
+                                    setAviso({
+                                        tipo: "exito",
+                                        texto: copiada
+                                            ? "Se abrió el chat con el mensaje del catálogo y la boleta quedó copiada: envía el mensaje y luego mantén presionado el cuadro de mensaje → «Pegar» para enviar la imagen."
+                                            : "Se abrió el chat con el mensaje del catálogo. Para la imagen, usa «Enviar boleta por WhatsApp»."
+                                    });
+                                }}
+                            >
                                 💬 Abrir chat de {telefono.trim()}
                             </a>
                         ) : (
                             telefono.trim() && <span className="ayuda-campo texto-aviso">Revisa el número: 9 dígitos (Perú) o con código de país.</span>
                         )}
-                        <span className="ayuda-campo">El mensaje lleva el enlace a la boleta y al catálogo.</span>
+                        <span className="ayuda-campo">Se abre el chat con el mensaje del catálogo y la imagen de la boleta queda copiada para pegarla.</span>
                     </div>
                 </div>
 
@@ -165,7 +190,7 @@ export default function Comprobante({ boleta: venta, onCerrar }) {
                     {vistaPrevia ? (
                         <img src={vistaPrevia} alt={`Boleta de venta N° ${numeroComprobante(venta)}`} />
                     ) : errorImagen ? (
-                        <p className="mensaje mensaje-error">No se pudo crear la imagen. Puedes enviar el enlace de la boleta.</p>
+                        <p className="mensaje mensaje-error">No se pudo crear la imagen de la boleta. Cierra y vuelve a abrirla.</p>
                     ) : (
                         <p className="cargando-imagen">
                             <span className="spinner" aria-hidden="true"></span> Preparando imagen...
@@ -183,15 +208,13 @@ export default function Comprobante({ boleta: venta, onCerrar }) {
                             ⬇️ Descargar imagen
                         </button>
                     )}
-                    {enlace && (
-                        <button
-                            type="button"
-                            className="boton-secundario boton-pequeno"
-                            onClick={() => copiar(mensajeBoleta(venta, { conEnlace: true }), "Mensaje con el enlace de la boleta copiado.")}
-                        >
-                            🔗 Copiar mensaje con enlace
-                        </button>
-                    )}
+                    <button
+                        type="button"
+                        className="boton-secundario boton-pequeno"
+                        onClick={() => copiar(textoImagen, "Mensaje del catálogo copiado.")}
+                    >
+                        📋 Copiar mensaje del catálogo
+                    </button>
                 </div>
 
                 <button type="button" className="boton-principal" onClick={onCerrar}>
