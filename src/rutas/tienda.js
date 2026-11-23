@@ -221,6 +221,9 @@ router.put("/", requiereJefe, async (req, res) => {
 });
 
 // Foto de portada o logo (pública: la usa el catálogo).
+// Última imagen de la tienda enviada con directo=1 (el logo de la boleta). Cambia de nombre al subir otra.
+let logoDirecto = null;
+
 router.get("/imagen/:clave", async (req, res) => {
     if (!IMAGENES[req.params.clave]) {
         return res.status(404).end();
@@ -244,7 +247,11 @@ router.get("/imagen/:clave", async (req, res) => {
         // directo=1: se envía desde aquí aunque esté en R2 (la boleta dibuja el logo y solo puede
         // usar imágenes de la misma dirección de la app).
         if (imagen.clave_r2 && req.query.directo === "1") {
-            return res.type(imagen.tipo).send(await almacen.descargar(imagen.clave_r2));
+            // El logo se guarda en memoria (pesa poco): no se descarga de R2 en cada boleta.
+            if (logoDirecto?.clave !== imagen.clave_r2) {
+                logoDirecto = { clave: imagen.clave_r2, datos: await almacen.descargar(imagen.clave_r2) };
+            }
+            return res.type(imagen.tipo).send(logoDirecto.datos);
         }
 
         if (imagen.clave_r2) {

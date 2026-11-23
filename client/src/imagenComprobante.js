@@ -753,7 +753,7 @@ export async function generarImagenComprobante(boleta) {
             (resultado) => (resultado ? resolver(resultado) : rechazar(new Error("No se pudo crear la imagen."))),
             // JPG: pesa varias veces menos que PNG y se comparte más rápido por WhatsApp.
             "image/jpeg",
-            0.9
+            0.84
         )
     );
 

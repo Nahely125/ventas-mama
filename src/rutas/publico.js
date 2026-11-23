@@ -76,7 +76,17 @@ router.get("/catalogo", async (req, res) => {
    - logoVersion: el logo subido en «Página web» (o null: se usa el monograma «MD»);
    - masVendidos: hasta 8 productos con foto de esa campaña, los más vendidos de los últimos 90 días
      (si faltan, los más recientes), sin los de la papelera. */
+// Se recuerdan 5 minutos: abrir varias boletas seguidas no vuelve a consultar la base.
+const RECORDAR_EXTRAS_MS = 5 * 60 * 1000;
+let extrasRecordados = null; // { datos, hasta }
+
 router.get("/boleta-extras", async (req, res) => {
+    res.set("Cache-Control", "public, max-age=300");
+
+    if (extrasRecordados && extrasRecordados.hasta > Date.now()) {
+        return res.json(extrasRecordados.datos);
+    }
+
     try {
         const [campanas, logo] = await Promise.all([
             pool.query(
@@ -104,12 +114,13 @@ router.get("/boleta-extras", async (req, res) => {
             [campana?.id ?? null]
         );
 
-        res.set("Cache-Control", "public, max-age=300");
-        res.json({
+        const datos = {
             campana,
             logoVersion: logo.rows[0] ? String(logo.rows[0].version) : null,
             masVendidos: productos.rows.map((p) => ({ ...p, precio: Number(p.precio).toFixed(2) }))
-        });
+        };
+        extrasRecordados = { datos, hasta: Date.now() + RECORDAR_EXTRAS_MS };
+        res.json(datos);
     } catch (error) {
         console.error("Error al consultar los datos de la boleta:", error.message);
         res.status(500).json({ error: "No se pudieron consultar los datos de la boleta." });
