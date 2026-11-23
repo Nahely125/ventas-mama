@@ -71,28 +71,48 @@ router.get("/catalogo", async (req, res) => {
     }
 });
 
-/* Fotos para decorar la boleta: hasta 8 productos con foto (primero los más vendidos de los
-   últimos 90 días, luego los más recientes), sin los de la papelera. */
-router.get("/fotos-boleta", async (req, res) => {
+/* Lo que la boleta necesita además de la venta:
+   - campana: la campaña actual (la primera feria visible del catálogo) con su descripción;
+   - logoVersion: el logo subido en «Página web» (o null: se usa el monograma «MD»);
+   - masVendidos: hasta 8 productos con foto de esa campaña, los más vendidos de los últimos 90 días
+     (si faltan, los más recientes), sin los de la papelera. */
+router.get("/boleta-extras", async (req, res) => {
     try {
-        const resultado = await pool.query(
-            `SELECT productos.id,
+        const [campanas, logo] = await Promise.all([
+            pool.query(
+                `SELECT id, nombre, descripcion, tema FROM secciones WHERE visible ORDER BY orden, id LIMIT 1`
+            ),
+            pool.query(`SELECT EXTRACT(EPOCH FROM actualizada)::BIGINT AS version FROM tienda_imagenes WHERE clave = 'logo'`)
+        ]);
+        const campana = campanas.rows[0] ?? null;
+
+        const productos = await pool.query(
+            `SELECT productos.id, productos.nombre, productos.precio,
                     COALESCE(EXTRACT(EPOCH FROM productos.foto_actualizada)::BIGINT, 0)::INT AS "fotoVersion"
              FROM productos
+             LEFT JOIN categorias ON categorias.id = productos.categoria_id
              LEFT JOIN (
                 SELECT producto_id, SUM(cantidad) AS unidades FROM ventas
-                WHERE anulada_en IS NULL AND fecha >= CURRENT_DATE - 90
+                WHERE anulada_en IS NULL AND NOT obsequio AND fecha >= CURRENT_DATE - 90
                 GROUP BY producto_id
              ) vendidos ON vendidos.producto_id = productos.id
-             WHERE (productos.foto IS NOT NULL OR productos.foto_r2 IS NOT NULL) AND productos.eliminado_en IS NULL
-             ORDER BY vendidos.unidades DESC NULLS LAST, productos.foto_actualizada DESC NULLS LAST
-             LIMIT 8`
+             WHERE (productos.foto IS NOT NULL OR productos.foto_r2 IS NOT NULL)
+               AND productos.eliminado_en IS NULL AND productos.stock > 0
+               AND ($1::INT IS NULL OR COALESCE(categorias.seccion_id, productos.seccion_id) = $1)
+             ORDER BY vendidos.unidades DESC NULLS LAST, productos.creado_en DESC NULLS LAST, productos.id DESC
+             LIMIT 8`,
+            [campana?.id ?? null]
         );
+
         res.set("Cache-Control", "public, max-age=300");
-        res.json(resultado.rows);
+        res.json({
+            campana,
+            logoVersion: logo.rows[0] ? String(logo.rows[0].version) : null,
+            masVendidos: productos.rows.map((p) => ({ ...p, precio: Number(p.precio).toFixed(2) }))
+        });
     } catch (error) {
-        console.error("Error al consultar las fotos de la boleta:", error.message);
-        res.status(500).json({ error: "No se pudieron consultar las fotos." });
+        console.error("Error al consultar los datos de la boleta:", error.message);
+        res.status(500).json({ error: "No se pudieron consultar los datos de la boleta." });
     }
 });
 

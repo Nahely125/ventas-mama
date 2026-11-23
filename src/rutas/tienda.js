@@ -241,6 +241,12 @@ router.get("/imagen/:clave", async (req, res) => {
         // Con versión en la dirección se guarda en caché mucho tiempo (cambia al subir otra).
         res.set("Cache-Control", req.query.v ? "public, max-age=31536000, immutable" : "public, max-age=300");
 
+        // directo=1: se envía desde aquí aunque esté en R2 (la boleta dibuja el logo y solo puede
+        // usar imágenes de la misma dirección de la app).
+        if (imagen.clave_r2 && req.query.directo === "1") {
+            return res.type(imagen.tipo).send(await almacen.descargar(imagen.clave_r2));
+        }
+
         if (imagen.clave_r2) {
             return res.redirect(302, almacen.direccionPublica(imagen.clave_r2));
         }
