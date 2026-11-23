@@ -134,19 +134,31 @@ export function normalizarWhatsapp(numero) {
     return null;
 }
 
-/* Mensaje de WhatsApp que va junto a la imagen de la boleta: agradecimiento e información
-   del catálogo con su enlace (la boleta va como imagen, no como enlace). */
-export function mensajeBoleta(boleta) {
+const ICONO_CAMPANA = { navidad: "🎄", escolar: "🎒" };
+
+// Campaña actual: la primera feria visible en el catálogo (por su orden), o null si no hay.
+export function campanaActual(secciones) {
+    return [...(secciones ?? [])]
+        .filter((s) => s.visible)
+        .sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0))[0] ?? null;
+}
+
+/* Mensaje de WhatsApp de la boleta: agradecimiento y solo la campaña actual con el enlace al
+   catálogo. conEnlace: añade el enlace para ver la boleta (cuando no se puede mandar la imagen). */
+export function mensajeBoleta(boleta, { campana = null, conEnlace = false } = {}) {
     const lineas = [
         "Hola 👋 ¡Gracias por tu compra en Mil Deseos! 🎁",
-        `Aquí tienes tu boleta N° ${numeroComprobante(boleta)} por ${moneda(boleta.total)}.`
+        `Tu boleta N° ${numeroComprobante(boleta)} por ${moneda(boleta.total)}.`
     ];
 
-    lineas.push(
-        "",
-        `🛍️ Mira nuestro catálogo: ${enlaceCatalogo()}`,
-        "Adornos y árboles navideños, luces y útiles escolares (Porta, School, Children, Recreo y Disney), al por mayor y menor. Elige por unidad, media docena o docena y haz tu pedido por WhatsApp. ✨"
-    );
+    const enlace = enlaceBoleta(boleta);
+    if (conEnlace && enlace) lineas.push(`🧾 Mírala aquí: ${enlace}`);
+
+    lineas.push("");
+    if (campana) {
+        lineas.push(`${ICONO_CAMPANA[campana.tema] ?? "✨"} ${campana.nombre}${campana.descripcion ? `: ${campana.descripcion}` : ""}`);
+    }
+    lineas.push(`Mira el catálogo 👉 ${enlaceCatalogo()}`);
 
     return lineas.join("\n");
 }

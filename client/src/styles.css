@@ -10662,3 +10662,62 @@ body.sin-desplazamiento {
     text-align: center;
     text-decoration: none;
 }
+
+/* ===== Comprobante: envío sencillo ===== */
+.envio-numero {
+    display: grid;
+    gap: 6px;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px dashed var(--morado-200);
+}
+
+.envio-numero label {
+    color: var(--morado-900);
+    font-size: 0.88rem;
+    font-weight: 600;
+}
+
+.envio-numero-fila {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+}
+
+.envio-numero-fila input {
+    min-width: 0;
+}
+
+.envio-numero .boton-chat-directo {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+    padding: 0 16px;
+    white-space: nowrap;
+}
+
+.boton-chat-directo.inactivo {
+    opacity: 0.45;
+    pointer-events: none;
+}
+
+.boton-listo-comprobante {
+    display: block;
+    margin: 12px auto 0;
+}
+
+.modal-contenido > .boton-whatsapp-grande {
+    width: 100%;
+    margin-top: 12px;
+}
+
+/* La vista previa de la boleta no empuja el botón de enviar fuera de la pantalla. */
+.vista-previa-comprobante img {
+    display: block;
+    width: auto;
+    max-width: 100%;
+    max-height: 46vh;
+    margin: 0 auto;
+    object-fit: contain;
+}
