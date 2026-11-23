@@ -92,6 +92,7 @@ function consultar(clave) {
 function olvidarFoto(id) {
     sacar(`${id}:foto`);
     sacar(`${id}:mini`);
+    sacar(`${id}:mini:directo`);
 }
 
 function responder(res, foto, versionPedida) {
@@ -109,12 +110,15 @@ function responder(res, foto, versionPedida) {
 // Pesa casi nada: solo la dirección, no la foto.
 const PESO_REDIRECCION = 200;
 
-// GET /api/productos/:id/foto?v=<versión>[&tam=mini] (pública: inventario y catálogo).
+/* GET /api/productos/:id/foto?v=<versión>[&tam=mini][&directo=1] (pública: inventario y catálogo).
+   directo=1 (solo miniaturas): la envía desde aquí aunque esté en R2, sin redirigir. Lo usa la
+   boleta, que dibuja las fotos de los productos y solo puede usar imágenes de la misma dirección. */
 async function enviarFoto(req, res) {
     const id = leerId(req);
     const mini = req.query.tam === "mini" && Boolean(sharp);
+    const directo = mini && req.query.directo === "1";
     const versionPedida = Number(req.query.v);
-    const clave = `${id}:${mini ? "mini" : "foto"}`;
+    const clave = `${id}:${mini ? "mini" : "foto"}${directo ? ":directo" : ""}`;
 
     if (!id) {
         return res.status(404).end();
@@ -140,6 +144,12 @@ async function enviarFoto(req, res) {
 
         if (!fila) {
             return res.status(404).end();
+        }
+
+        if (fila.foto_r2 && almacen.activo && directo) {
+            const foto = { version: fila.version, tipo: "image/jpeg", datos: await almacen.descargar(almacen.claveMini(fila.foto_r2)) };
+            recordar(clave, foto);
+            return responder(res, foto, versionPedida);
         }
 
         if (fila.foto_r2 && almacen.activo) {

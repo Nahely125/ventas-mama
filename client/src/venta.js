@@ -1,4 +1,5 @@
 import { moneda } from "./api.js";
+import { fraseDeBoleta } from "./frases.js";
 
 export const METODOS_PAGO = [
     { valor: "efectivo", nombre: "Efectivo", icono: "💵" },
@@ -154,7 +155,7 @@ export function mensajeBoleta(boleta, { campana = null, conEnlace = false } = {}
     const enlace = enlaceBoleta(boleta);
     if (conEnlace && enlace) lineas.push(`🧾 Mírala aquí: ${enlace}`);
 
-    lineas.push("");
+    lineas.push("", `✨ «${fraseDeBoleta(boleta.numero)}»`, "");
     if (campana) {
         lineas.push(`${ICONO_CAMPANA[campana.tema] ?? "✨"} ${campana.nombre}${campana.descripcion ? `: ${campana.descripcion}` : ""}`);
     }

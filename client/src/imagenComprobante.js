@@ -1,50 +1,57 @@
 import { moneda } from "./api.js";
 import { RECARGO_TARJETA, cobroConTarjeta } from "./datosPago.js";
+import { fraseDeBoleta } from "./frases.js";
 import { UNIDADES_MODALIDAD, enlaceCatalogo, importeItem, nombreCortoPago, nombreMetodoPago, precioCobrado } from "./venta.js";
 
-/* Imagen de la boleta para enviar por WhatsApp, con el diseño de la boleta impresa de Mil Deseos:
-   papel crema con acuarela, adornos navideños y mochilas, casillas de fecha, tabla
-   CANT. / DESCRIPCIÓN / P. UNIT. / IMPORTE y el total en su recuadro. */
+/* Imagen de la boleta para enviar por WhatsApp, con los colores de Mil Deseos (morado y dorado):
+   encabezado morado con la marca, fotos de los productos como decoración, la tabla de productos,
+   el total, una frase inspiradora (distinta en cada boleta) y el enlace al catálogo. */
 
 // Datos del negocio que van impresos en la boleta.
 export const NEGOCIO = {
     duena: "Carolina Rojas",
-    rubro: [
-        "VENTA DE PRODUCTOS NAVIDEÑOS (ZG) Y ESCOLARES (PORTA,",
-        "SCHOOL, CHILDREN, RECREO Y DISNEY) AL POR MAYOR Y MENOR"
-    ],
+    rubro: "Productos navideños (ZG) y escolares (Porta, School, Children, Recreo y Disney) · Por mayor y menor",
     telefono: "917303705"
 };
 
 const ANCHO = 707;
-const ESCALA = 2; // 1414 px de ancho: igual que la boleta impresa, nítida en el celular.
+const ESCALA = 2; // 1414 px de ancho: nítida en el celular.
+const MARGEN = 40;
+const DERECHA = ANCHO - MARGEN;
 
-// Columnas de la tabla (como en la boleta impresa).
-const X0 = 59;
-const COLUMNAS = [59, 134, 448, 543, 662];
-const ALTO_ENCABEZADO_TABLA = 66;
-const ALTO_FILA = 56;
-const FILAS_MINIMAS = 6;
+// Paleta de la app.
+const C = {
+    fondo: "#faf7ff",
+    fondo2: "#f3ecff",
+    morado900: "#3b1677",
+    morado800: "#4c1d95",
+    morado700: "#6d28d9",
+    morado200: "#e9d5ff",
+    morado150: "#ede9fe",
+    dorado: "#b8892f",
+    doradoClaro: "#f3d38b",
+    doradoOscuro: "#6b4e12",
+    tinta: "#241736",
+    suave: "#6b5b7a"
+};
 
-const TINTA = "#1f1a17";
-const SUAVE = "#5b4f47";
 const SERIF = "'Playfair Display', Georgia, serif";
 // Letra del texto: la del sistema (en el canvas se ve pareja y con el grosor correcto en todos los celulares).
 const SANS = "'Helvetica Neue', Helvetica, Arial, sans-serif";
 const CURSIVA = "'Great Vibes', 'Segoe Script', cursive";
 
-const ADORNOS = {
-    luces: { src: "/boleta/luces.png", x: 50, y: 0, ancho: 235 },
-    esferas: { src: "/boleta/esferas.png", x: 0, y: 29, ancho: 84 },
-    mochilas: { src: "/boleta/mochilas.png", x: 274, y: 14, ancho: 152 },
-    arbol: { src: "/boleta/arbol.png", x: 404, y: 62, ancho: 114 }
-};
+// Columnas de la tabla: cantidad (centro), descripción (inicio), precio e importe (bordes derechos).
+const COL = { cant: MARGEN + 24, desc: MARGEN + 60, precio: DERECHA - 118, importe: DERECHA - 14 };
+const ALTO_ENCABEZADO = 196;
+const RADIO_FOTO = 36;
+const MAXIMO_FOTOS = 6;
 
 function cargarImagen(src) {
     return new Promise((resolver) => {
         const imagen = new Image();
-        imagen.onload = () => resolver(imagen);
-        imagen.onerror = () => resolver(null); // Sin el adorno, la boleta igual sale.
+        const tiempo = setTimeout(() => resolver(null), 6000);
+        imagen.onload = () => { clearTimeout(tiempo); resolver(imagen); };
+        imagen.onerror = () => { clearTimeout(tiempo); resolver(null); }; // Sin esa foto, la boleta igual sale.
         imagen.src = src;
     });
 }
@@ -53,14 +60,47 @@ async function cargarFuentes() {
     try {
         await Promise.all([
             document.fonts?.load(`40px ${CURSIVA}`),
-            document.fonts?.load(`italic 800 34px Montserrat`),
             document.fonts?.load(`700 30px ${SERIF}`),
-            document.fonts?.load(`500 30px ${SERIF}`)
+            document.fonts?.load(`italic 500 30px ${SERIF}`),
+            document.fonts?.load(`600 30px ${SERIF}`)
         ]);
         await document.fonts?.ready;
     } catch {
         // Si una fuente no carga, se usa la de respaldo.
     }
+}
+
+/* Fotos para decorar: primero las de los productos de la venta y, si faltan, las de los más
+   vendidos de la tienda. Se piden desde la misma dirección de la app (directo=1) para poder dibujarlas. */
+async function fotosDecoracion(boleta) {
+    const elegidas = new Map();
+
+    for (const item of boleta.items ?? []) {
+        if (item.tieneFoto && item.productoId && !elegidas.has(item.productoId)) {
+            elegidas.set(item.productoId, item.fotoVersion ?? 0);
+        }
+    }
+
+    if (elegidas.size < MAXIMO_FOTOS) {
+        try {
+            const respuesta = await fetch("/api/publico/fotos-boleta");
+            if (respuesta.ok) {
+                for (const p of await respuesta.json()) {
+                    if (elegidas.size >= MAXIMO_FOTOS) break;
+                    if (!elegidas.has(p.id)) elegidas.set(p.id, p.fotoVersion ?? 0);
+                }
+            }
+        } catch {
+            // Sin conexión: solo las fotos de la venta.
+        }
+    }
+
+    const imagenes = await Promise.all(
+        [...elegidas.entries()].slice(0, MAXIMO_FOTOS).map(([id, version]) =>
+            cargarImagen(`/api/productos/${id}/foto?v=${version}&tam=mini&directo=1`)
+        )
+    );
+    return imagenes.filter(Boolean);
 }
 
 // Parte un texto en líneas que quepan en el ancho indicado.
@@ -82,7 +122,26 @@ function partirTexto(ctx, texto, anchoMaximo) {
     return lineas;
 }
 
-// Generador de números al azar con semilla: la acuarela sale igual en cada boleta.
+function redondeado(ctx, x, y, ancho, alto, radio) {
+    ctx.beginPath();
+    ctx.roundRect(x, y, ancho, alto, radio);
+}
+
+// Destello dorado de cuatro puntas (decoración).
+function destello(ctx, x, y, tamano, color) {
+    ctx.save();
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(x, y - tamano);
+    ctx.quadraticCurveTo(x, y, x + tamano, y);
+    ctx.quadraticCurveTo(x, y, x, y + tamano);
+    ctx.quadraticCurveTo(x, y, x - tamano, y);
+    ctx.quadraticCurveTo(x, y, x, y - tamano);
+    ctx.fill();
+    ctx.restore();
+}
+
+// Generador con semilla: los destellos salen en el mismo lugar en cada boleta.
 function azar(semilla) {
     let s = semilla;
     return () => {
@@ -91,81 +150,7 @@ function azar(semilla) {
     };
 }
 
-// Papel crema con manchas de acuarela salmón (como el fondo de la boleta impresa).
-function pintarPapel(ctx, alto) {
-    ctx.fillStyle = "#f6eee5";
-    ctx.fillRect(0, 0, ANCHO, alto);
-
-    const manchas = [
-        [ANCHO * 0.82, alto * 0.08, 260, "rgba(240, 196, 168, 0.45)"],
-        [ANCHO * 0.95, alto * 0.42, 300, "rgba(243, 206, 180, 0.35)"],
-        [ANCHO * 0.1, alto * 0.18, 220, "rgba(244, 214, 192, 0.35)"],
-        [ANCHO * 0.5, alto * 0.3, 260, "rgba(250, 244, 236, 0.55)"]
-    ];
-    for (const [x, y, radio, color] of manchas) {
-        const degradado = ctx.createRadialGradient(x, y, 0, x, y, radio);
-        degradado.addColorStop(0, color);
-        degradado.addColorStop(1, "rgba(246, 238, 229, 0)");
-        ctx.fillStyle = degradado;
-        ctx.fillRect(0, 0, ANCHO, alto);
-    }
-
-    // Gran trazo de acuarela en diagonal: de la izquierda (a media hoja) hasta abajo a la derecha.
-    const borde = (t) => ({
-        x: ANCHO * t,
-        y: alto * (0.47 + 0.47 * t) + Math.sin(t * 9) * 10
-    });
-    const aleatorio = azar(7);
-
-    for (let capa = 0; capa < 3; capa++) {
-        ctx.beginPath();
-        ctx.moveTo(0, alto);
-        for (let t = 0; t <= 1.0001; t += 0.05) {
-            const p = borde(t);
-            ctx.lineTo(p.x, p.y + capa * 14 + (aleatorio() - 0.5) * 8);
-        }
-        ctx.lineTo(ANCHO, alto);
-        ctx.closePath();
-        const relleno = ctx.createLinearGradient(ANCHO * 0.6, alto * 0.6, 0, alto);
-        relleno.addColorStop(0, `rgba(238, 168, 140, ${0.18 + capa * 0.08})`);
-        relleno.addColorStop(1, `rgba(228, 132, 102, ${0.3 + capa * 0.1})`);
-        ctx.fillStyle = relleno;
-        ctx.fill();
-    }
-
-    // Vetas más oscuras en el borde de la acuarela.
-    ctx.save();
-    ctx.lineCap = "round";
-    for (let veta = 0; veta < 5; veta++) {
-        ctx.beginPath();
-        const desplazamiento = 8 + veta * 9;
-        for (let t = 0; t <= 0.62; t += 0.03) {
-            const p = borde(t);
-            const y = p.y + desplazamiento + (aleatorio() - 0.5) * 6;
-            if (t === 0) ctx.moveTo(p.x, y);
-            else ctx.lineTo(p.x, y);
-        }
-        ctx.strokeStyle = `rgba(214, 112, 86, ${0.12 + aleatorio() * 0.12})`;
-        ctx.lineWidth = 1 + aleatorio() * 2.5;
-        ctx.stroke();
-    }
-    ctx.restore();
-}
-
-function lineaPunteada(ctx, x1, x2, y) {
-    ctx.save();
-    ctx.fillStyle = TINTA;
-    for (let x = x1; x < x2; x += 5) ctx.fillRect(x, y - 1, 1.6, 1.6);
-    ctx.restore();
-}
-
-function cuadro(ctx, x, y, ancho, alto) {
-    ctx.strokeStyle = TINTA;
-    ctx.lineWidth = 1.6;
-    ctx.strokeRect(x, y, ancho, alto);
-}
-
-// Fecha en hora de Lima: { dia, mes, anio }.
+// Fecha en hora de Lima: «23 / 11 / 2026».
 function fechaLima(fecha) {
     const partes = new Intl.DateTimeFormat("es-PE", {
         timeZone: "America/Lima",
@@ -174,7 +159,7 @@ function fechaLima(fecha) {
         year: "numeric"
     }).formatToParts(new Date(fecha));
     const valor = (tipo) => partes.find((p) => p.type === tipo)?.value ?? "";
-    return { dia: valor("day"), mes: valor("month"), anio: valor("year") };
+    return `${valor("day")} / ${valor("month")} / ${valor("year")}`;
 }
 
 // Cantidad (en paquetes si es docena o media) y descripción de cada producto.
@@ -197,249 +182,347 @@ function filaDeProducto(item) {
         cantidad,
         nombre: item.producto,
         extras,
-        precio: item.obsequio ? "—" : moneda(precioCobrado(item)).replace("S/ ", ""),
-        importe: item.obsequio ? "Gratis" : moneda(importeItem(item)).replace("S/ ", "")
+        precio: item.obsequio ? "—" : moneda(precioCobrado(item)),
+        importe: item.obsequio ? "Gratis" : moneda(importeItem(item))
     };
 }
 
-// Dibuja la boleta (uno o varios productos) y devuelve un archivo PNG listo para compartir.
+// Foto redonda con aro blanco y dorado (recortada al centro, sin deformarla).
+function fotoRedonda(ctx, imagen, x, y, radio) {
+    ctx.save();
+    ctx.shadowColor = "rgba(59, 22, 119, 0.28)";
+    ctx.shadowBlur = 14;
+    ctx.shadowOffsetY = 5;
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.arc(x, y, radio + 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x, y, radio, 0, Math.PI * 2);
+    ctx.clip();
+    const lado = Math.min(imagen.width, imagen.height);
+    ctx.drawImage(imagen, (imagen.width - lado) / 2, (imagen.height - lado) / 2, lado, lado, x - radio, y - radio, radio * 2, radio * 2);
+    ctx.restore();
+
+    ctx.strokeStyle = C.dorado;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(x, y, radio + 5, 0, Math.PI * 2);
+    ctx.stroke();
+}
+
+// Dibuja la boleta (uno o varios productos) y devuelve un archivo JPG listo para compartir.
 export async function generarImagenComprobante(boleta) {
-    const [, imagenes] = await Promise.all([
-        cargarFuentes(),
-        Promise.all(Object.entries(ADORNOS).map(async ([clave, a]) => [clave, await cargarImagen(a.src)]))
-    ]);
+    const [, fotos] = await Promise.all([cargarFuentes(), fotosDecoracion(boleta)]);
 
     const lienzo = document.createElement("canvas");
     const ctx = lienzo.getContext("2d");
 
-    // Medir las filas de productos (el nombre puede ocupar varias líneas).
-    const anchoDescripcion = COLUMNAS[2] - COLUMNAS[1] - 20;
+    // ---- Medidas (el alto depende de los productos, el pago y la frase) ----
+    const anchoDescripcion = COL.precio - 76 - COL.desc;
     ctx.font = `600 15px ${SANS}`;
     const filas = boleta.items.map((item) => {
         const fila = filaDeProducto(item);
         const lineas = partirTexto(ctx, fila.nombre, anchoDescripcion);
-        const alto = Math.max(ALTO_FILA, 22 + lineas.length * 19 + (fila.extras ? 18 : 0));
-        return { ...fila, lineas, alto };
+        return { ...fila, lineas, alto: 22 + lineas.length * 19 + (fila.extras ? 17 : 0) };
     });
-    const vacias = Math.max(FILAS_MINIMAS - filas.length, 0);
-    const altoFilas = filas.reduce((suma, f) => suma + f.alto, 0) + vacias * ALTO_FILA + ALTO_FILA; // + fila de «Gracias»
-    const inicioTabla = 258;
-    const finTabla = inicioTabla + ALTO_ENCABEZADO_TABLA + altoFilas;
-    const conDescuento = Number(boleta.ajuste?.monto ?? 0) > 0;
-    // Recuadro de abajo: quién atendió y cómo pagó (una línea por medio si pagó con varios).
+
     const pagosMixtos = boleta.metodoPago === "mixto" && Array.isArray(boleta.pagos) ? boleta.pagos : null;
-    const altoRecuadro = Math.max(60, 22 + (pagosMixtos ? 2 + pagosMixtos.length : 2) * 20);
-    // Pago con tarjeta (Izipay): el recargo y el total cobrado con él (en un pago mixto, sobre la parte con tarjeta).
     const baseTarjeta = boleta.metodoPago === "tarjeta"
         ? Number(boleta.total)
         : Number(pagosMixtos?.find((p) => p.metodo === "tarjeta")?.monto ?? 0);
     const tarjeta = baseTarjeta > 0 ? cobroConTarjeta(baseTarjeta) : null;
-    const altoPie = Math.max(altoRecuadro, 60 + (tarjeta ? 66 : 0));
-    const alto = finTabla + (conDescuento ? 50 : 0) + 140 + altoPie;
+    const conDescuento = Number(boleta.ajuste?.monto ?? 0) > 0;
+
+    const frase = fraseDeBoleta(boleta.numero);
+    ctx.font = `italic 500 19px ${SERIF}`;
+    const lineasFrase = partirTexto(ctx, `“${frase}”`, ANCHO - 2 * MARGEN - 80);
+
+    const conFotos = fotos.length > 0;
+    const inicioDatos = ALTO_ENCABEZADO + (conFotos ? RADIO_FOTO + 30 : 24);
+    const inicioTabla = inicioDatos + 64;
+    const altoFilas = filas.reduce((suma, f) => suma + f.alto, 0);
+    const finTabla = inicioTabla + 38 + altoFilas;
+    const lineasPago = pagosMixtos ? 1 + pagosMixtos.length : 2;
+    const altoPago = 22 + lineasPago * 20;
+    const altoTotales = (conDescuento ? 48 : 0) + 50 + (tarjeta ? 48 : 0);
+    const inicioPie = finTabla + 24;
+    const finPie = inicioPie + Math.max(altoPago, altoTotales);
+    const inicioFrase = finPie + 44;
+    const alto = inicioFrase + 30 + lineasFrase.length * 28 + 120;
 
     lienzo.width = ANCHO * ESCALA;
     lienzo.height = alto * ESCALA;
     ctx.scale(ESCALA, ESCALA);
     ctx.textBaseline = "alphabetic";
 
-    pintarPapel(ctx, alto);
+    // ---- Fondo lila ----
+    const fondo = ctx.createLinearGradient(0, 0, ANCHO, alto);
+    fondo.addColorStop(0, C.fondo);
+    fondo.addColorStop(1, C.fondo2);
+    ctx.fillStyle = fondo;
+    ctx.fillRect(0, 0, ANCHO, alto);
 
-    // Adornos
-    for (const [clave, imagen] of imagenes) {
-        if (!imagen) continue;
-        const a = ADORNOS[clave];
-        ctx.drawImage(imagen, a.x, a.y, a.ancho, (imagen.height / imagen.width) * a.ancho);
-    }
-
-    // Encabezado: dueña, marca y rubro
-    ctx.fillStyle = TINTA;
-    ctx.textAlign = "center";
-    ctx.font = `500 16px ${SANS}`;
-    ctx.fillText(`De: ${NEGOCIO.duena}`, 182, 62);
-    ctx.font = `italic 800 33px Montserrat, 'Arial Black', sans-serif`;
-    ctx.fillText("Mil Deseos", 186, 98);
-    ctx.font = `500 11px ${SANS}`;
-    NEGOCIO.rubro.forEach((linea, i) => ctx.fillText(linea, 242, 121 + i * 16));
-
-    // «BOLETA DE VENTA»
-    ctx.textAlign = "right";
-    ctx.font = `500 41px ${SERIF}`;
-    ctx.fillText("BOLETA DE", 662, 52);
-    ctx.fillText("VENTA", 662, 110);
-
-    // Casillas de fecha
-    const { dia, mes, anio } = fechaLima(boleta.fecha);
-    const xFecha = 520;
-    const anchoCasilla = 47.3;
-    cuadro(ctx, xFecha, 144, anchoCasilla * 3, 94);
+    // ---- Encabezado morado con borde curvo ----
+    const banda = ctx.createLinearGradient(0, 0, ANCHO, ALTO_ENCABEZADO);
+    banda.addColorStop(0, C.morado900);
+    banda.addColorStop(0.6, C.morado800);
+    banda.addColorStop(1, C.morado700);
+    ctx.fillStyle = banda;
     ctx.beginPath();
-    ctx.moveTo(xFecha, 191);
-    ctx.lineTo(xFecha + anchoCasilla * 3, 191);
-    for (let i = 1; i < 3; i++) {
-        ctx.moveTo(xFecha + anchoCasilla * i, 144);
-        ctx.lineTo(xFecha + anchoCasilla * i, 238);
+    ctx.moveTo(0, 0);
+    ctx.lineTo(ANCHO, 0);
+    ctx.lineTo(ANCHO, ALTO_ENCABEZADO - 18);
+    ctx.quadraticCurveTo(ANCHO / 2, ALTO_ENCABEZADO + 18, 0, ALTO_ENCABEZADO - 18);
+    ctx.closePath();
+    ctx.fill();
+
+    // Brillo suave y destellos dorados.
+    const brillo = ctx.createRadialGradient(ANCHO * 0.82, 30, 0, ANCHO * 0.82, 30, 260);
+    brillo.addColorStop(0, "rgba(243, 211, 139, 0.22)");
+    brillo.addColorStop(1, "rgba(243, 211, 139, 0)");
+    ctx.fillStyle = brillo;
+    ctx.fillRect(0, 0, ANCHO, ALTO_ENCABEZADO);
+    // Solo en zonas sin texto: la franja de arriba y debajo de la fecha.
+    const aleatorio = azar(11);
+    const zonas = [[300, 8, 160, 22], [460, 122, 220, 40], [12, 150, 20, 30]];
+    for (const [x, yZona, ancho, altoZona] of zonas) {
+        for (let i = 0; i < 4; i++) {
+            destello(ctx, x + aleatorio() * ancho, yZona + aleatorio() * altoZona, 2 + aleatorio() * 3.5, `rgba(243, 211, 139, ${0.35 + aleatorio() * 0.45})`);
+        }
     }
+
+    // Monograma «MD» y marca.
+    ctx.strokeStyle = C.doradoClaro;
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(MARGEN + 28, 60, 28, 0, Math.PI * 2);
     ctx.stroke();
+    ctx.fillStyle = "#ffffff";
     ctx.textAlign = "center";
-    ctx.font = `600 16px ${SERIF}`;
-    ["Día", "Mes", "Año"].forEach((t, i) => ctx.fillText(t, xFecha + anchoCasilla * (i + 0.5), 174));
-    ctx.font = `600 15px ${SANS}`;
-    [dia, mes, anio].forEach((t, i) => ctx.fillText(t, xFecha + anchoCasilla * (i + 0.5), 221));
+    ctx.font = `600 19px ${SERIF}`;
+    ctx.fillText("MD", MARGEN + 28, 67);
 
-    // N° de boleta, cliente y teléfono
     ctx.textAlign = "left";
-    ctx.font = `500 16px ${SANS}`;
-    ctx.fillText(`N° DE BOLETA: ${String(boleta.numero).padStart(9, "0")}`, 54, 163);
-    ctx.font = `700 16px ${SANS}`;
-    ctx.fillText("Señor(es):", 54, 190);
-    const xCliente = 54 + ctx.measureText("Señor(es): ").width;
-    if (boleta.cliente) {
-        ctx.font = `600 16px ${SANS}`;
-        const lineasCliente = partirTexto(ctx, boleta.cliente, 405 - xCliente).slice(0, 2);
-        ctx.fillText(lineasCliente[0], xCliente, 188);
-        if (lineasCliente[1]) ctx.fillText(lineasCliente[1], 54, 208);
-    } else {
-        lineaPunteada(ctx, xCliente, 405, 190);
-        lineaPunteada(ctx, 54, 205, 210);
+    ctx.font = `700 34px ${SERIF}`;
+    ctx.fillText("Mil Deseos", MARGEN + 70, 64);
+    ctx.font = `500 13.5px ${SANS}`;
+    ctx.fillStyle = C.morado200;
+    ctx.fillText(`De: ${NEGOCIO.duena} · WhatsApp ${NEGOCIO.telefono}`, MARGEN + 70, 86);
+    ctx.font = `500 11px ${SANS}`;
+    ctx.fillStyle = "rgba(237, 233, 254, 0.85)";
+    partirTexto(ctx, NEGOCIO.rubro, 390).slice(0, 2).forEach((l, i) => ctx.fillText(l, MARGEN, 120 + i * 15));
+
+    // «Boleta de venta», número y fecha.
+    ctx.textAlign = "right";
+    ctx.fillStyle = C.doradoClaro;
+    ctx.font = `600 12.5px ${SANS}`;
+    ctx.fillText("B O L E T A   D E   V E N T A", DERECHA, 42);
+    const numero = `N° ${String(boleta.numero).padStart(9, "0")}`;
+    ctx.font = `700 15px ${SANS}`;
+    const anchoNumero = ctx.measureText(numero).width + 28;
+    redondeado(ctx, DERECHA - anchoNumero, 54, anchoNumero, 30, 15);
+    ctx.fillStyle = C.dorado;
+    ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(numero, DERECHA - 14, 74);
+    ctx.font = `500 14px ${SANS}`;
+    ctx.fillText(fechaLima(boleta.fecha), DERECHA, 108);
+
+    // ---- Fotos de productos como decoración, sobre el borde del encabezado ----
+    if (conFotos) {
+        const separacion = Math.min(104, (ANCHO - 2 * MARGEN - 2 * RADIO_FOTO) / Math.max(fotos.length - 1, 1));
+        const x0 = ANCHO / 2 - (separacion * (fotos.length - 1)) / 2;
+        fotos.forEach((imagen, i) => {
+            // Siguen la curva del encabezado: las del centro, un poco más abajo.
+            const desdeElCentro = Math.abs(i - (fotos.length - 1) / 2);
+            fotoRedonda(ctx, imagen, x0 + i * separacion, ALTO_ENCABEZADO + 2 - desdeElCentro * 6, RADIO_FOTO);
+        });
     }
-    ctx.font = `500 16px ${SANS}`;
-    ctx.fillText(`Teléfono: ${NEGOCIO.telefono} - WhatsApp`, 54, 236);
 
-    // Tabla
-    ctx.fillStyle = TINTA;
-    ctx.font = `700 17px ${SERIF}`;
+    // ---- Datos: cliente (izquierda) y quién atendió (derecha) ----
+    const yDatos = inicioDatos + 20;
+    ctx.textAlign = "left";
+    ctx.font = `700 14px ${SANS}`;
+    ctx.fillStyle = C.morado800;
+    ctx.fillText("Señor(es):", MARGEN, yDatos);
+    const xCliente = MARGEN + ctx.measureText("Señor(es): ").width;
+    if (boleta.cliente) {
+        ctx.font = `500 14.5px ${SANS}`;
+        ctx.fillStyle = C.tinta;
+        ctx.fillText(partirTexto(ctx, boleta.cliente, 330 - xCliente)[0] ?? "", xCliente, yDatos);
+    } else {
+        ctx.fillStyle = C.morado200;
+        ctx.fillRect(xCliente, yDatos + 3, 330 - xCliente, 1.2);
+    }
+
+    ctx.textAlign = "right";
+    ctx.font = `700 14px ${SANS}`;
+    const nombreVendedor = boleta.vendedor ?? "";
+    const anchoVendedor = ctx.measureText(nombreVendedor).width;
+    ctx.fillStyle = C.tinta;
+    ctx.fillText(nombreVendedor, DERECHA, yDatos);
+    ctx.font = `500 14px ${SANS}`;
+    ctx.fillStyle = C.morado800;
+    ctx.fillText("Atendido por: ", DERECHA - anchoVendedor, yDatos);
+
+    // Línea dorada que se desvanece en los extremos.
+    const linea = ctx.createLinearGradient(MARGEN, 0, DERECHA, 0);
+    linea.addColorStop(0, "rgba(184, 137, 47, 0)");
+    linea.addColorStop(0.5, C.dorado);
+    linea.addColorStop(1, "rgba(184, 137, 47, 0)");
+    ctx.fillStyle = linea;
+    ctx.fillRect(MARGEN, yDatos + 22, DERECHA - MARGEN, 1.2);
+
+    // ---- Tabla ----
+    redondeado(ctx, MARGEN, inicioTabla, DERECHA - MARGEN, 36, 10);
+    ctx.fillStyle = C.morado150;
+    ctx.fill();
+    ctx.fillStyle = C.morado800;
+    ctx.font = `700 11.5px ${SANS}`;
     ctx.textAlign = "center";
-    const encabezados = ["CANT.", "DESCRIPCIÓN", "P. UNIT.", "IMPORTE"];
-    encabezados.forEach((t, i) => ctx.fillText(t, (COLUMNAS[i] + COLUMNAS[i + 1]) / 2, inicioTabla + 40));
+    ctx.fillText("CANT.", COL.cant, inicioTabla + 23);
+    ctx.textAlign = "left";
+    ctx.fillText("DESCRIPCIÓN", COL.desc, inicioTabla + 23);
+    ctx.textAlign = "right";
+    ctx.fillText("P. UNIT.", COL.precio, inicioTabla + 23);
+    ctx.fillText("IMPORTE", COL.importe, inicioTabla + 23);
 
-    let y = inicioTabla + ALTO_ENCABEZADO_TABLA;
-    const lineasHorizontales = [inicioTabla, y];
-
-    for (const fila of filas) {
+    let y = inicioTabla + 38;
+    filas.forEach((fila, indice) => {
         const centro = y + fila.alto / 2;
-        ctx.font = `600 16px ${SANS}`;
         ctx.textAlign = "center";
-        ctx.fillText(fila.cantidad, (COLUMNAS[0] + COLUMNAS[1]) / 2, centro + 6);
+        ctx.font = `700 15px ${SANS}`;
+        ctx.fillStyle = C.morado700;
+        ctx.fillText(fila.cantidad, COL.cant, centro + 5);
 
         ctx.textAlign = "left";
-        const altoTexto = fila.lineas.length * 19 + (fila.extras ? 18 : 0);
-        let yTexto = centro - altoTexto / 2 + 14;
+        ctx.fillStyle = C.tinta;
         ctx.font = `600 15px ${SANS}`;
-        fila.lineas.forEach((linea) => {
-            ctx.fillText(linea, COLUMNAS[1] + 10, yTexto);
+        let yTexto = y + 27;
+        fila.lineas.forEach((l) => {
+            ctx.fillText(l, COL.desc, yTexto);
             yTexto += 19;
         });
         if (fila.extras) {
             ctx.font = `500 12.5px ${SANS}`;
-            ctx.fillStyle = SUAVE;
-            ctx.fillText(fila.extras, COLUMNAS[1] + 10, yTexto - 1);
-            ctx.fillStyle = TINTA;
+            ctx.fillStyle = C.suave;
+            ctx.fillText(fila.extras, COL.desc, yTexto - 2);
         }
 
-        ctx.font = `600 15px ${SANS}`;
-        ctx.textAlign = "right";
-        ctx.fillText(fila.precio, COLUMNAS[3] - 10, centro + 6);
-        ctx.fillText(fila.importe, COLUMNAS[4] - 10, centro + 6);
-
-        y += fila.alto;
-        lineasHorizontales.push(y);
-    }
-
-    for (let i = 0; i < vacias; i++) {
-        y += ALTO_FILA;
-        lineasHorizontales.push(y);
-    }
-
-    // Última fila: «Gracias por tu preferencia»
-    ctx.textAlign = "center";
-    ctx.font = `32px ${CURSIVA}`;
-    ctx.fillText("Gracias por tu preferencia", (COLUMNAS[1] + COLUMNAS[2]) / 2, y + ALTO_FILA / 2 + 10);
-    y += ALTO_FILA;
-    lineasHorizontales.push(y);
-
-    ctx.strokeStyle = TINTA;
-    ctx.lineWidth = 1.6;
-    ctx.beginPath();
-    for (const lineaY of lineasHorizontales) {
-        ctx.moveTo(COLUMNAS[0], lineaY);
-        ctx.lineTo(COLUMNAS[4], lineaY);
-    }
-    for (const x of COLUMNAS) {
-        ctx.moveTo(x, inicioTabla);
-        ctx.lineTo(x, finTabla);
-    }
-    ctx.stroke();
-
-    // Pie: forma de pago y quién atendió (recuadro izquierdo) y el total.
-    let yPie = finTabla + 50;
-
-    if (conDescuento) {
         ctx.textAlign = "right";
         ctx.font = `500 14px ${SANS}`;
-        ctx.fillStyle = SUAVE;
-        ctx.fillText(`Subtotal S/ ${Number(boleta.subtotal).toFixed(2)}   ·   Descuento − S/ ${Number(boleta.ajuste.monto).toFixed(2)}`, 662, yPie - 14);
-        ctx.fillStyle = TINTA;
-        yPie += 20;
-    }
+        ctx.fillStyle = C.suave;
+        ctx.fillText(fila.precio, COL.precio, centro + 5);
+        ctx.font = `700 15px ${SANS}`;
+        ctx.fillStyle = C.tinta;
+        ctx.fillText(fila.importe, COL.importe, centro + 5);
 
-    const anchoRecuadro = 290;
-    cuadro(ctx, X0, yPie, anchoRecuadro, altoRecuadro);
-    ctx.textAlign = "left";
-    let yLinea = yPie + 26;
-    ctx.font = `500 13.5px ${SANS}`;
-    ctx.fillText("Atendido por:", X0 + 12, yLinea);
-    const xNombre = X0 + 12 + ctx.measureText("Atendido por: ").width;
-    ctx.font = `700 13.5px ${SANS}`;
-    ctx.fillText(partirTexto(ctx, boleta.vendedor ?? "", X0 + anchoRecuadro - 12 - xNombre)[0] ?? "", xNombre, yLinea);
-    yLinea += 20;
-
-    ctx.font = `500 13.5px ${SANS}`;
-    if (pagosMixtos) {
-        ctx.fillText("Pagó con:", X0 + 12, yLinea);
-        for (const pago of pagosMixtos) {
-            yLinea += 20;
-            ctx.font = `600 13.5px ${SANS}`;
-            ctx.textAlign = "left";
-            ctx.fillText(`• ${nombreCortoPago(pago.metodo)}`, X0 + 20, yLinea);
-            ctx.textAlign = "right";
-            ctx.fillText(moneda(pago.monto), X0 + anchoRecuadro - 12, yLinea);
+        y += fila.alto;
+        if (indice < filas.length - 1) {
+            ctx.fillStyle = C.morado200;
+            ctx.fillRect(MARGEN + 10, y, DERECHA - MARGEN - 20, 1);
         }
-        ctx.textAlign = "left";
+    });
+
+    // ---- Forma de pago (izquierda) y total (derecha) ----
+    const anchoPago = 290;
+    redondeado(ctx, MARGEN, inicioPie, anchoPago, altoPago, 14);
+    ctx.fillStyle = "#ffffff";
+    ctx.fill();
+    ctx.strokeStyle = C.morado200;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.textAlign = "left";
+    let yPago = inicioPie + 26;
+    ctx.font = `700 11.5px ${SANS}`;
+    ctx.fillStyle = C.dorado;
+    ctx.fillText(pagosMixtos ? "PAGÓ CON" : "FORMA DE PAGO", MARGEN + 16, yPago);
+    if (pagosMixtos) {
+        for (const pago of pagosMixtos) {
+            yPago += 20;
+            ctx.textAlign = "left";
+            ctx.font = `600 14px ${SANS}`;
+            ctx.fillStyle = C.tinta;
+            ctx.fillText(nombreCortoPago(pago.metodo), MARGEN + 16, yPago);
+            ctx.textAlign = "right";
+            ctx.fillText(moneda(pago.monto), MARGEN + anchoPago - 16, yPago);
+        }
     } else {
-        ctx.fillText("Pago:", X0 + 12, yLinea);
-        ctx.font = `700 13.5px ${SANS}`;
-        ctx.fillText(nombreMetodoPago(boleta.metodoPago), X0 + 12 + ctx.measureText("Pago: ").width + 4, yLinea);
+        yPago += 22;
+        ctx.font = `600 15px ${SANS}`;
+        ctx.fillStyle = C.tinta;
+        ctx.fillText(nombreMetodoPago(boleta.metodoPago), MARGEN + 16, yPago);
     }
 
-    cuadro(ctx, 543, yPie, 119, 60);
+    const xTotales = MARGEN + anchoPago + 22;
+    let yTotal = inicioPie;
+    ctx.textAlign = "left";
+    if (conDescuento) {
+        ctx.font = `500 13.5px ${SANS}`;
+        ctx.fillStyle = C.suave;
+        ctx.fillText("Subtotal", xTotales + 4, yTotal + 16);
+        ctx.fillText("Descuento", xTotales + 4, yTotal + 38);
+        ctx.textAlign = "right";
+        ctx.fillText(moneda(boleta.subtotal), DERECHA - 4, yTotal + 16);
+        ctx.fillText(`− ${moneda(boleta.ajuste.monto)}`, DERECHA - 4, yTotal + 38);
+        ctx.textAlign = "left";
+        yTotal += 48;
+    }
+
+    const caja = ctx.createLinearGradient(xTotales, 0, DERECHA, 0);
+    caja.addColorStop(0, C.morado800);
+    caja.addColorStop(1, C.morado700);
+    redondeado(ctx, xTotales, yTotal, DERECHA - xTotales, 50, 14);
+    ctx.fillStyle = caja;
+    ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.font = `700 13px ${SANS}`;
+    ctx.fillText("TOTAL", xTotales + 16, yTotal + 30);
     ctx.textAlign = "right";
-    ctx.font = `500 26px ${SERIF}`;
-    ctx.fillText("TOTAL S/.", 533, yPie + 40);
-    ctx.textAlign = "center";
-    ctx.font = `700 20px ${SANS}`;
-    ctx.fillText(Number(boleta.total).toFixed(2), 602.5, yPie + 37);
+    ctx.fillStyle = C.doradoClaro;
+    ctx.font = `700 24px ${SANS}`;
+    ctx.fillText(moneda(boleta.total), DERECHA - 16, yTotal + 34);
 
     if (tarjeta) {
         const totalConRecargo = Number(boleta.total) + tarjeta.recargo;
-        ctx.textAlign = "right";
-        ctx.font = `500 13px ${SANS}`;
-        ctx.fillStyle = SUAVE;
+        ctx.font = `500 12.5px ${SANS}`;
+        ctx.fillStyle = C.suave;
         ctx.fillText(
             boleta.metodoPago === "tarjeta"
-                ? `Pago con tarjeta (Izipay): recargo ${RECARGO_TARJETA}%  + ${moneda(tarjeta.recargo)}`
-                : `Tarjeta (Izipay) ${moneda(tarjeta.base)}: recargo ${RECARGO_TARJETA}%  + ${moneda(tarjeta.recargo)}`,
-            662, yPie + 84
+                ? `Tarjeta (Izipay) recargo ${RECARGO_TARJETA}%: + ${moneda(tarjeta.recargo)}`
+                : `Tarjeta ${moneda(tarjeta.base)}, recargo ${RECARGO_TARJETA}%: + ${moneda(tarjeta.recargo)}`,
+            DERECHA - 4, yTotal + 70
         );
-        ctx.fillStyle = TINTA;
-        ctx.font = `700 15px ${SANS}`;
-        ctx.fillText(`Total con recargo: ${moneda(totalConRecargo)}`, 662, yPie + 106);
+        ctx.font = `700 14px ${SANS}`;
+        ctx.fillStyle = C.morado800;
+        ctx.fillText(`Total con recargo: ${moneda(totalConRecargo)}`, DERECHA - 4, yTotal + 90);
     }
 
-    // Enlace al catálogo
+    // ---- Frase inspiradora (distinta en cada boleta) ----
     ctx.textAlign = "center";
-    ctx.font = `600 13px ${SANS}`;
-    ctx.fillStyle = SUAVE;
-    ctx.fillText(`Mira nuestro catálogo: ${enlaceCatalogo().replace(/^https?:\/\//, "")}`, ANCHO / 2, alto - 34);
+    ctx.fillStyle = C.dorado;
+    ctx.fillRect(ANCHO / 2 - 118, inicioFrase, 94, 1);
+    ctx.fillRect(ANCHO / 2 + 24, inicioFrase, 94, 1);
+    destello(ctx, ANCHO / 2, inicioFrase, 7, C.dorado);
+
+    ctx.font = `italic 500 19px ${SERIF}`;
+    ctx.fillStyle = C.morado700;
+    lineasFrase.forEach((l, i) => ctx.fillText(l, ANCHO / 2, inicioFrase + 34 + i * 28));
+
+    // ---- Pie: gracias y catálogo ----
+    ctx.font = `32px ${CURSIVA}`;
+    ctx.fillStyle = C.doradoOscuro;
+    ctx.fillText("Gracias por tu preferencia", ANCHO / 2, inicioFrase + 34 + lineasFrase.length * 28 + 26);
+
+    ctx.fillStyle = C.morado150;
+    ctx.fillRect(0, alto - 52, ANCHO, 52);
+    ctx.fillStyle = C.morado800;
+    ctx.font = `600 13.5px ${SANS}`;
+    ctx.fillText(`Mira nuestro catálogo: ${enlaceCatalogo().replace(/^https?:\/\//, "")}`, ANCHO / 2, alto - 21);
 
     // Boleta anulada: sello en diagonal.
     if (boleta.anulada) {
@@ -447,7 +530,7 @@ export async function generarImagenComprobante(boleta) {
         ctx.translate(ANCHO / 2, (inicioTabla + finTabla) / 2);
         ctx.rotate(-0.35);
         ctx.font = `800 70px ${SANS}`;
-        ctx.fillStyle = "rgba(185, 28, 28, 0.35)";
+        ctx.fillStyle = "rgba(185, 28, 28, 0.32)";
         ctx.fillText("ANULADA", 0, 20);
         ctx.restore();
     }
@@ -457,7 +540,7 @@ export async function generarImagenComprobante(boleta) {
             (resultado) => (resultado ? resolver(resultado) : rechazar(new Error("No se pudo crear la imagen."))),
             // JPG: pesa varias veces menos que PNG y se comparte más rápido por WhatsApp.
             "image/jpeg",
-            0.88
+            0.9
         )
     );
 

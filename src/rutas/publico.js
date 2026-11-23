@@ -71,6 +71,31 @@ router.get("/catalogo", async (req, res) => {
     }
 });
 
+/* Fotos para decorar la boleta: hasta 8 productos con foto (primero los más vendidos de los
+   últimos 90 días, luego los más recientes), sin los de la papelera. */
+router.get("/fotos-boleta", async (req, res) => {
+    try {
+        const resultado = await pool.query(
+            `SELECT productos.id,
+                    COALESCE(EXTRACT(EPOCH FROM productos.foto_actualizada)::BIGINT, 0)::INT AS "fotoVersion"
+             FROM productos
+             LEFT JOIN (
+                SELECT producto_id, SUM(cantidad) AS unidades FROM ventas
+                WHERE anulada_en IS NULL AND fecha >= CURRENT_DATE - 90
+                GROUP BY producto_id
+             ) vendidos ON vendidos.producto_id = productos.id
+             WHERE (productos.foto IS NOT NULL OR productos.foto_r2 IS NOT NULL) AND productos.eliminado_en IS NULL
+             ORDER BY vendidos.unidades DESC NULLS LAST, productos.foto_actualizada DESC NULLS LAST
+             LIMIT 8`
+        );
+        res.set("Cache-Control", "public, max-age=300");
+        res.json(resultado.rows);
+    } catch (error) {
+        console.error("Error al consultar las fotos de la boleta:", error.message);
+        res.status(500).json({ error: "No se pudieron consultar las fotos." });
+    }
+});
+
 const FORMATO_TOKEN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Boleta de una venta, a partir del enlace que se envía por WhatsApp.

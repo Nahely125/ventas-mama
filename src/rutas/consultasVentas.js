@@ -71,6 +71,9 @@ async function consultarVentas(pool, esJefe, opciones = {}) {
             TO_CHAR(ventas.fecha, 'YYYY-MM-DD"T"HH24:MI:SS') AS fecha,
             productos.nombre || COALESCE(' · ' || ventas.color, '') AS producto,
             ventas.color,
+            ventas.producto_id AS "productoId",
+            (productos.foto IS NOT NULL OR productos.foto_r2 IS NOT NULL) AS "tieneFoto",
+            COALESCE(EXTRACT(EPOCH FROM productos.foto_actualizada)::BIGINT, 0)::INT AS "fotoVersion",
             productos.codigo,
             ventas.modalidad,
             ventas.cantidad,
@@ -176,6 +179,9 @@ function armarBoleta(todas) {
             monto: filas.reduce((suma, f) => suma + Number(f.descuento), 0).toFixed(2)
         },
         items: filas.map((f) => ({
+            productoId: f.productoId,
+            tieneFoto: f.tieneFoto,
+            fotoVersion: f.fotoVersion,
             producto: f.producto,
             codigo: f.codigo,
             modalidad: f.modalidad,
