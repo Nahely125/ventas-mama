@@ -1,4 +1,4 @@
-import { Suspense, lazy, useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { pedir } from "../api.js";
 import Encabezado from "./Encabezado.jsx";
 import Cajonera from "./Cajonera.jsx";
@@ -139,6 +139,10 @@ const VISTAS = [
     }
 ];
 
+// Cada cuánto se vuelve a pedir la lista de productos y el resumen al cambiar de pantalla.
+const RECARGAR_PRODUCTOS_MS = 60 * 1000;
+const RECARGAR_RESUMEN_MS = 30 * 1000;
+
 export default function Panel({ usuario, onSalir, onActualizarUsuario }) {
     const esJefe = usuario.rol === "jefe";
     const vistas = VISTAS.filter((v) => esJefe || !v.soloJefe);
@@ -164,9 +168,14 @@ export default function Panel({ usuario, onSalir, onActualizarUsuario }) {
         mostrarError?.();
     }, [onSalir]);
 
+    /* Cuándo se cargó por última vez cada cosa: al cambiar de pantalla no se vuelve a pedir lo que
+       se cargó hace muy poco (después de vender, comprar o editar siempre se recarga). */
+    const cargadoEn = useRef({ productos: 0, resumen: 0 });
+
     const cargarProductos = useCallback(async () => {
         try {
             setProductos(await pedir("/api/productos"));
+            cargadoEn.current.productos = Date.now();
             setErrorProductos("");
         } catch (error) {
             manejarError(error, () => setErrorProductos(
@@ -178,6 +187,7 @@ export default function Panel({ usuario, onSalir, onActualizarUsuario }) {
     const cargarResumen = useCallback(async () => {
         try {
             setResumen(await pedir("/api/resumen"));
+            cargadoEn.current.resumen = Date.now();
         } catch (error) {
             manejarError(error);
         }
@@ -204,16 +214,30 @@ export default function Panel({ usuario, onSalir, onActualizarUsuario }) {
         recargarTodo();
     }, [recargarTodo]);
 
+    // Al volver a la app (por ejemplo, después de usar WhatsApp) se actualiza si pasó un rato.
+    useEffect(() => {
+        function alVolver() {
+            if (document.visibilityState === "visible" && Date.now() - cargadoEn.current.productos > RECARGAR_PRODUCTOS_MS) {
+                recargarTodo();
+            }
+        }
+
+        document.addEventListener("visibilitychange", alVolver);
+        return () => document.removeEventListener("visibilitychange", alVolver);
+    }, [recargarTodo]);
+
     function cambiarVista(nueva) {
         setVista(nueva);
         setMenuAbierto(false);
         window.scrollTo({ top: 0 });
 
-        if (nueva === "ventas" || nueva === "inventario" || nueva === "compras") {
+        const hace = (clave) => Date.now() - cargadoEn.current[clave];
+
+        if ((nueva === "ventas" || nueva === "inventario" || nueva === "compras") && hace("productos") > RECARGAR_PRODUCTOS_MS) {
             cargarProductos();
         }
 
-        if (nueva === "panel") {
+        if (nueva === "panel" && hace("resumen") > RECARGAR_RESUMEN_MS) {
             cargarResumen();
             cargarAlertas();
         }

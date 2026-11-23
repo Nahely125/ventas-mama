@@ -455,10 +455,11 @@ export async function generarImagenComprobante(boleta) {
     const blob = await new Promise((resolver, rechazar) =>
         lienzo.toBlob(
             (resultado) => (resultado ? resolver(resultado) : rechazar(new Error("No se pudo crear la imagen."))),
-            // PNG: es el único formato que el celular deja copiar para pegarlo en WhatsApp.
-            "image/png"
+            // JPG: pesa varias veces menos que PNG y se comparte más rápido por WhatsApp.
+            "image/jpeg",
+            0.88
         )
     );
 
-    return new File([blob], `boleta-${String(boleta.numero).padStart(9, "0")}.png`, { type: "image/png" });
+    return new File([blob], `boleta-${String(boleta.numero).padStart(9, "0")}.jpg`, { type: "image/jpeg" });
 }
