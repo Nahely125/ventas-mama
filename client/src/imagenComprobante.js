@@ -1,4 +1,5 @@
 import { moneda } from "./api.js";
+import { RECARGO_TARJETA, cobroConTarjeta } from "./datosPago.js";
 import { UNIDADES_MODALIDAD, enlaceCatalogo, importeItem, nombreCortoPago, nombreMetodoPago, precioCobrado } from "./venta.js";
 
 /* Imagen de la boleta para enviar por WhatsApp, con el diseño de la boleta impresa de Mil Deseos:
@@ -228,7 +229,13 @@ export async function generarImagenComprobante(boleta) {
     // Recuadro de abajo: quién atendió y cómo pagó (una línea por medio si pagó con varios).
     const pagosMixtos = boleta.metodoPago === "mixto" && Array.isArray(boleta.pagos) ? boleta.pagos : null;
     const altoRecuadro = Math.max(60, 22 + (pagosMixtos ? 2 + pagosMixtos.length : 2) * 20);
-    const alto = finTabla + (conDescuento ? 50 : 0) + 140 + altoRecuadro;
+    // Pago con tarjeta (Izipay): el recargo y el total cobrado con él (en un pago mixto, sobre la parte con tarjeta).
+    const baseTarjeta = boleta.metodoPago === "tarjeta"
+        ? Number(boleta.total)
+        : Number(pagosMixtos?.find((p) => p.metodo === "tarjeta")?.monto ?? 0);
+    const tarjeta = baseTarjeta > 0 ? cobroConTarjeta(baseTarjeta) : null;
+    const altoPie = Math.max(altoRecuadro, 60 + (tarjeta ? 66 : 0));
+    const alto = finTabla + (conDescuento ? 50 : 0) + 140 + altoPie;
 
     lienzo.width = ANCHO * ESCALA;
     lienzo.height = alto * ESCALA;
@@ -412,7 +419,24 @@ export async function generarImagenComprobante(boleta) {
     ctx.font = `700 20px ${SANS}`;
     ctx.fillText(Number(boleta.total).toFixed(2), 602.5, yPie + 37);
 
+    if (tarjeta) {
+        const totalConRecargo = Number(boleta.total) + tarjeta.recargo;
+        ctx.textAlign = "right";
+        ctx.font = `500 13px ${SANS}`;
+        ctx.fillStyle = SUAVE;
+        ctx.fillText(
+            boleta.metodoPago === "tarjeta"
+                ? `Pago con tarjeta (Izipay): recargo ${RECARGO_TARJETA}%  + ${moneda(tarjeta.recargo)}`
+                : `Tarjeta (Izipay) ${moneda(tarjeta.base)}: recargo ${RECARGO_TARJETA}%  + ${moneda(tarjeta.recargo)}`,
+            662, yPie + 84
+        );
+        ctx.fillStyle = TINTA;
+        ctx.font = `700 15px ${SANS}`;
+        ctx.fillText(`Total con recargo: ${moneda(totalConRecargo)}`, 662, yPie + 106);
+    }
+
     // Enlace al catálogo
+    ctx.textAlign = "center";
     ctx.font = `600 13px ${SANS}`;
     ctx.fillStyle = SUAVE;
     ctx.fillText(`Mira nuestro catálogo: ${enlaceCatalogo().replace(/^https?:\/\//, "")}`, ANCHO / 2, alto - 34);

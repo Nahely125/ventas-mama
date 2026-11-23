@@ -10476,3 +10476,189 @@ body.sin-desplazamiento {
     color: var(--texto-suave);
     text-align: center;
 }
+
+/* ===== Historial: una tarjeta por boleta ===== */
+.lista-boletas {
+    display: grid;
+    gap: 12px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+@media (min-width: 960px) {
+    .lista-boletas {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        align-items: start;
+    }
+}
+
+.boleta-historial {
+    display: grid;
+    gap: 10px;
+    padding: 14px;
+    border: 1px solid var(--morado-200);
+    border-left: 4px solid var(--morado-400);
+    border-radius: 14px;
+    background: #ffffff;
+}
+
+.boleta-historial.anulada {
+    border-left-color: #dc2626;
+    background: #fff7f7;
+}
+
+.boleta-cabecera {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.boleta-cabecera > div {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.boleta-numero {
+    color: var(--morado-900);
+    font-size: 1rem;
+}
+
+.boleta-cabecera small {
+    color: var(--texto-suave);
+    font-size: 0.78rem;
+}
+
+.boleta-total {
+    align-items: flex-end;
+    text-align: right;
+}
+
+.boleta-total strong {
+    color: var(--morado-700);
+    font-size: 1.25rem;
+    white-space: nowrap;
+}
+
+.boleta-historial.anulada .boleta-total strong {
+    color: #b91c1c;
+    text-decoration: line-through;
+}
+
+.boleta-personas {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 14px;
+    margin: 0;
+    color: var(--texto);
+    font-size: 0.85rem;
+}
+
+.boleta-productos {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+    padding: 8px 0;
+    border-top: 1px dashed var(--morado-200);
+    border-bottom: 1px dashed var(--morado-200);
+    list-style: none;
+}
+
+.boleta-productos li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.boleta-productos li.producto-anulado {
+    opacity: 0.55;
+}
+
+.boleta-producto-datos {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.boleta-producto-datos > span {
+    color: var(--morado-900);
+    font-size: 0.9rem;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.boleta-producto-datos small {
+    color: var(--texto-suave);
+    font-size: 0.78rem;
+}
+
+.boleta-producto-importe {
+    flex: 0 0 auto;
+    color: var(--texto);
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.boleta-productos .boton-devolver {
+    flex: 0 0 auto;
+    width: 32px;
+    height: 32px;
+}
+
+.boleta-resumen {
+    display: grid;
+    gap: 4px;
+    margin: 0;
+}
+
+.boleta-resumen > div {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 0.85rem;
+}
+
+.boleta-resumen dt {
+    color: var(--texto-suave);
+}
+
+.boleta-resumen dd {
+    margin: 0;
+    color: var(--texto);
+    font-weight: 600;
+    text-align: right;
+}
+
+.boleta-resumen dd small {
+    display: block;
+    color: var(--texto-suave);
+    font-weight: 500;
+}
+
+.boleta-acciones {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.boleta-acciones .boton-secundario {
+    flex: 1;
+}
+
+/* ===== Comprobante: chat directo ===== */
+.campo-chat-directo {
+    margin-top: 10px;
+    padding-top: 12px;
+    border-top: 1px dashed var(--morado-200);
+}
+
+.boton-chat-directo {
+    display: block;
+    margin-top: 8px;
+    padding: 12px;
+    text-align: center;
+    text-decoration: none;
+}

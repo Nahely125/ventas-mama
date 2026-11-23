@@ -1,158 +1,186 @@
 import { useState } from "react";
 import { moneda, monedaCosto } from "../api.js";
-import { describirCantidad, formatearFecha, precioCobrado, textoPago } from "../venta.js";
-
-function monedaOpcional(valor) {
-    return valor == null ? "No disponible" : monedaCosto(valor);
-}
+import { RECARGO_TARJETA, cobroConTarjeta } from "../datosPago.js";
+import { describirCantidad, formatearFecha, importeItem, numeroComprobante, precioCobrado, textoPago } from "../venta.js";
 
 // Ventas (boletas) que se ven al inicio; el resto con «Ver más».
 const VENTAS_VISIBLES = 5;
+
+/* Agrupa las filas (una por producto) en boletas, en el orden en que llegan.
+   Número de boleta = el id más bajo de sus filas. */
+function agruparBoletas(ventas) {
+    const porGrupo = new Map();
+
+    for (const fila of ventas) {
+        const clave = fila.grupo ?? fila.id;
+        if (!porGrupo.has(clave)) porGrupo.set(clave, []);
+        porGrupo.get(clave).push(fila);
+    }
+
+    return [...porGrupo.entries()].map(([clave, filas]) => {
+        const vigentes = filas.filter((f) => !f.anuladaEn);
+        const cuentan = vigentes.length > 0 ? vigentes : filas;
+        const suma = (campo) => cuentan.reduce((total, f) => total + Number(f[campo] ?? 0), 0);
+
+        return {
+            clave,
+            numero: Math.min(...filas.map((f) => f.id)),
+            primera: filas[0],
+            filas,
+            anulada: vigentes.length === 0,
+            total: suma("total"),
+            descuento: suma("descuento"),
+            ganancia: cuentan.some((f) => f.ganancia == null) ? null : suma("ganancia") - suma("ganancia2025"),
+            ganancia2025: suma("ganancia2025"),
+            piezas: cuentan.reduce((total, f) => total + Number(f.cantidad), 0)
+        };
+    });
+}
 
 export default function HistorialVentas({
     ventas, error, esJefe, textoVacio, onVerComprobante, onAnular, onDevolver, hayMas = false, cargandoMas = false, onCargarMas
 }) {
     const [verTodas, setVerTodas] = useState(false);
-    // Grupos (boletas) en el orden en que llegan: se cortan por venta, no por producto.
-    const grupos = [...new Set((ventas ?? []).map((v) => v.grupo ?? v.id))];
-    const gruposVisibles = new Set(verTodas ? grupos : grupos.slice(0, VENTAS_VISIBLES));
-    const ocultas = grupos.length - gruposVisibles.size;
-    const visibles = (ventas ?? []).filter((v) => gruposVisibles.has(v.grupo ?? v.id));
-
-    // Número de boleta = el id más bajo de las filas de la misma venta.
-    const numeros = new Map();
-    for (const venta of ventas ?? []) {
-        numeros.set(venta.grupo, Math.min(numeros.get(venta.grupo) ?? Infinity, venta.id));
-    }
-    const boletaDe = (venta) => numeros.get(venta.grupo) ?? venta.id;
-
-    const columnas = esJefe ? 11 : 8;
-    // El botón de anular va solo en la primera fila de cada venta.
-    const primeraDe = new Set();
-    const esPrimera = (venta) => (primeraDe.has(venta.grupo) ? false : (primeraDe.add(venta.grupo), true));
-
-    let filas;
-
-    if (ventas === null) {
-        filas = <tr><td colSpan={columnas}>Cargando historial de ventas...</td></tr>;
-    } else if (ventas.length === 0) {
-        filas = <tr><td colSpan={columnas}>{textoVacio}</td></tr>;
-    } else {
-        // data-etiqueta se usa en móvil para mostrar cada fila como tarjeta.
-        filas = visibles.map((venta) => (
-            <tr key={venta.id} className={venta.anuladaEn ? "fila-anulada" : ""}>
-                <td data-etiqueta="Fecha" className="celda-fecha">{formatearFecha(venta.fecha)}</td>
-                <td data-etiqueta="Producto" className="celda-producto">
-                    {venta.codigo && <span className="codigo-producto">{venta.codigo}</span>}
-                    {venta.producto}
-                    <small className="numero-boleta">Boleta N° {String(boletaDe(venta)).padStart(6, "0")}</small>
-                    {venta.cliente && <small className="numero-boleta">👤 {venta.cliente}</small>}
-                    {venta.obsequio && <small className="etiqueta etiqueta-obsequio">🎁 Obsequio</small>}
-                    {Number(venta.descuento) > 0 && (
-                        <small className="etiqueta etiqueta-ajustado">
-                            🏷️ {venta.codigoAjuste}: −{moneda(venta.descuento)}
-                        </small>
-                    )}
-                    {venta.unidadesDevueltas > 0 && !venta.anuladaEn && (
-                        <small className="etiqueta etiqueta-devuelta">↩ {venta.unidadesDevueltas} devueltas</small>
-                    )}
-                    {venta.anuladaEn && (
-                        <small className="etiqueta-anulada" title={venta.motivoAnulacion ?? ""}>
-                            ANULADA · {venta.anuladaPor}: {venta.motivoAnulacion}
-                        </small>
-                    )}
-                </td>
-                <td data-etiqueta="Vendedor" className="celda-flexible">{venta.vendedor || "No registrado"}</td>
-                <td data-etiqueta="Cantidad" className="celda-flexible">{describirCantidad(venta)}</td>
-                <td data-etiqueta={venta.modalidad === "docena" ? "Precio docena" : venta.modalidad === "media" ? "Precio media docena" : "Precio unitario"}>
-                    {moneda(precioCobrado(venta))}
-                </td>
-                <td data-etiqueta="Total" className="celda-total">{moneda(venta.total)}</td>
-                <td data-etiqueta="Pago">{textoPago(venta)}</td>
-                {esJefe && (
-                    <>
-                        <td data-etiqueta="Costo por unidad">{monedaOpcional(venta.costoUnitario)}</td>
-                        {/* Ganancia de este año y, aparte, la de la mercadería 2025. */}
-                        <td data-etiqueta="Ganancia">
-                            {venta.ganancia == null ? "No disponible" : moneda(Number(venta.ganancia) - Number(venta.ganancia2025 ?? 0))}
-                        </td>
-                        <td data-etiqueta="Ganancia 2025" className={Number(venta.ganancia2025) > 0 ? "celda-2025" : "celda-vacia-2025"}>
-                            {Number(venta.ganancia2025) > 0 ? moneda(venta.ganancia2025) : "—"}
-                        </td>
-                    </>
-                )}
-                <td className="celda-accion">
-                    <button
-                        type="button"
-                        className="boton-secundario boton-pequeno"
-                        onClick={() => onVerComprobante(venta)}
-                        aria-label={`Ver comprobante N° ${venta.id}`}
-                        title="Ver comprobante"
-                    >
-                        <span aria-hidden="true">🧾</span>
-                        <span className="texto-comprobante" aria-hidden="true"> Comprobante</span>
-                    </button>
-                    {onDevolver && !venta.anuladaEn && (
-                        <button
-                            type="button"
-                            className="boton-anular boton-devolver"
-                            onClick={() => onDevolver(venta)}
-                            aria-label={`Devolver unidades de ${venta.producto}`}
-                            title="Devolver unidades de este producto"
-                        >
-                            ↩
-                        </button>
-                    )}
-                    {onAnular && !venta.anuladaEn && esPrimera(venta) && (
-                        <button
-                            type="button"
-                            className="boton-anular"
-                            onClick={() => onAnular(venta)}
-                            aria-label={`Anular venta N° ${String(boletaDe(venta)).padStart(6, "0")}`}
-                            title="Anular venta"
-                        >
-                            ⊘
-                        </button>
-                    )}
-                </td>
-            </tr>
-        ));
-    }
+    const boletas = agruparBoletas(ventas ?? []);
+    const visibles = verTodas ? boletas : boletas.slice(0, VENTAS_VISIBLES);
+    const ocultas = boletas.length - visibles.length;
 
     return (
         <section className="tarjeta historial-ventas">
             <h2>Detalle de ventas</h2>
 
-            <div className="tabla-contenedor">
-                <table className="tabla-ventas">
-                    <thead>
-                        <tr>
-                            <th>Fecha</th>
-                            <th>Producto</th>
-                            <th>Vendedor</th>
-                            <th>Cantidad</th>
-                            <th>Precio</th>
-                            <th>Total</th>
-                            <th>Pago</th>
-                            {esJefe && (
-                                <>
-                                    <th>Costo unit.</th>
-                                    <th>Ganancia</th>
-                                    <th>Gan. 2025</th>
-                                </>
-                            )}
-                            <th><span className="solo-lector">Acciones</span></th>
-                        </tr>
-                    </thead>
-                    <tbody>{filas}</tbody>
-                </table>
-            </div>
+            {ventas === null ? (
+                <p>Cargando historial de ventas...</p>
+            ) : boletas.length === 0 ? (
+                <p>{textoVacio}</p>
+            ) : (
+                <ul className="lista-boletas">
+                    {visibles.map((boleta) => {
+                        const { primera } = boleta;
+                        const tarjeta = primera.metodoPago === "tarjeta" ? cobroConTarjeta(boleta.total) : null;
+
+                        return (
+                            <li key={boleta.clave} className={`boleta-historial ${boleta.anulada ? "anulada" : ""}`}>
+                                <div className="boleta-cabecera">
+                                    <div>
+                                        <strong className="boleta-numero">Boleta N° {numeroComprobante({ numero: boleta.numero })}</strong>
+                                        <small>{formatearFecha(primera.fecha)}</small>
+                                    </div>
+                                    <div className="boleta-total">
+                                        <strong>{moneda(boleta.total)}</strong>
+                                        <small>{boleta.piezas} {boleta.piezas === 1 ? "pieza" : "piezas"}</small>
+                                    </div>
+                                </div>
+
+                                <p className="boleta-personas">
+                                    <span>🧑‍💼 Atendió: <strong>{primera.vendedor || "No registrado"}</strong></span>
+                                    {primera.cliente && <span>👤 {primera.cliente}</span>}
+                                </p>
+
+                                {boleta.anulada && (
+                                    <p className="etiqueta-anulada" title={primera.motivoAnulacion ?? ""}>
+                                        ANULADA · {primera.anuladaPor}: {primera.motivoAnulacion}
+                                    </p>
+                                )}
+
+                                <ul className="boleta-productos">
+                                    {boleta.filas.map((fila) => (
+                                        <li key={fila.id} className={fila.anuladaEn ? "producto-anulado" : ""}>
+                                            <div className="boleta-producto-datos">
+                                                <span>
+                                                    {fila.codigo && <span className="codigo-producto">{fila.codigo}</span>}
+                                                    {fila.producto}
+                                                </span>
+                                                <small>
+                                                    {describirCantidad(fila)}
+                                                    {fila.obsequio ? " · 🎁 Obsequio" : ` × ${moneda(precioCobrado(fila))}`}
+                                                    {fila.unidadesDevueltas > 0 && ` · ↩ ${fila.unidadesDevueltas} devueltas`}
+                                                    {fila.anuladaEn && !boleta.anulada && " · devuelto"}
+                                                </small>
+                                            </div>
+                                            <span className="boleta-producto-importe">
+                                                {fila.obsequio ? "Gratis" : moneda(importeItem(fila))}
+                                            </span>
+                                            {onDevolver && !fila.anuladaEn && (
+                                                <button
+                                                    type="button"
+                                                    className="boton-anular boton-devolver"
+                                                    onClick={() => onDevolver(fila)}
+                                                    aria-label={`Devolver unidades de ${fila.producto}`}
+                                                    title="Devolver unidades de este producto"
+                                                >
+                                                    ↩
+                                                </button>
+                                            )}
+                                        </li>
+                                    ))}
+                                </ul>
+
+                                <dl className="boleta-resumen">
+                                    {boleta.descuento > 0 && (
+                                        <div>
+                                            <dt>🏷️ {primera.codigoAjuste || "Descuento"}</dt>
+                                            <dd>− {moneda(boleta.descuento)}</dd>
+                                        </div>
+                                    )}
+                                    <div>
+                                        <dt>Pago</dt>
+                                        <dd>{textoPago(primera)}</dd>
+                                    </div>
+                                    {tarjeta && (
+                                        <div>
+                                            <dt>Con recargo Izipay ({RECARGO_TARJETA}%)</dt>
+                                            <dd>{moneda(tarjeta.cobrar)}</dd>
+                                        </div>
+                                    )}
+                                    {esJefe && (
+                                        <div>
+                                            <dt>Ganancia</dt>
+                                            <dd>
+                                                {boleta.ganancia == null ? "No disponible" : moneda(boleta.ganancia)}
+                                                {boleta.ganancia2025 > 0 && <small> + {moneda(boleta.ganancia2025)} del 2025</small>}
+                                            </dd>
+                                        </div>
+                                    )}
+                                    {esJefe && primera.costoUnitario != null && boleta.filas.length === 1 && (
+                                        <div>
+                                            <dt>Costo por unidad</dt>
+                                            <dd>{monedaCosto(primera.costoUnitario)}</dd>
+                                        </div>
+                                    )}
+                                </dl>
+
+                                <div className="boleta-acciones">
+                                    <button
+                                        type="button"
+                                        className="boton-secundario boton-pequeno"
+                                        onClick={() => onVerComprobante(primera)}
+                                    >
+                                        🧾 Ver / enviar boleta
+                                    </button>
+                                    {onAnular && !boleta.anulada && (
+                                        <button
+                                            type="button"
+                                            className="boton-anular"
+                                            onClick={() => onAnular(primera)}
+                                            aria-label={`Anular venta N° ${numeroComprobante({ numero: boleta.numero })}`}
+                                            title="Anular venta"
+                                        >
+                                            ⊘
+                                        </button>
+                                    )}
+                                </div>
+                            </li>
+                        );
+                    })}
+                </ul>
+            )}
 
             {ocultas > 0 ? (
                 <button type="button" className="boton-secundario boton-ver-mas-ventas" onClick={() => setVerTodas(true)}>
                     Ver más ({ocultas} {ocultas === 1 ? "venta" : "ventas"}{hayMas ? " y más" : ""})
                 </button>
-            ) : verTodas && grupos.length > VENTAS_VISIBLES ? (
+            ) : verTodas && boletas.length > VENTAS_VISIBLES ? (
                 <div className="acciones-ver-mas-ventas">
                     {hayMas && onCargarMas && (
                         <button type="button" className="boton-secundario" onClick={onCargarMas} disabled={cargandoMas}>

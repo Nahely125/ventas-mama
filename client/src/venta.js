@@ -133,3 +133,23 @@ export function normalizarWhatsapp(numero) {
 
     return null;
 }
+
+/* Mensaje de WhatsApp que acompaña la boleta: agradecimiento, la boleta (con su enlace si se
+   manda por chat directo) e información del catálogo con su enlace. */
+export function mensajeBoleta(boleta, { conEnlace = true } = {}) {
+    const lineas = [
+        "Hola 👋 ¡Gracias por tu compra en Mil Deseos! 🎁",
+        `Te envío tu boleta N° ${numeroComprobante(boleta)} por ${moneda(boleta.total)}.`
+    ];
+
+    const enlace = enlaceBoleta(boleta);
+    if (conEnlace && enlace) lineas.push(`🧾 Ver boleta: ${enlace}`);
+
+    lineas.push(
+        "",
+        `🛍️ Mira nuestro catálogo: ${enlaceCatalogo()}`,
+        "Adornos y árboles navideños, luces y útiles escolares (Porta, School, Children, Recreo y Disney), al por mayor y menor. Elige por unidad, media docena o docena y haz tu pedido por WhatsApp. ✨"
+    );
+
+    return lineas.join("\n");
+}

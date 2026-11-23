@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { generarImagenComprobante } from "../imagenComprobante.js";
-import { enlaceBoleta, normalizarWhatsapp, numeroComprobante } from "../venta.js";
+import { enlaceBoleta, mensajeBoleta, normalizarWhatsapp, numeroComprobante } from "../venta.js";
 
 function descargar(archivo) {
     const url = URL.createObjectURL(archivo);
@@ -19,8 +19,8 @@ export default function Comprobante({ boleta: venta, onCerrar }) {
     const [archivo, setArchivo] = useState(null);
     const [vistaPrevia, setVistaPrevia] = useState("");
     const [errorImagen, setErrorImagen] = useState(false);
-    // Si la venta tiene cliente, su número ya aparece escrito.
-    const [telefono, setTelefono] = useState(() => (venta.clienteTelefono ?? "").replace(/^51(?=9d{8}$)/, ""));
+    // Si la venta tiene cliente, su número ya aparece escrito (sin el 51 de Perú).
+    const [telefono, setTelefono] = useState(() => (venta.clienteTelefono ?? "").replace(/^51(?=9\d{8}$)/, ""));
     const [aviso, setAviso] = useState(null);
 
     useEffect(() => {
@@ -54,84 +54,46 @@ export default function Comprobante({ boleta: venta, onCerrar }) {
         archivo && navigator.canShare && navigator.canShare({ files: [archivo] })
     );
 
-    // Abre el chat de ese número con la boleta: el mensaje lleva el enlace a la boleta
-    // en imagen y al catálogo, así el cliente la ve aunque WhatsApp no adjunte archivos por enlace.
-    /* Envía la boleta EN IMAGEN al número escrito.
-       WhatsApp no permite adjuntar archivos desde un enlace, así que:
-       1) se copia la imagen al portapapeles y se abre el chat de ese número → solo hay que pegarla;
-       2) si el teléfono no deja copiar imágenes, se abre el menú Compartir con la imagen;
-       3) en computadoras sin esas opciones, se descarga y se abre el chat para adjuntarla. */
-    async function enviarAlNumero(evento) {
-        evento.preventDefault();
+    const numero = normalizarWhatsapp(telefono);
+    // Mensaje que acompaña la imagen (gracias + catálogo) y el del chat directo (además, el enlace a la boleta).
+    const textoImagen = mensajeBoleta(venta, { conEnlace: false });
+    const chatDirecto = numero
+        ? `https://wa.me/${numero}?text=${encodeURIComponent(mensajeBoleta(venta, { conEnlace: true }))}`
+        : null;
 
-        const numero = normalizarWhatsapp(telefono);
-
-        if (!numero) {
-            setAviso({
-                tipo: "error",
-                texto: "Ingresa un número válido. Ej. 987654321 (Perú) o con código de país."
-            });
-            return;
-        }
+    /* Enviar la boleta en imagen por WhatsApp.
+       En el celular (iPhone o Android) se abre al instante la ventana de Compartir con la imagen y
+       el mensaje: se toca WhatsApp y se elige al cliente. Importante: navigator.share se llama
+       directamente en el toque (sin esperar nada antes), si no Safari la bloquea. */
+    function enviarImagen() {
+        setAviso(null);
 
         if (!archivo) {
             setAviso({ tipo: "error", texto: "La imagen todavía se está preparando. Inténtalo en un momento." });
             return;
         }
 
-        const saludo = `Hola 👋 Te envío tu boleta N° ${numeroComprobante(venta)} de Mil Deseos 🎁`;
-        const chat = `https://wa.me/${numero}?text=${encodeURIComponent(saludo)}`;
-
-        try {
-            await navigator.clipboard.write([new ClipboardItem({ [archivo.type]: archivo })]);
-            window.open(chat, "_blank", "noopener");
-            setAviso({
-                tipo: "exito",
-                texto: "✅ Imagen copiada. En el chat que se abrió, mantén presionado el cuadro de mensaje y toca «Pegar» (en computadora: Ctrl + V)."
-            });
-            return;
-        } catch {
-            // El navegador no permite copiar imágenes: se prueba con Compartir.
-        }
-
         if (puedeCompartirArchivos) {
-            try {
-                await navigator.share({ files: [archivo], text: saludo });
-                setAviso({ tipo: "exito", texto: `Elige WhatsApp y busca el número ${telefono.trim()}.` });
-            } catch (error) {
-                if (error.name !== "AbortError") {
-                    setAviso({ tipo: "error", texto: "No se pudo compartir la imagen. Prueba con «Descargar imagen»." });
-                }
-            }
+            navigator
+                .share({ files: [archivo], text: textoImagen })
+                .then(() => setAviso({ tipo: "exito", texto: "✅ Listo. Si elegiste WhatsApp, la boleta ya va con el mensaje del catálogo." }))
+                .catch((error) => {
+                    if (error.name !== "AbortError") {
+                        setAviso({ tipo: "error", texto: "No se pudo abrir Compartir. Prueba con «Abrir chat del cliente»." });
+                    }
+                });
             return;
         }
 
+        // Computadora sin «Compartir»: se abre el chat (en el mismo toque) y se descarga la imagen para adjuntarla.
+        if (chatDirecto) window.open(chatDirecto, "_blank", "noopener");
         descargar(archivo);
-        window.open(chat, "_blank", "noopener");
         setAviso({
             tipo: "exito",
-            texto: "La imagen se descargó. Adjúntala en el chat que se abrió (clip 📎 → Fotos)."
+            texto: chatDirecto
+                ? "La imagen se descargó y se abrió el chat. Adjúntala con el clip 📎."
+                : "La imagen se descargó. Adjúntala en WhatsApp con el clip 📎."
         });
-    }
-
-    async function compartirImagen() {
-        setAviso(null);
-
-        if (!archivo) return;
-
-        if (!puedeCompartirArchivos) {
-            descargar(archivo);
-            setAviso({ tipo: "exito", texto: "Imagen descargada. Puedes adjuntarla en el chat (clip 📎 → Fotos)." });
-            return;
-        }
-
-        try {
-            await navigator.share({ files: [archivo], title: `Boleta N° ${numeroComprobante(venta)}` });
-        } catch (error) {
-            if (error.name !== "AbortError") {
-                setAviso({ tipo: "error", texto: "No se pudo compartir la imagen. Prueba con «Descargar imagen»." });
-            }
-        }
     }
 
     async function copiar(texto, mensajeExito) {
@@ -161,35 +123,49 @@ export default function Comprobante({ boleta: venta, onCerrar }) {
                     </button>
                 </div>
 
-                <form className="formulario envio-whatsapp" onSubmit={enviarAlNumero}>
-                    <div className="campo">
-                        <label htmlFor="telefono-whatsapp">Número de WhatsApp del cliente</label>
-                        <div className="campo-con-boton">
-                            <input
-                                type="tel"
-                                id="telefono-whatsapp"
-                                inputMode="tel"
-                                autoComplete="tel"
-                                placeholder="Ej. 987 654 321"
-                                value={telefono}
-                                onChange={(e) => setTelefono(e.target.value)}
-                            />
-                        </div>
-                    </div>
-
-                    <button type="submit" className="boton-whatsapp boton-whatsapp-grande">
-                        📷 Enviar boleta en imagen
+                <div className="formulario envio-whatsapp">
+                    <button
+                        type="button"
+                        className="boton-whatsapp boton-whatsapp-grande"
+                        onClick={enviarImagen}
+                        disabled={!archivo}
+                    >
+                        {archivo ? "📲 Enviar boleta por WhatsApp" : "Preparando la boleta..."}
                     </button>
                     <span className="ayuda-campo">
-                        Se copia la imagen y se abre el chat de ese número: solo tienes que pegarla y enviar.
+                        {puedeCompartirArchivos || !archivo
+                            ? "Se abre la ventana de Compartir con la boleta y el mensaje del catálogo: toca WhatsApp y elige al cliente."
+                            : "Se descarga la imagen para adjuntarla en WhatsApp."}
                     </span>
-                </form>
+
+                    <div className="campo campo-chat-directo">
+                        <label htmlFor="telefono-whatsapp">O ábrele el chat directo (número del cliente)</label>
+                        <input
+                            type="tel"
+                            id="telefono-whatsapp"
+                            inputMode="tel"
+                            autoComplete="tel"
+                            placeholder="Ej. 987 654 321"
+                            value={telefono}
+                            onChange={(e) => setTelefono(e.target.value)}
+                        />
+                        {/* Es un enlace (no un botón con espera): el iPhone lo abre directo en WhatsApp. */}
+                        {chatDirecto ? (
+                            <a className="boton-secundario boton-chat-directo" href={chatDirecto} target="_blank" rel="noopener noreferrer">
+                                💬 Abrir chat de {telefono.trim()}
+                            </a>
+                        ) : (
+                            telefono.trim() && <span className="ayuda-campo texto-aviso">Revisa el número: 9 dígitos (Perú) o con código de país.</span>
+                        )}
+                        <span className="ayuda-campo">El mensaje lleva el enlace a la boleta y al catálogo.</span>
+                    </div>
+                </div>
 
                 <div className="vista-previa-comprobante">
                     {vistaPrevia ? (
                         <img src={vistaPrevia} alt={`Boleta de venta N° ${numeroComprobante(venta)}`} />
                     ) : errorImagen ? (
-                        <p className="mensaje mensaje-error">No se pudo crear la imagen. Puedes enviarla como texto.</p>
+                        <p className="mensaje mensaje-error">No se pudo crear la imagen. Puedes enviar el enlace de la boleta.</p>
                     ) : (
                         <p className="cargando-imagen">
                             <span className="spinner" aria-hidden="true"></span> Preparando imagen...
@@ -202,21 +178,18 @@ export default function Comprobante({ boleta: venta, onCerrar }) {
                 )}
 
                 <div className="acciones-comprobante">
-                    <button
-                        type="button"
-                        className="boton-secundario boton-pequeno"
-                        onClick={compartirImagen}
-                        disabled={!archivo}
-                    >
-                        {puedeCompartirArchivos ? "📷 Compartir imagen" : "⬇️ Descargar imagen"}
-                    </button>
+                    {archivo && !puedeCompartirArchivos && (
+                        <button type="button" className="boton-secundario boton-pequeno" onClick={() => descargar(archivo)}>
+                            ⬇️ Descargar imagen
+                        </button>
+                    )}
                     {enlace && (
                         <button
                             type="button"
                             className="boton-secundario boton-pequeno"
-                            onClick={() => copiar(enlace, "Enlace de la boleta copiado.")}
+                            onClick={() => copiar(mensajeBoleta(venta, { conEnlace: true }), "Mensaje con el enlace de la boleta copiado.")}
                         >
-                            🔗 Copiar enlace
+                            🔗 Copiar mensaje con enlace
                         </button>
                     )}
                 </div>
