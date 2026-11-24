@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { moneda, monedaCosto, pedir } from "../api.js";
 import { METODOS_MIXTO, METODOS_PAGO, nombreCortoPago, nombreModalidad } from "../venta.js";
 import {
-    MODALIDADES_VENTA, centimos, esPaquete, minimoDe, nuevaClave, precioDeLista, precioPaquete, tieneColores,
+    MODALIDADES_VENTA, centimos, esPaquete, minimoDe, nuevaClave, precioPaquete, tieneColores,
     ajustarPrecios, unidadesColorEnCarrito as unidadesColor, unidadesDe, unidadesEnCarrito as unidadesProducto
 } from "../ventaItems.js";
 import CantidadesPorColor from "./CantidadesPorColor.jsx";
@@ -116,6 +116,11 @@ function ModalAutorizacion({ productos, minimoDescuento, error, enviando, onConf
 
 /* El carrito lo guarda el panel (carrito, onCarrito): así no se pierde al ir al inventario y
    desde allí también se pueden agregar productos a la venta. */
+// Precio de lista de lo que se vende: por unidad, o el total de la media docena o de la docena.
+function listaDe(producto, modalidad) {
+    return producto ? precioPaquete(producto, modalidad).toFixed(2) : "";
+}
+
 export default function Ventas({ esJefe, productos, carrito, onCarrito: setCarrito, onVenta, onIrAHistorial, onError }) {
     // Producto que se está agregando
     const [producto, setProducto] = useState(null);
@@ -171,17 +176,14 @@ export default function Ventas({ esJefe, productos, carrito, onCarrito: setCarri
     const cantidadValida = Number.isInteger(cantidadNumero) && cantidadNumero > 0 ? cantidadNumero : 0;
     const precioNumero = Number(precio);
     const precioValido = precio !== "" && Number.isFinite(precioNumero) && precioNumero > 0 ? precioNumero : 0;
-    const lista = precioDeLista(productoActual, modalidad);
+    /* Lo que se escribe es el precio de lo que se vende: por unidad, o el TOTAL de la media docena
+       o de la docena (la app calcula cuánto sale cada unidad). */
+    const lista = listaDe(productoActual, modalidad);
     const minimoPaquete = productoActual ? minimoDe(productoActual, modalidad) : null;
-    // Mínimo por unidad redondeado hacia arriba: escribiéndolo, el paquete nunca queda bajo el mínimo
-    // (por ejemplo, docena de S/ 49 → S/ 4.09 c/u, porque 4.08 × 12 = 48.96).
-    const minimo = minimoPaquete === null ? null : Math.ceil(Math.round((minimoPaquete * 100) / porUnidades * 1000) / 1000) / 100;
-    // Precio del paquete: precio por unidad × unidades (al precio de lista, exactamente el registrado).
-    const precioDelPaquete = !productoActual
-        ? 0
-        : precio === lista
-            ? precioPaquete(productoActual, modalidad)
-            : Number((precioValido * porUnidades).toFixed(2));
+    const precioDelPaquete = productoActual ? Number(precioValido.toFixed(2)) : 0;
+    // Cuánto sale cada unidad dentro del paquete (puede no ser exacto al céntimo: S/ 50 ÷ 12 ≈ S/ 4.17).
+    const precioPorUnidad = precioDelPaquete / porUnidades;
+    const unidadExacta = Math.abs(Math.round(precioPorUnidad * 100) - precioPorUnidad * 100) < 1e-6;
     // Solo el jefe recibe el costo: ve cuánto le costó y cuánto gana con el precio escrito.
     const costoUnidad = esJefe && productoActual?.precioCompra != null ? Number(productoActual.precioCompra) : null;
     const gananciaPaquete = costoUnidad !== null && precioValido > 0 ? precioDelPaquete - costoUnidad * porUnidades : null;
@@ -238,14 +240,14 @@ export default function Ventas({ esJefe, productos, carrito, onCarrito: setCarri
     function seleccionarProducto(nuevo) {
         setProducto(nuevo);
         setCantidadesColor({});
-        setPrecio(precioDeLista(nuevo, modalidad));
+        setPrecio(listaDe(nuevo, modalidad));
         setCantidad("1");
         setErrorItem("");
     }
 
     function cambiarModalidad(nueva) {
         setModalidad(nueva);
-        setPrecio(precioDeLista(productoActual, nueva));
+        setPrecio(listaDe(productoActual, nueva));
     }
 
     function agregar() {
@@ -673,7 +675,7 @@ export default function Ventas({ esJefe, productos, carrito, onCarrito: setCarri
 
                                     <div className="campo">
                                         <label htmlFor="precio-venta">
-                                            {esDePaquete ? `Precio por unidad en la ${nombreModalidad(modalidad)}` : "Precio por unidad"} (S/)
+                                            {esDePaquete ? `Precio de la ${nombreModalidad(modalidad)} completa` : "Precio por unidad"} (S/)
                                         </label>
                                         <input
                                             type="number"
@@ -696,15 +698,13 @@ export default function Ventas({ esJefe, productos, carrito, onCarrito: setCarri
                                                 </>
                                             )}
                                             {!esJefe && (
-                                                <>{" "}· Mínimo: <strong>{moneda(minimo)}</strong>{esDePaquete && " c/u"}</>
+                                                <>{" "}· Mínimo: <strong>{moneda(minimoPaquete)}</strong>{esDePaquete && ` la ${nombreModalidad(modalidad)}`}</>
                                             )}
                                             {esDePaquete && precioValido > 0 && (
-                                                <>
-                                                    <br />
-                                                    La {nombreModalidad(modalidad)} sale a <strong>{moneda(precioDelPaquete)}</strong>{" "}
-                                                    ({moneda(precioValido)} × {porUnidades})
-                                                    {!esJefe && <> · mínimo {moneda(minimoPaquete)}</>}
-                                                </>
+                                                <span className="precio-por-unidad">
+                                                    Cada unidad sale a <strong>{unidadExacta ? "" : "≈ "}{moneda(precioPorUnidad)}</strong>
+                                                    {" "}({moneda(precioDelPaquete)} ÷ {porUnidades})
+                                                </span>
                                             )}
                                             {bajoMinimo && (
                                                 <><br />🔒 Bajo el mínimo: necesitará la contraseña del jefe.</>

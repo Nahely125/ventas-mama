@@ -10721,3 +10721,19 @@ body.sin-desplazamiento {
     margin: 0 auto;
     object-fit: contain;
 }
+
+/* Registrar venta: precio por unidad calculado desde el total del paquete */
+.precio-por-unidad {
+    display: block;
+    margin-top: 6px;
+    padding: 6px 10px;
+    border-radius: 10px;
+    background: var(--morado-100);
+    color: var(--morado-900);
+    font-size: 0.85rem;
+}
+
+.precio-por-unidad strong {
+    color: var(--morado-700);
+    font-size: 0.95rem;
+}
